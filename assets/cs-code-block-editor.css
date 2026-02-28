@@ -1,0 +1,110 @@
+/**
+ * CloudScale Code Block — Editor Styles v1.1.0
+ */
+
+/* Force full width in the editor content area */
+.wp-block-cloudscale-code-block,
+.wp-block[data-type="cloudscale/code-block"] {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.cs-code-editor-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: 1px solid #1e1e1e;
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Consolas', monospace;
+    box-sizing: border-box;
+}
+
+.cs-code-editor-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    background: #1e1e1e;
+    color: #9da5b4;
+    font-size: 12px;
+    font-weight: 500;
+    user-select: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.cs-code-editor-icon {
+    display: flex;
+    align-items: center;
+    color: #61aeee;
+    flex-shrink: 0;
+}
+
+.cs-code-editor-label {
+    color: #abb2bf;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cs-code-editor-lang {
+    margin-left: auto;
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #98c379;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cs-code-editor-lang-auto {
+    color: #7c8493;
+    font-style: italic;
+    text-transform: none;
+    font-weight: 400;
+}
+
+.cs-code-editor-title {
+    padding: 2px 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 4px;
+    font-size: 11px;
+    color: #d19a66;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cs-code-editor-textarea {
+    display: block;
+    width: 100% !important;
+    min-height: 160px;
+    padding: 16px 18px !important;
+    margin: 0 !important;
+    border: none !important;
+    outline: none !important;
+    resize: vertical;
+    background: #282c34 !important;
+    color: #abb2bf !important;
+    font-family: 'SF Mono', 'Fira Code', 'Fira Mono', 'Roboto Mono', 'Consolas', monospace !important;
+    font-size: 13px !important;
+    line-height: 1.6 !important;
+    tab-size: 4;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+    box-sizing: border-box;
+}
+
+.cs-code-editor-textarea::placeholder {
+    color: #5c6370;
+    font-style: italic;
+}
+
+.cs-code-editor-textarea:focus {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
