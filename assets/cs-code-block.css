@@ -111,7 +111,7 @@
     padding: 2px 7px;
     border-radius: 4px;
     line-height: 1.4;
-    color: var(--cs-text-muted);
+    color: #ffffff;
     background: var(--cs-hover-bg);
 }
 
@@ -135,7 +135,7 @@
     transition: background 0.15s ease, color 0.15s ease;
     background: transparent;
     line-height: 1;
-    color: var(--cs-text-muted);
+    color: #ffffff;
 }
 
 .cs-code-theme-toggle:hover,

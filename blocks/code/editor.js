@@ -177,10 +177,28 @@
                 props.setAttributes( { content: '' } );
             }
 
+            function decodeClipboardText( text ) {
+                // Gutenberg sometimes JSON-encodes clipboard text internally,
+                // producing unicode escapes like u003c for < and u0022 for ".
+                // Attempt to detect and decode that form before setting content.
+                if ( typeof text !== 'string' ) return text;
+                // If it looks like a JSON string value (wrapped in quotes), parse it
+                var trimmed = text.trim();
+                if ( trimmed.charAt(0) === '"' && trimmed.charAt( trimmed.length - 1 ) === '"' ) {
+                    try { return JSON.parse( trimmed ); } catch(e) {}
+                }
+                // If it contains bare unicode escapes (u003c style without backslash),
+                // reconstruct as a quoted JSON string and parse
+                if ( /(?:^|[^\\])u[0-9a-fA-F]{4}/.test( trimmed ) ) {
+                    try { return JSON.parse( '"' + trimmed.replace( /"/g, '\\"' ) + '"' ); } catch(e) {}
+                }
+                return text;
+            }
+
             function onPasteCode() {
                 if ( navigator.clipboard && navigator.clipboard.readText ) {
                     navigator.clipboard.readText().then( function( text ) {
-                        props.setAttributes( { content: text } );
+                        props.setAttributes( { content: decodeClipboardText( text ) } );
                     } ).catch( function() {} );
                 }
             }

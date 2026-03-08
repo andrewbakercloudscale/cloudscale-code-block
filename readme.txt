@@ -4,7 +4,7 @@ Tags: code, syntax highlighting, highlight.js, developer, gutenberg block, sql, 
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.7.4
+Stable tag: 1.7.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,16 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.7.15 =
+* Fix: split decode_migrated_content() into two independent passes so the bare-n newline fix always runs regardless of whether unicode escapes were already decoded in the database.
+
+= 1.7.14 =
+* Fix: decode_migrated_content() in render_block() decodes unicode escapes and bare newline separators left by the v1 migration bug, fixing display of affected code blocks without requiring database changes.
+
+= 1.7.13 =
+* Fixed: Code Block Migrator now uses safe JSON encoding so special characters like <, >, and quotes are stored as proper unicode escapes in block comment attributes, preventing content corruption on subsequent Gutenberg saves
+
 
 = 1.7.3 =
 * Embedded admin CSS inline for reliable rendering across all WordPress configurations

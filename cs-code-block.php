@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.8
+ * Version: 1.7.16
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL v2 or later
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class CloudScale_Code_Block {
 
-    const VERSION      = '1.7.8';
+    const VERSION      = '1.7.16';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
@@ -229,14 +229,14 @@ class CloudScale_Code_Block {
             'cs-code-block-editor',
             plugins_url( 'assets/cs-code-block-editor.css', __FILE__ ),
             [],
-            self::VERSION
+            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block-editor.css' )
         );
 
         wp_register_script(
             'cloudscale-code-block-editor-script',
             plugins_url( 'blocks/code/editor.js', __FILE__ ),
             [ 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-i18n', 'wp-data', 'wp-hooks' ],
-            self::VERSION,
+            filemtime( plugin_dir_path( __FILE__ ) . 'blocks/code/editor.js' ),
             true
         );
 
@@ -258,7 +258,7 @@ class CloudScale_Code_Block {
             'cs-code-block-convert',
             plugins_url( 'assets/cs-convert.js', __FILE__ ),
             [ 'wp-blocks', 'wp-data' ],
-            self::VERSION,
+            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-convert.js' ),
             true
         );
     }
@@ -272,7 +272,7 @@ class CloudScale_Code_Block {
         self::$instance_count++;
 
         $id    = 'cs-code-' . self::$instance_count;
-        $code  = isset( $attributes['content'] )  ? $attributes['content']  : '';
+        $code  = isset( $attributes['content'] )  ? $attributes['content'] : '';
         $lang  = isset( $attributes['language'] ) ? $attributes['language'] : '';
         $title = isset( $attributes['title'] )    ? $attributes['title']    : '';
         $theme = isset( $attributes['theme'] )    ? $attributes['theme']    : '';
@@ -430,7 +430,7 @@ class CloudScale_Code_Block {
             'cs-admin-tabs',
             plugins_url( 'assets/cs-admin-tabs.css', __FILE__ ),
             [],
-            self::VERSION
+            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-admin-tabs.css' )
         );
 
         // Migrate CSS + JS
@@ -438,13 +438,13 @@ class CloudScale_Code_Block {
             'cs-code-migrate',
             plugins_url( 'assets/cs-code-migrate.css', __FILE__ ),
             [],
-            self::VERSION
+            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-migrate.css' )
         );
         wp_enqueue_script(
             'cs-code-migrate',
             plugins_url( 'assets/cs-code-migrate.js', __FILE__ ),
             [],
-            self::VERSION,
+            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-migrate.js' ),
             true
         );
         wp_localize_script( 'cs-code-migrate', 'csMigrate', [
@@ -1308,7 +1308,7 @@ class CloudScale_Code_Block {
             $attrs['language'] = $lang;
         }
 
-        $attrs_json = wp_json_encode( $attrs, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+        $attrs_json = wp_json_encode( $attrs );
 
         return '<!-- wp:cloudscale/code-block ' . $attrs_json . ' /-->';
     }
