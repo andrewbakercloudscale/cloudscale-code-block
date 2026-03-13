@@ -4,7 +4,7 @@ Tags: code, syntax highlighting, highlight.js, developer, gutenberg block, sql, 
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.7.17
+Stable tag: 1.7.18
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,26 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.7.18 =
+* Security: is_safe_query() now rejects queries containing semicolons, preventing statement stacking
+* Security: Removed $_REQUEST fallback in SQL AJAX handler
+* Fixed: Echoed <style> block removed from admin page; inline <script> blocks extracted to enqueued JS files (PCP compliance)
+* Fixed: Dynamic style injection in block editor replaced with wp_add_inline_style()
+* Fixed: console.warn() and console.log() removed from cs-convert.js
+* Added: uninstall.php removes plugin options on deletion
+* Added: load_plugin_textdomain() on init; 48 strings wrapped with i18n functions
+* Added: Full DocBlocks on all methods
+* Changed: date() replaced with wp_date() in migration scan
+
+= 1.7.17 =
+* Added: Copy button now shows a "Copy" label alongside the clipboard icon
+* Changed: CSS refactored for copy button styling
+
+= 1.7.16 =
+* Fixed: build_migrate_block() JSON encoding corrected; removed JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES flags that corrupted block attributes containing <, >, and quote characters
+* Added: filemtime() cache busting for all enqueued assets
+* Improved: block editor toolbar enhancements
 
 = 1.7.15 =
 * Fix: split decode_migrated_content() into two independent passes so the bare-n newline fix always runs regardless of whether unicode escapes were already decoded in the database.
