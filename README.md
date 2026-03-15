@@ -1,6 +1,6 @@
 # WordPress Code Block with Syntax Highlighting
 
-![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue) ![PHP](https://img.shields.io/badge/PHP-8.0%2B-purple) ![License](https://img.shields.io/badge/License-GPLv2-green) ![Version](https://img.shields.io/badge/Version-1.7.4-orange)
+![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-blue) ![PHP](https://img.shields.io/badge/PHP-8.0%2B-purple) ![License](https://img.shields.io/badge/License-GPLv2-green) ![Version](https://img.shields.io/badge/Version-1.7.18-orange)
 
 Proper syntax highlighted code blocks for WordPress. Automatic language detection, one click copy to clipboard, dark and light theme toggle, line numbers, full width responsive display. Works as both a Gutenberg block and a shortcode. Zero build step required. Completely free.
 
