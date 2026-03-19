@@ -917,8 +917,10 @@ class CloudScale_Code_Block {
      */
     private static function is_safe_query( string $sql ): bool {
         $clean = trim( $sql );
-        // Strip leading block and line comments before keyword check.
-        $clean = preg_replace( '/^(\/\*.*?\*\/\s*|--[^\n]*\n\s*|#[^\n]*\n\s*)*/s', '', $clean );
+        // Strip all block comments (including mid-query MySQL /*!...*/ optimizer hints),
+        // line comments (-- and #), and surrounding whitespace before keyword check.
+        $clean = preg_replace( '/\/\*.*?\*\//s', '', $clean );
+        $clean = preg_replace( '/(--|#)[^\n]*/m', '', $clean );
         $clean = trim( $clean );
         // Reject any query containing a semicolon — prevents statement stacking
         // (e.g. SELECT 1; DROP TABLE wp_users).
@@ -1238,12 +1240,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_scan() {
-        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
-            wp_send_json_error( 'Bad nonce', 403 );
-        }
-
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
+        }
+
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
         }
 
         global $wpdb;
@@ -1294,12 +1296,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_preview() {
-        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
-            wp_send_json_error( 'Bad nonce', 403 );
-        }
-
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
+        }
+
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
         }
 
         $post_id = (int) ( $_POST['post_id'] ?? 0 );
@@ -1326,12 +1328,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_migrate_single() {
-        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
-            wp_send_json_error( 'Bad nonce', 403 );
-        }
-
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
+        }
+
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
         }
 
         $post_id = (int) ( $_POST['post_id'] ?? 0 );
@@ -1361,7 +1363,7 @@ class CloudScale_Code_Block {
         wp_send_json_success( [
             'post_id'         => $post_id,
             'blocks_migrated' => $count,
-            'message'         => "Migrated {$count} block(s) in \"{$post->post_title}\".",
+            'message'         => 'Migrated ' . $count . ' block(s) in "' . esc_html( $post->post_title ) . '".',
         ] );
     }
 
@@ -1372,12 +1374,12 @@ class CloudScale_Code_Block {
      * @return void Sends JSON response and exits.
      */
     public static function ajax_migrate_all() {
-        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
-            wp_send_json_error( 'Bad nonce', 403 );
-        }
-
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
+        }
+
+        if ( ! check_ajax_referer( self::MIGRATE_NONCE, 'nonce', false ) ) {
+            wp_send_json_error( 'Bad nonce', 403 );
         }
 
         global $wpdb;
@@ -1422,7 +1424,7 @@ class CloudScale_Code_Block {
 
                 $migrated_posts++;
                 $migrated_blocks += $count;
-                $details[] = "#{$post->ID}: {$post->post_title} ({$count} blocks)";
+                $details[] = '#' . $post->ID . ': ' . esc_html( $post->post_title ) . ' (' . $count . ' blocks)';
             }
         }
 
