@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.7.21
+Stable tag: 1.7.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,7 +79,7 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.7.21 =
+= 1.7.22 =
 * Fixed: readme.txt tags reduced from 8 to 5 (WordPress.org maximum)
 * Fixed: readme.txt short description trimmed to 141 chars (maximum is 150)
 * Fixed: readme.txt Requires at least updated to 6.0 to match plugin header
