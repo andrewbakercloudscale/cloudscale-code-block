@@ -125,7 +125,8 @@
             var s = coreBlocks.length > 1 ? 's' : '';
             toast.innerHTML = '' +
                 '<span>\u26A0\uFE0F ' + coreBlocks.length + ' core code block' + s + ' found</span>' +
-                '<button onclick="window.__csConvertAll()">\u26A1 Convert All to CloudScale</button>';
+                '<button>\u26A1 Convert All to CloudScale</button>';
+            toast.querySelector( 'button' ).addEventListener( 'click', convertAll );
         } else {
             if ( toast ) {
                 toast.remove();

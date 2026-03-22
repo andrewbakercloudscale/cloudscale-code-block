@@ -199,6 +199,8 @@
                     setTimeout( function() {
                         copyBtn.classList.remove( 'copied' );
                     }, 2000 );
+                } ).catch( function( e ) {
+                    console.error( 'cs-code-block: clipboard write failed', e );
                 } );
             } );
         }

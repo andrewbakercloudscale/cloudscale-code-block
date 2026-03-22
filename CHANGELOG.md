@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.7.21] - 2026-03-22
+
+### Fixed
+- `readme.txt`: Reduced tags from 8 to 5 (WordPress.org enforces a maximum of 5)
+- `readme.txt`: Shortened short description to 141 characters (WordPress.org maximum is 150)
+- `readme.txt`: Updated `Requires at least` from 5.8 to 6.0 to match plugin header
+- `cs-code-block.php`: Added `phpcs:ignore InputNotSanitized` on `$_POST['sql']` — validated via `is_safe_query()`, not a standard `sanitize_*()` call
+- `cs-code-block.php`: Added `phpcs:ignore InputNotSanitized` on `$_POST['post_id']` reads in `ajax_preview()` and `ajax_migrate_single()` — sanitised via `(int)` cast
+- `cs-convert.js`: Removed `onclick` attribute from JS-generated toast button; replaced with `addEventListener`
+- `cs-code-block.js`: Added `.catch()` to `copyToClipboard()` promise chain — logs clipboard API rejection via `console.error()`
+- `cs-admin-settings.js`: Added `console.error()` to settings save `.catch()` block
+
 ## [1.7.18] - 2026-03-13
 
 ### Security

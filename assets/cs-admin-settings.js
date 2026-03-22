@@ -38,9 +38,10 @@
                     }, 2000 );
                 }
             } )
-            .catch( function() {
+            .catch( function( e ) {
                 saveBtn.disabled    = false;
                 saveBtn.textContent = '💾 Save Settings';
+                console.error( 'cs-code-block: settings save failed', e );
             } );
     } );
 } )();
