@@ -6,9 +6,6 @@
 #cs-perf {
     position: fixed;
     bottom: 0;
-    /* On mobile browsers the toolbar overlaps bottom:0 fixed elements.
-       calc(100vh - 100svh) = toolbar height; svh = small viewport (toolbar always shown). */
-    bottom: calc(100vh - 100svh);
     left: 0;
     right: 0;
     z-index: 99999;
@@ -681,6 +678,8 @@
     background: #252526;
     border-top: 1px solid #3c3c3c;
     padding: 3px 10px;
+    /* Keep footer text above mobile browser toolbar (toolbar = 100vh - 100svh) */
+    padding-bottom: calc(3px + (100vh - 100svh));
     font-size: 10px;
     color: #666;
     flex-shrink: 0;
