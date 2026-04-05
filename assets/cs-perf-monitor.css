@@ -165,6 +165,7 @@
     max-width: 520px;
     max-height: calc(100svh - 80px);
     overflow-y: auto;
+    overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     background: #252526;
     border: 1px solid #007acc;
@@ -265,6 +266,17 @@
     flex-shrink: 0;
 }
 .cs-perf-btn:hover { background: #3c3c3c; color: #fff; border-color: #777; }
+
+/* Copy + Help buttons — electric pink accent */
+#cs-perf-copy,
+.cs-perf-help-btn {
+    background: #ff1493;
+    border-color: #ff1493;
+    color: #fff;
+    font-weight: 700;
+}
+#cs-perf-copy:hover,
+.cs-perf-help-btn:hover { background: #ff45a8; border-color: #ff45a8; color: #fff; }
 
 /* ── Panel body ──────────────────────────────────────────────────────────── */
 #cs-perf-body {

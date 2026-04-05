@@ -5,7 +5,7 @@
  * Features: call-chain trace, EXPLAIN on demand, N+1 detection,
  *           multi-column sort, colour-coded severity, export JSON.
  *
- * @since 1.8.0
+ * @since 1.8.6
  */
 (function () {
     'use strict';
@@ -1232,6 +1232,273 @@
         }
     }
 
+    // ── Copy current tab to clipboard ─────────────────────────────────────────
+    function copyCurrentTab() {
+        var tab   = activeTab;
+        var lines = ['=== CS Monitor: ' + tab.toUpperCase() + ' ===', 'URL: ' + (meta.url || window.location.href), ''];
+
+        switch (tab) {
+            case 'issues':
+                if (issuesList.length === 0) {
+                    lines.push('No issues detected.');
+                } else {
+                    issuesList.forEach(function (issue) {
+                        lines.push('[' + issue.sev.toUpperCase() + '] ' + issue.title
+                            + (issue.detail ? ' — ' + issue.detail : '')
+                            + ' (\u2192 ' + issue.tab + ')');
+                    });
+                }
+                break;
+            case 'db':
+                lines.push('Queries: ' + filteredDB.length + ' / ' + data.queries.length);
+                lines.push('');
+                filteredDB.forEach(function (q, i) {
+                    lines.push((i + 1) + '. [' + q.keyword + '] ' + q.sql.replace(/\s+/g, ' ').trim());
+                    lines.push('   Plugin: ' + q.plugin + ' | Rows: ' + (q.rows >= 0 ? q.rows : '\u2013') + ' | Time: ' + fmtMs(q.time_ms));
+                    if (q.is_dupe)   lines.push('   [DUPLICATE]');
+                    if (isN1(q.sql)) lines.push('   [N+1 PATTERN]');
+                });
+                break;
+            case 'http':
+                lines.push('HTTP calls: ' + filteredHTTP.length);
+                lines.push('');
+                filteredHTTP.forEach(function (h, i) {
+                    lines.push((i + 1) + '. [' + (h.method || 'GET') + '] ' + h.url);
+                    lines.push('   Plugin: ' + h.plugin + ' | Status: ' + (h.status || 'ERR') + ' | Time: ' + fmtMs(h.time_ms));
+                    if (h.error) lines.push('   Error: ' + h.error);
+                });
+                break;
+            case 'logs':
+                var logs = data.logs || [];
+                lines.push('Log entries: ' + logs.length);
+                lines.push('');
+                logs.forEach(function (l) {
+                    lines.push('[' + (l.level || 'info').toUpperCase() + '] ' + (l.message || '')
+                        + (l.file ? ' (' + l.file + (l.line ? ':' + l.line : '') + ')' : ''));
+                });
+                break;
+            case 'assets':
+                var assets = data.assets || {};
+                var scripts = assets.scripts || [], styles = assets.styles || [];
+                lines.push('Scripts: ' + scripts.length + ' | Styles: ' + styles.length);
+                lines.push('');
+                lines.push('--- Scripts ---');
+                scripts.forEach(function (a) { lines.push(a.handle + ' | ' + a.plugin + ' | ' + (a.src || '')); });
+                lines.push('');
+                lines.push('--- Styles ---');
+                styles.forEach(function (a) { lines.push(a.handle + ' | ' + a.plugin + ' | ' + (a.src || '')); });
+                break;
+            case 'hooks':
+                var hooks = data.hooks || [];
+                lines.push('Hooks: ' + hooks.length);
+                lines.push('');
+                hooks.slice(0, 50).forEach(function (h) {
+                    lines.push(h.hook + ' | ' + h.count + 'x | ' + fmtMs(h.total_ms) + ' total | max ' + fmtMs(h.max_ms));
+                });
+                break;
+            case 'request':
+                var req = data.request || {};
+                if (req.method)        lines.push('Method: ' + req.method);
+                if (req.url)           lines.push('Request URL: ' + req.url);
+                if (req.matched_rule)  lines.push('Rewrite rule: ' + req.matched_rule);
+                if (req.query_vars && Object.keys(req.query_vars).length) {
+                    lines.push('Query vars:');
+                    Object.keys(req.query_vars).forEach(function (k) { lines.push('  ' + k + ': ' + req.query_vars[k]); });
+                }
+                if (req.get && Object.keys(req.get).length) {
+                    lines.push('GET:');
+                    Object.keys(req.get).forEach(function (k) { lines.push('  ' + k + ': ' + req.get[k]); });
+                }
+                if (req.post && Object.keys(req.post).length) {
+                    lines.push('POST:');
+                    Object.keys(req.post).forEach(function (k) { lines.push('  ' + k + ': ' + req.post[k]); });
+                }
+                if (req.user_roles && req.user_roles.length) lines.push('Roles: ' + req.user_roles.join(', '));
+                break;
+            case 'template':
+                var tmpl = data.template || {};
+                lines.push('Active template: ' + (tmpl.final || '(unknown)'));
+                lines.push('');
+                (tmpl.hierarchy || []).forEach(function (f) {
+                    lines.push((f.exists ? '[x] ' : '[ ] ') + f.file);
+                });
+                break;
+            case 'transients':
+                var trans = data.transients || [];
+                lines.push('Transients: ' + trans.length);
+                lines.push('');
+                trans.forEach(function (t) {
+                    lines.push(t.key + ' | ' + (t.hit ? 'HIT' : 'MISS')
+                        + ' | gets: ' + t.gets + ' | sets: ' + t.sets + ' | deletes: ' + t.deletes);
+                });
+                break;
+            case 'summary':
+                var cQueries = data.queries || [], cHttp = data.http || [], cLogs = data.logs || [];
+
+                // Environment
+                if (meta.php_version) {
+                    lines.push('Environment');
+                    lines.push('  PHP: ' + meta.php_version + ' | WP: ' + (meta.wp_version || '?') + (meta.mysql_version ? ' | MySQL: ' + meta.mysql_version : ''));
+                    if (meta.memory_peak_mb) lines.push('  Memory peak: ' + meta.memory_peak_mb + 'MB / ' + (meta.memory_limit || '?'));
+                    if (meta.active_theme)   lines.push('  Theme: ' + meta.active_theme);
+                    if (meta.is_multisite)   lines.push('  Multisite: yes');
+                    lines.push('');
+                }
+
+                // DB card
+                var cSlowQ = cQueries.filter(function (q) { return q.time_ms >= T_SLOW; }).length;
+                var cCritQ = cQueries.filter(function (q) { return q.time_ms >= T_CRITICAL; }).length;
+                var cDupeQ = cQueries.filter(function (q) { return q.is_dupe; }).length;
+                var cN1Cnt = Object.keys(n1Patterns).length;
+                lines.push('DB Queries: ' + meta.query_count + ' | ' + fmtMs(meta.query_total_ms) + ' total'
+                    + (cCritQ ? ' | ' + cCritQ + ' critical' : cSlowQ ? ' | ' + cSlowQ + ' slow' : ' | no slow queries')
+                    + (cDupeQ ? ' | ' + cDupeQ + ' dupes' : '')
+                    + (cN1Cnt ? ' | ' + cN1Cnt + ' N+1 pattern' + (cN1Cnt > 1 ? 's' : '') : ''));
+
+                // HTTP card
+                var cSlowH = cHttp.filter(function (h) { return h.time_ms >= T_SLOW; }).length;
+                var cCacH  = cHttp.filter(function (h) { return h.cached; }).length;
+                var cErrH  = cHttp.filter(function (h) { return !!h.error; }).length;
+                lines.push('HTTP / REST: ' + meta.http_count + ' calls | ' + fmtMs(meta.http_total_ms) + ' total'
+                    + (cSlowH ? ' | ' + cSlowH + ' slow' : '')
+                    + (cCacH  ? ' | ' + cCacH  + ' cached' : '')
+                    + (cErrH  ? ' | ' + cErrH  + ' errors' : '')
+                    + (cHttp.length === 0 ? ' | no outbound calls' : ''));
+
+                // Logs card
+                var cErrL  = cLogs.filter(function (e) { return (e.level || '').toLowerCase().indexOf('error') !== -1; }).length;
+                var cWarnL = cLogs.filter(function (e) { return (e.level || '').toLowerCase().indexOf('warn')  !== -1; }).length;
+                var cDepL  = cLogs.filter(function (e) { return (e.level || '').toLowerCase().indexOf('dep')   !== -1; }).length;
+                lines.push('Logs: ' + cLogs.length
+                    + (cErrL  ? ' | ' + cErrL  + ' errors' : '')
+                    + (cWarnL ? ' | ' + cWarnL + ' warnings' : '')
+                    + (cDepL  ? ' | ' + cDepL  + ' deprecated' : '')
+                    + (cLogs.length === 0 ? ' | none' : ''));
+
+                // Cache card
+                var cCache = data.cache || {};
+                if (cCache.available) {
+                    var cHitStr = cCache.hit_rate !== null ? cCache.hit_rate + '%' : 'n/a';
+                    lines.push('Object Cache: ' + cHitStr + ' hit rate | ' + (cCache.hits || 0) + ' hits, ' + (cCache.misses || 0) + ' misses'
+                        + (cCache.persistent ? ' | persistent' : ' | non-persistent'));
+                }
+
+                // Assets card
+                var cAssets = data.assets || {};
+                lines.push('Assets: ' + ((cAssets.scripts || []).length + (cAssets.styles || []).length)
+                    + ' | ' + (cAssets.scripts || []).length + ' JS, ' + (cAssets.styles || []).length + ' CSS');
+
+                lines.push('');
+
+                // Plugin leaderboard
+                var cByP = {};
+                cQueries.forEach(function (q) {
+                    if (!cByP[q.plugin]) cByP[q.plugin] = { count: 0, total_ms: 0, slow: 0, n1: 0 };
+                    cByP[q.plugin].count++; cByP[q.plugin].total_ms += q.time_ms;
+                    if (q.time_ms >= T_SLOW) cByP[q.plugin].slow++;
+                    if (isN1(q.sql))         cByP[q.plugin].n1++;
+                });
+                var cPluginList = Object.keys(cByP).map(function (p) {
+                    return { plugin: p, count: cByP[p].count, total_ms: cByP[p].total_ms, slow: cByP[p].slow, n1: cByP[p].n1 };
+                }).sort(function (a, b) { return b.total_ms - a.total_ms; });
+                if (cPluginList.length > 0) {
+                    lines.push('Plugin Leaderboard — DB query time');
+                    cPluginList.slice(0, 8).forEach(function (p, i) {
+                        lines.push('  ' + (i + 1) + '. ' + p.plugin + ' \u2014 ' + p.count + ' queries, ' + fmtMs(p.total_ms)
+                            + (p.slow ? ', ' + p.slow + ' slow' : '')
+                            + (p.n1   ? ', ' + p.n1   + ' N+1'  : ''));
+                    });
+                    lines.push('');
+                }
+
+                // Slowest queries (top 5)
+                var cTop5Q = cQueries.slice().sort(function (a, b) { return b.time_ms - a.time_ms; }).slice(0, 5);
+                if (cTop5Q.length > 0) {
+                    lines.push('Slowest Queries');
+                    cTop5Q.forEach(function (q) {
+                        lines.push('  ' + fmtMs(q.time_ms) + '  ' + q.sql.replace(/\s+/g, ' ').trim().slice(0, 100) + '  [' + q.plugin + ']');
+                    });
+                    lines.push('');
+                }
+
+                // N+1 patterns
+                var cN1List = Object.values(n1Patterns).sort(function (a, b) { return b.count - a.count; });
+                if (cN1List.length > 0) {
+                    lines.push('N+1 Query Patterns');
+                    cN1List.forEach(function (p) {
+                        lines.push('  x' + p.count + '  ' + normalisePattern(p.example).slice(0, 100) + '  [' + p.plugin + ']');
+                    });
+                    lines.push('');
+                }
+
+                // Slowest HTTP (top 5)
+                var cTop5H = cHttp.slice().sort(function (a, b) { return b.time_ms - a.time_ms; }).slice(0, 5);
+                if (cTop5H.length > 0) {
+                    lines.push('Slowest HTTP Calls');
+                    cTop5H.forEach(function (h) {
+                        lines.push('  ' + fmtMs(h.time_ms) + '  [' + (h.method || 'GET') + '] ' + (h.url || '').slice(0, 100) + '  [' + h.plugin + ']');
+                    });
+                    lines.push('');
+                }
+
+                // Duplicate queries
+                var cDupeGroups = {};
+                cQueries.forEach(function (q) {
+                    var fp = q.sql.replace(/\s+/g, ' ').toLowerCase().trim();
+                    if (!cDupeGroups[fp]) cDupeGroups[fp] = { sql: q.sql, count: 0, total_ms: 0 };
+                    cDupeGroups[fp].count++; cDupeGroups[fp].total_ms += q.time_ms;
+                });
+                var cDupeList = Object.values(cDupeGroups).filter(function (g) { return g.count > 1; })
+                    .sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
+                if (cDupeList.length > 0) {
+                    lines.push('Exact Duplicate Queries (' + cDupeList.length + ' groups)');
+                    cDupeList.forEach(function (g) {
+                        lines.push('  x' + g.count + '  ' + g.sql.replace(/\s+/g, ' ').trim().slice(0, 100)
+                            + '  (' + fmtMs(g.count > 0 ? g.total_ms / g.count : 0) + ' avg)');
+                    });
+                    lines.push('');
+                }
+
+                // Slowest hooks (top 8)
+                var cTopHooks = (data.hooks || []).slice(0, 8);
+                if (cTopHooks.length > 0) {
+                    lines.push('Slowest Hooks');
+                    cTopHooks.forEach(function (h) {
+                        lines.push('  ' + h.hook + ' | ' + h.count + 'x | ' + fmtMs(h.total_ms) + ' total | max ' + fmtMs(h.max_ms));
+                    });
+                }
+                break;
+        }
+
+        var text   = lines.join('\n');
+        var copyBtn = document.getElementById('cs-perf-copy');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () {
+                flashCopyBtn(copyBtn, 'Copied!');
+            }).catch(function () { fallbackCopy(text, copyBtn); });
+        } else {
+            fallbackCopy(text, copyBtn);
+        }
+    }
+
+    function fallbackCopy(text, btn) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        try { document.execCommand('copy'); flashCopyBtn(btn, 'Copied!'); }
+        catch (e)                          { flashCopyBtn(btn, 'Failed'); }
+        document.body.removeChild(ta);
+    }
+
+    function flashCopyBtn(btn, msg) {
+        if (!btn) return;
+        var orig = btn.textContent;
+        btn.textContent = msg;
+        setTimeout(function () { btn.textContent = orig; }, 1500);
+    }
+
     // ── Resize ────────────────────────────────────────────────────────────────
     function bindResizeHandle() {
         var startY, startH;
@@ -1287,6 +1554,8 @@
             togglePanel();
         });
         if (exportBtn) exportBtn.addEventListener('click', function (e) { e.stopPropagation(); exportJSON(); });
+        var copyBtn = document.getElementById('cs-perf-copy');
+        if (copyBtn) copyBtn.addEventListener('click', function (e) { e.stopPropagation(); copyCurrentTab(); });
 
         var helpBtn   = document.getElementById('cs-perf-help-btn');
         var helpPanel = document.getElementById('cs-perf-help');
@@ -1408,6 +1677,28 @@
         document.addEventListener('keydown', function (e) {
             if (e.ctrlKey && e.shiftKey && (e.key === 'm' || e.key === 'M')) {
                 e.preventDefault(); togglePanel();
+            }
+            if (e.key === 'Escape') {
+                // Close help panel first if open
+                var helpPanelEl = document.getElementById('cs-perf-help');
+                if (helpPanelEl && helpPanelEl.style.display !== 'none') {
+                    helpPanelEl.style.display = 'none';
+                    return;
+                }
+                // Collapse any open EXPLAIN result divs and detail rows
+                var hadOpen = false;
+                Array.prototype.forEach.call(document.querySelectorAll('.cs-explain-result'), function (r) {
+                    if (r.innerHTML) { r.innerHTML = ''; hadOpen = true; }
+                });
+                Array.prototype.forEach.call(document.querySelectorAll('.cs-row-detail'), function (d) {
+                    if (d.style.display !== 'none') { d.style.display = 'none'; hadOpen = true; }
+                });
+                // Reset any disabled EXPLAIN buttons
+                if (hadOpen) {
+                    Array.prototype.forEach.call(document.querySelectorAll('.cs-explain-btn'), function (btn) {
+                        btn.disabled = false; btn.textContent = 'EXPLAIN';
+                    });
+                }
             }
         });
     }
