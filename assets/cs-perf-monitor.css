@@ -1171,7 +1171,7 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
     .cs-perf-name-short { display: inline; }
 
     /* Tighten up the toggle button on mobile */
-    .cs-perf-monitor-btn { padding: 6px 23px; gap: 4px; }
+    .cs-perf-monitor-btn { padding: 6px 14px; gap: 4px; min-width: 90px; justify-content: center; }
 
     /* DB table: hide Plugin & Rows columns, keep Query + Time */
     .cs-ptable th.c-p,
