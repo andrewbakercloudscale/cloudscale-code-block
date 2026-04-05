@@ -106,6 +106,11 @@
         renderSummary();
         restoreState();
         bindEvents();
+        updatePanelBottom();
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', updatePanelBottom);
+            window.visualViewport.addEventListener('scroll', updatePanelBottom);
+        }
     });
 
     // ── Page context strip ────────────────────────────────────────────────────
@@ -1093,7 +1098,15 @@
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-    function clampHeight(h) { return Math.max(MIN_H, Math.min(Math.floor(window.innerHeight * MAX_H_PCT), h)); }
+    function visualH() {
+        return window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    }
+    function updatePanelBottom() {
+        if (!panel) return;
+        var offset = window.innerHeight - visualH();
+        panel.style.bottom = (offset > 0 ? offset : 0) + 'px';
+    }
+    function clampHeight(h) { return Math.max(MIN_H, Math.min(Math.floor(visualH() * MAX_H_PCT), h)); }
 
     function fmtMs(ms) {
         ms = +ms || 0;
