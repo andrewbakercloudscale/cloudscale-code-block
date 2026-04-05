@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.8.0
+ * Version: 1.8.6
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -1926,6 +1926,7 @@ class CloudScale_Code_Block {
      * @return void
      */
     public static function perf_output_panel() {
+        global $wpdb;
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
@@ -2623,6 +2624,7 @@ class CloudScale_Code_Block {
                 . '<div class="cs-perf-hr">'
                     . '<span id="cs-perf-ttl" class="cs-perf-total"></span>'
                     . '<button id="cs-perf-export" class="cs-perf-btn" title="Export data as JSON (download)">&#8595;&nbsp;JSON</button>'
+                    . '<button id="cs-perf-copy" class="cs-perf-btn" title="Copy current tab to clipboard">Copy</button>'
                     . '<button id="cs-perf-help-btn" class="cs-perf-btn cs-perf-help-btn" title="What am I looking at?">?</button>'
                 . '</div>'
             . '</div>'
@@ -2657,6 +2659,14 @@ class CloudScale_Code_Block {
                     . '<div class="cs-help-card">'
                         . '<div class="cs-help-card-title" style="color:#9cdcfe">&#128196; Request</div>'
                         . '<p>Current request context: GET/POST params, matched WordPress rewrite rule, WP query vars, and current user roles. Useful for debugging routing issues and unexpected page behaviour.</p>'
+                    . '</div>'
+                    . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title" style="color:#c586c0">&#127959; Template</div>'
+                        . '<p>The template file WordPress selected to render this page, plus the full candidate hierarchy it evaluated. Use this to find which theme file is active and why.</p>'
+                    . '</div>'
+                    . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title" style="color:#dcdcaa">&#9202; Transients</div>'
+                        . '<p>WordPress transients read and written during this request. A low hit rate means data is being regenerated every page load — a common performance overhead from uncached expensive operations.</p>'
                     . '</div>'
                     . '<div class="cs-help-card">'
                         . '<div class="cs-help-card-title cs-help-sum">&#9650; Summary</div>'
