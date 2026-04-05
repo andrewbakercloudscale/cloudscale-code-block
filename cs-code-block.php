@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://andrewbaker.ninja
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.22
+ * Version: 1.7.35
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -20,6 +20,13 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// Enable DB query saving for the performance monitor.
+// Defined unconditionally so frontend page loads are also captured.
+// Only the panel rendering checks user capability before outputting data.
+if ( ! defined( 'SAVEQUERIES' ) ) {
+    define( 'SAVEQUERIES', true );
+}
+
 /**
  * CloudScale Code Block — main plugin class.
  *
@@ -31,7 +38,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class CloudScale_Code_Block {
 
-    const VERSION      = '1.7.22';
+    const VERSION      = '1.7.35';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
@@ -180,6 +187,20 @@ class CloudScale_Code_Block {
     private static $instance_count  = 0;
     private static $assets_enqueued = false;
 
+    // Performance monitor — static storage.
+    /** @var array HTTP calls captured during this request. */
+    private static $perf_http_calls = [];
+    /** @var float|null Microtime when last HTTP request started. */
+    private static $perf_http_timer = null;
+    /** @var array PHP errors captured during this request. */
+    private static $perf_php_errors = [];
+    /** @var array|null Active plugin prefix → slug map cache. */
+    private static $perf_plugin_map = null;
+    /** @var callable|null Previous PHP error handler to chain into. */
+    private static $perf_prev_error_handler = null;
+    /** @var string Template filename captured via template_include filter. */
+    private static $perf_template = '';
+
     /**
      * Registers all plugin hooks.
      *
@@ -206,6 +227,46 @@ class CloudScale_Code_Block {
 
         // Settings AJAX
         add_action( 'wp_ajax_cs_save_theme_setting', [ __CLASS__, 'ajax_save_theme_setting' ] );
+
+        // Performance monitor — EXPLAIN endpoint.
+        add_action( 'wp_ajax_cs_perf_explain',       [ __CLASS__, 'ajax_perf_explain' ] );
+        add_action( 'wp_ajax_cs_perf_debug_toggle',  [ __CLASS__, 'ajax_perf_debug_toggle' ] );
+
+        // Performance monitor — data collection runs on every page load.
+        add_filter( 'pre_http_request', [ __CLASS__, 'perf_http_before' ], 10, 3 );
+        add_action( 'http_api_debug',   [ __CLASS__, 'perf_http_after' ],  10, 5 );
+        // If the user enabled debug logging via the panel, activate PHP error logging
+        // using ini_set — this works regardless of WP_DEBUG in wp-config.php and
+        // survives Docker container rebuilds because the setting lives in the DB.
+        if ( get_option( 'cs_perf_debug_logging', false ) ) {
+            // phpcs:ignore WordPress.PHP.IniSet.Risky
+            @ini_set( 'log_errors', '1' );
+            // phpcs:ignore WordPress.PHP.IniSet.Risky
+            @ini_set( 'error_log', WP_CONTENT_DIR . '/debug.log' );
+            // phpcs:ignore WordPress.PHP.DevelopmentFunctions.prevent_path_disclosure_error_reporting
+            error_reporting( E_ALL );
+        }
+
+        // Register error handler late (priority 9999 on plugins_loaded) so we sit
+        // on top of any handler registered by other plugins (e.g. Query Monitor).
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_set_error_handler
+        add_action( 'plugins_loaded', function () {
+            self::$perf_prev_error_handler = set_error_handler(
+                [ __CLASS__, 'perf_error_handler' ],
+                E_WARNING | E_NOTICE | E_DEPRECATED | E_USER_WARNING | E_USER_NOTICE | E_USER_DEPRECATED
+            );
+        }, 9999 );
+
+        // Performance monitor — panel rendering (admin pages).
+        add_action( 'admin_enqueue_scripts', [ __CLASS__, 'perf_enqueue' ] );
+        add_action( 'admin_footer',          [ __CLASS__, 'perf_output_panel' ], 9999 );
+
+        // Performance monitor — panel rendering (frontend, admin users only).
+        add_action( 'wp_enqueue_scripts', [ __CLASS__, 'perf_frontend_enqueue' ] );
+        add_action( 'wp_footer',          [ __CLASS__, 'perf_output_panel' ], 9999 );
+
+        // Capture the active template filename for the page-context strip.
+        add_filter( 'template_include', [ __CLASS__, 'perf_capture_template' ], 9999 );
     }
 
     /* ==================================================================
@@ -761,14 +822,14 @@ class CloudScale_Code_Block {
                     <button id="cs-scan-btn" class="cs-btn-primary" style="padding:8px 20px;font-size:13px">
                         <span class="dashicons dashicons-search" style="font-size:14px;width:14px;height:14px;margin-top:1px"></span> <?php esc_html_e( 'Scan Posts', 'cloudscale-code-block' ); ?>
                     </button>
-                    <button id="cs-migrate-all-btn" class="cs-btn-orange" style="padding:8px 20px;font-size:13px;opacity:.5;pointer-events:none" disabled>
+                    <button id="cs-migrate-all-btn" class="cs-btn-orange" style="padding:8px 20px;font-size:13px" disabled>
                         <span class="dashicons dashicons-update" style="font-size:14px;width:14px;height:14px;margin-top:1px"></span> <?php esc_html_e( 'Migrate All Remaining', 'cloudscale-code-block' ); ?>
                     </button>
                     <span id="cs-scan-status" class="cs-status"></span>
                 </div>
 
                 <div id="cs-results-area">
-                    <p class="cs-migrate-hint"><?php printf( esc_html__( 'Click %s to find all posts with legacy code blocks.', 'cloudscale-code-block' ), '<strong>' . esc_html__( 'Scan Posts', 'cloudscale-code-block' ) . '</strong>' ); ?></p>
+                    <p class="cs-migrate-hint"><?php printf( __( 'Click %s to find all posts with legacy code blocks.', 'cloudscale-code-block' ), '<strong>' . esc_html__( 'Scan Posts', 'cloudscale-code-block' ) . '</strong>' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- format string is hardcoded, only %s is user-visible and escaped above ?></p>
                 </div>
             </div>
         </div>
@@ -1433,6 +1494,770 @@ class CloudScale_Code_Block {
             'migrated_blocks' => $migrated_blocks,
             'details'         => $details,
         ] );
+    }
+
+    /* ==================================================================
+       PERFORMANCE MONITOR — HTTP capture
+       ================================================================== */
+
+    /**
+     * Records microtime before each outbound HTTP request starts.
+     *
+     * Returns the $pre value unchanged so it never short-circuits the request.
+     *
+     * @param  false|array|\WP_Error $pre  Pre-emptive response or false.
+     * @param  array                 $args Request arguments.
+     * @param  string                $url  Request URL.
+     * @return false|array|\WP_Error
+     */
+    public static function perf_http_before( $pre, $args, $url ) {
+        self::$perf_http_timer = microtime( true );
+        return $pre;
+    }
+
+    /**
+     * Captures a completed HTTP request into the performance monitor data store.
+     *
+     * @param  array|\WP_Error $response    HTTP response or WP_Error.
+     * @param  string          $context     Transport context string.
+     * @param  string          $class       WP_HTTP transport class name.
+     * @param  array           $parsed_args Parsed request arguments.
+     * @param  string          $url         Request URL.
+     * @return void
+     */
+    public static function perf_http_after( $response, $context, $class, $parsed_args, $url ) {
+        $elapsed_ms            = self::$perf_http_timer
+            ? round( ( microtime( true ) - self::$perf_http_timer ) * 1000, 2 )
+            : 0;
+        self::$perf_http_timer = null;
+
+        $status = 0;
+        $cached = false;
+        $error  = null;
+
+        if ( is_wp_error( $response ) ) {
+            $error = $response->get_error_message();
+        } else {
+            $status  = (int) wp_remote_retrieve_response_code( $response );
+            $headers = wp_remote_retrieve_headers( $response );
+            // Detect CDN / proxy cache hits.
+            if ( ! empty( $headers['x-cache'] ) && false !== stripos( $headers['x-cache'], 'HIT' ) ) {
+                $cached = true;
+            } elseif ( ! empty( $headers['cf-cache-status'] ) && 'HIT' === strtoupper( $headers['cf-cache-status'] ) ) {
+                $cached = true;
+            } elseif ( ! empty( $headers['x-wp-cache'] ) && 'HIT' === strtoupper( $headers['x-wp-cache'] ) ) {
+                $cached = true;
+            }
+        }
+
+        // Use a real file-path backtrace for accurate plugin attribution.
+        // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_debug_backtrace
+        $bt     = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 25 );
+        $plugin = self::perf_plugin_from_frames( $bt );
+
+        self::$perf_http_calls[] = [
+            'url'     => $url,
+            'method'  => strtoupper( $parsed_args['method'] ?? 'GET' ),
+            'status'  => $status,
+            'time_ms' => $elapsed_ms,
+            'cached'  => $cached,
+            'plugin'  => $plugin,
+            'error'   => $error,
+        ];
+    }
+
+    /**
+     * Captures PHP warnings, notices, and deprecations into the performance monitor store.
+     *
+     * Chains to any previously registered error handler so existing error reporting
+     * (WP_DEBUG display, logging) continues to work unaffected.
+     *
+     * @param  int    $errno   Error number / level bitmask.
+     * @param  string $errstr  Error message.
+     * @param  string $errfile File where the error occurred.
+     * @param  int    $errline Line number where the error occurred.
+     * @return bool   false to allow PHP's default handler to also run.
+     */
+    public static function perf_error_handler( int $errno, string $errstr, string $errfile = '', int $errline = 0 ): bool {
+        static $count = 0;
+        if ( $count < 75 ) {
+            $count++;
+            $levels = [
+                E_WARNING         => 'Warning',
+                E_NOTICE          => 'Notice',
+                E_DEPRECATED      => 'Deprecated',
+                E_USER_WARNING    => 'Warning',
+                E_USER_NOTICE     => 'Notice',
+                E_USER_DEPRECATED => 'Deprecated',
+            ];
+            self::$perf_php_errors[] = [
+                'level'   => $levels[ $errno ] ?? 'Notice',
+                'message' => $errstr,
+                'file'    => defined( 'ABSPATH' ) ? str_replace( ABSPATH, '', $errfile ) : $errfile,
+                'line'    => $errline,
+            ];
+        }
+
+        // Chain to the previous handler (e.g. WordPress debug display/logging).
+        if ( is_callable( self::$perf_prev_error_handler ) ) {
+            return (bool) call_user_func( self::$perf_prev_error_handler, $errno, $errstr, $errfile, $errline );
+        }
+
+        return false; // let PHP's built-in handler continue.
+    }
+
+    /* ==================================================================
+       PERFORMANCE MONITOR — Admin assets + panel output
+       ================================================================== */
+
+    /**
+     * Enqueues the performance monitor CSS and JS on all admin pages for admins.
+     *
+     * @param  string $hook Current admin page hook suffix.
+     * @return void
+     */
+    public static function perf_enqueue( string $hook ) {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        $base = plugin_dir_path( __FILE__ ) . 'assets/';
+        wp_enqueue_style(
+            'cs-perf-monitor',
+            plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
+            [],
+            filemtime( $base . 'cs-perf-monitor.css' )
+        );
+        wp_enqueue_script(
+            'cs-perf-monitor',
+            plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
+            [],
+            filemtime( $base . 'cs-perf-monitor.js' ),
+            true
+        );
+    }
+
+    /**
+     * Stores the template filename so it can be included in panel meta context.
+     *
+     * @param  string $template Full path to the active template file.
+     * @return string           Unchanged template path.
+     */
+    public static function perf_capture_template( string $template ): string {
+        self::$perf_template = basename( $template );
+        return $template;
+    }
+
+    /**
+     * Enqueues performance monitor CSS and JS on frontend pages for admin users.
+     *
+     * @return void
+     */
+    public static function perf_frontend_enqueue() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+        $base = plugin_dir_path( __FILE__ ) . 'assets/';
+        wp_enqueue_style(
+            'cs-perf-monitor',
+            plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
+            [],
+            filemtime( $base . 'cs-perf-monitor.css' )
+        );
+        wp_enqueue_script(
+            'cs-perf-monitor',
+            plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
+            [],
+            filemtime( $base . 'cs-perf-monitor.js' ),
+            true
+        );
+    }
+
+    /**
+     * Outputs the performance monitor panel HTML and JSON payload at footer.
+     *
+     * Fires on both admin_footer and wp_footer so the panel appears on all
+     * pages for manage_options users.
+     *
+     * @return void
+     */
+    public static function perf_output_panel() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return;
+        }
+
+        $queries = self::perf_build_query_data();
+        $http    = self::$perf_http_calls;
+        $errors  = self::$perf_php_errors;
+        $logs    = self::perf_build_log_data();
+
+        $q_total = 0.0;
+        foreach ( $queries as $q ) {
+            $q_total += $q['time_ms'];
+        }
+        $h_total = 0.0;
+        foreach ( $http as $h ) {
+            $h_total += $h['time_ms'];
+        }
+
+        // Request time from PHP superglobal (µs precision, PHP 5.4+).
+        $page_ms = isset( $_SERVER['REQUEST_TIME_FLOAT'] )
+            ? round( ( microtime( true ) - (float) $_SERVER['REQUEST_TIME_FLOAT'] ) * 1000, 2 )
+            : 0;
+
+        $data = [
+            'queries' => $queries,
+            'http'    => $http,
+            'errors'  => $errors,
+            'logs'    => $logs,
+            'meta'    => [
+                'query_count'    => count( $queries ),
+                'query_total_ms' => round( $q_total, 2 ),
+                'http_count'     => count( $http ),
+                'http_total_ms'  => round( $h_total, 2 ),
+                'error_count'    => count( $errors ),
+                'log_count'      => count( $logs ),
+                'page_load_ms'       => $page_ms,
+                'is_admin'           => is_admin(),
+                'url'                => isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',
+                'ajax_url'           => admin_url( 'admin-ajax.php' ),
+                'explain_nonce'      => wp_create_nonce( 'cs_perf_explain' ),
+                'debug_nonce'        => wp_create_nonce( 'cs_perf_debug' ),
+                'wp_debug'           => (bool) get_option( 'cs_perf_debug_logging', false ),
+                'wp_debug_log'       => (bool) get_option( 'cs_perf_debug_logging', false ),
+                'savequeries_active' => defined( 'SAVEQUERIES' ) && SAVEQUERIES,
+                // Page-context strip: what screen / template is this?
+                'wp_screen'          => ( is_admin() && function_exists( 'get_current_screen' ) && get_current_screen() )
+                                            ? get_current_screen()->id
+                                            : '',
+                'page_type'          => is_admin() ? 'admin'
+                                        : ( is_singular() ? get_post_type() . ' (single)'
+                                        : ( is_archive() ? 'archive'
+                                        : ( is_home()    ? 'blog home'
+                                        : ( is_front_page() ? 'front page' : 'other' ) ) ) ),
+                'template'           => self::$perf_template,
+            ],
+        ];
+
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo '<script>window.csPerfData=' . wp_json_encode( $data ) . ';</script>' . "\n";
+        // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+        echo self::perf_panel_html();
+    }
+
+    /* ==================================================================
+       PERFORMANCE MONITOR — Query processing
+       ================================================================== */
+
+    /**
+     * Processes $wpdb->queries into a structured array for the panel.
+     *
+     * @return array
+     */
+    private static function perf_build_query_data(): array {
+        global $wpdb;
+
+        if ( ! defined( 'SAVEQUERIES' ) || ! SAVEQUERIES || empty( $wpdb->queries ) ) {
+            return [];
+        }
+
+        $seen   = [];
+        $result = [];
+
+        foreach ( $wpdb->queries as $q ) {
+            $sql     = isset( $q[0] ) ? trim( (string) $q[0] ) : '';
+            $time_ms = isset( $q[1] ) ? round( (float) $q[1] * 1000, 4 ) : 0.0;
+            $bt_str  = isset( $q[2] ) ? (string) $q[2] : '';
+            // Index 4 = row count for SELECT queries, rows_affected for write queries.
+            $rows = isset( $q[4] ) && is_numeric( $q[4] ) ? (int) $q[4] : -1;
+
+            if ( '' === $sql ) {
+                continue;
+            }
+
+            // Duplicate detection: normalise whitespace before hashing.
+            $hash    = md5( preg_replace( '/\s+/', ' ', strtolower( $sql ) ) );
+            $is_dupe = array_key_exists( $hash, $seen );
+            if ( ! $is_dupe ) {
+                $seen[ $hash ] = true;
+            }
+
+            // Extract leading keyword.
+            preg_match( '/^\s*(\w+)/i', $sql, $kw );
+            $keyword = strtoupper( $kw[1] ?? 'QUERY' );
+
+            $result[] = [
+                'sql'     => $sql,
+                'keyword' => $keyword,
+                'time_ms' => $time_ms,
+                'rows'    => $rows,
+                'plugin'  => self::perf_plugin_from_query_bt( $bt_str ),
+                'caller'  => self::perf_caller_from_query_bt( $bt_str ),
+                'stack'   => self::perf_parse_stack( $bt_str ),
+                'is_dupe' => $is_dupe,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Extracts the responsible plugin slug from a SAVEQUERIES backtrace string.
+     *
+     * wp_debug_backtrace_summary() includes require/include calls with file paths
+     * like require('wp-content/plugins/SLUG/...'), so we can extract the slug.
+     *
+     * @param  string $bt SAVEQUERIES backtrace string.
+     * @return string     Plugin directory slug or 'WordPress Core'.
+     */
+    private static function perf_plugin_from_query_bt( string $bt ): string {
+        // Primary: require/include with plugin path (most accurate).
+        if ( preg_match( "/(?:require|include)(?:_once)?\(['\"]wp-content\/plugins\/([^\/'\",\)]+)/i", $bt, $m ) ) {
+            return $m[1];
+        }
+
+        // Fallback: match class/function prefixes against installed plugin slugs.
+        $map = self::perf_get_plugin_prefix_map();
+        foreach ( $map as $prefix => $slug ) {
+            if ( 1 === preg_match( '/\b' . preg_quote( $prefix, '/' ) . '/i', $bt ) ) {
+                return $slug;
+            }
+        }
+
+        return 'WordPress Core';
+    }
+
+    /**
+     * Returns the most relevant calling function from a SAVEQUERIES backtrace string.
+     *
+     * Skips internal WordPress and wpdb frames to surface the application-level caller.
+     *
+     * @param  string $bt Backtrace string.
+     * @return string     Caller name (truncated to 70 chars) or empty string.
+     */
+    private static function perf_caller_from_query_bt( string $bt ): string {
+        static $skip = [ 'wpdb', 'WP_Hook', 'do_action', 'apply_filters',
+                          'require', 'include', '{main}', 'wp-settings', 'wp-blog-header' ];
+
+        $frames = array_map( 'trim', explode( ',', $bt ) );
+        foreach ( $frames as $frame ) {
+            if ( '' === $frame ) {
+                continue;
+            }
+            $skip_it = false;
+            foreach ( $skip as $s ) {
+                if ( false !== stripos( $frame, $s ) ) {
+                    $skip_it = true;
+                    break;
+                }
+            }
+            if ( ! $skip_it ) {
+                return strlen( $frame ) > 70 ? substr( $frame, 0, 67 ) . '...' : $frame;
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Parses a SAVEQUERIES backtrace string into a typed array of call-chain frames.
+     *
+     * Each frame is annotated with a type so the JS can colour-code the trace:
+     *   hook     — do_action / apply_filters (the WP entry point for this code path)
+     *   plugin   — require/include from wp-content/plugins/
+     *   theme    — require/include from wp-content/themes/
+     *   file     — require/include from WP core
+     *   wp       — WP_Hook, call_user_func, {main}
+     *   db       — wpdb methods
+     *   code     — application-level function or class method (the "real" work)
+     *
+     * @param  string $bt SAVEQUERIES backtrace string.
+     * @return array<int, array{frame: string, type: string}>
+     */
+    private static function perf_parse_stack( string $bt ): array {
+        if ( '' === $bt ) {
+            return [];
+        }
+
+        $frames = array_values( array_filter( array_map( 'trim', explode( ',', $bt ) ) ) );
+        $result = [];
+
+        foreach ( $frames as $frame ) {
+            if ( '' === $frame ) {
+                continue;
+            }
+
+            if ( preg_match( '/^(do_action|apply_filters)\b/i', $frame ) ) {
+                $type = 'hook';
+            } elseif ( preg_match( '/^WP_Hook\b/i', $frame ) ) {
+                $type = 'wp';
+            } elseif ( preg_match( '/^(call_user_func|{main})/i', $frame ) ) {
+                $type = 'wp';
+            } elseif ( preg_match( '/^wpdb\b/i', $frame ) ) {
+                $type = 'db';
+            } elseif ( preg_match( '/^(require|include)(?:_once)?\(/i', $frame ) ) {
+                if ( false !== stripos( $frame, '/plugins/' ) ) {
+                    $type = 'plugin';
+                } elseif ( false !== stripos( $frame, '/themes/' ) ) {
+                    $type = 'theme';
+                } else {
+                    $type = 'file';
+                }
+            } else {
+                $type = 'code';
+            }
+
+            $result[] = [ 'frame' => $frame, 'type' => $type ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Attributes an HTTP call to a plugin using real debug_backtrace frames with file paths.
+     *
+     * @param  array $frames debug_backtrace() frames.
+     * @return string        Plugin directory slug or 'WordPress Core'.
+     */
+    private static function perf_plugin_from_frames( array $frames ): string {
+        $plugins_dir = wp_normalize_path( WP_PLUGIN_DIR );
+        foreach ( $frames as $frame ) {
+            if ( empty( $frame['file'] ) ) {
+                continue;
+            }
+            $file = wp_normalize_path( $frame['file'] );
+            if ( 0 === strpos( $file, $plugins_dir . '/' ) ) {
+                $relative = substr( $file, strlen( $plugins_dir ) + 1 );
+                $parts    = explode( '/', $relative );
+                if ( ! empty( $parts[0] ) ) {
+                    return $parts[0];
+                }
+            }
+        }
+        return 'WordPress Core';
+    }
+
+    /**
+     * Builds a map of function/class prefixes to plugin slugs from active plugins.
+     *
+     * Used as a fallback when file-path attribution is not available.
+     *
+     * @return array<string, string>
+     */
+    private static function perf_get_plugin_prefix_map(): array {
+        if ( null !== self::$perf_plugin_map ) {
+            return self::$perf_plugin_map;
+        }
+        self::$perf_plugin_map = [];
+        foreach ( get_option( 'active_plugins', [] ) as $plugin_file ) {
+            $slug = dirname( $plugin_file );
+            if ( '.' === $slug ) {
+                $slug = basename( $plugin_file, '.php' );
+            }
+            $snake = str_replace( '-', '_', strtolower( $slug ) );
+            foreach ( [ $slug, $snake, strtoupper( $snake ) ] as $prefix ) {
+                if ( strlen( $prefix ) > 2 ) {
+                    self::$perf_plugin_map[ $prefix ] = $slug;
+                }
+            }
+        }
+        return self::$perf_plugin_map;
+    }
+
+    /* ==================================================================
+       PERFORMANCE MONITOR — EXPLAIN AJAX endpoint
+       ================================================================== */
+
+    /**
+     * AJAX handler: runs EXPLAIN on a captured SELECT query and returns the plan.
+     *
+     * Only SELECT, SHOW, and DESCRIBE queries are accepted.
+     * Access is restricted to manage_options users via nonce + capability check.
+     *
+     * @return void  Sends JSON and exits.
+     */
+    public static function ajax_perf_explain() {
+        check_ajax_referer( 'cs_perf_explain', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized.' );
+        }
+
+        $sql = isset( $_POST['sql'] ) ? trim( wp_unslash( $_POST['sql'] ) ) : '';
+
+        if ( '' === $sql ) {
+            wp_send_json_error( 'No SQL provided.' );
+        }
+
+        if ( ! preg_match( '/^\s*(SELECT|SHOW|DESCRIBE)\s/i', $sql ) ) {
+            wp_send_json_error( 'Only SELECT, SHOW, and DESCRIBE queries can be explained.' );
+        }
+
+        global $wpdb;
+        // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+        $rows = $wpdb->get_results( 'EXPLAIN ' . $sql, ARRAY_A );
+
+        if ( $wpdb->last_error ) {
+            wp_send_json_error( $wpdb->last_error );
+        }
+
+        wp_send_json_success( [ 'rows' => $rows ?: [] ] );
+    }
+
+    /**
+     * AJAX: toggle WP_DEBUG + WP_DEBUG_LOG + WP_DEBUG_DISPLAY in wp-config.php.
+     *
+     * Reads the current state, flips it, rewrites the relevant defines in the file.
+     * Restricted to manage_options admins.
+     *
+     * @return void  Sends JSON and exits.
+     */
+    public static function ajax_perf_debug_toggle() {
+        check_ajax_referer( 'cs_perf_debug', 'nonce' );
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized.' );
+        }
+
+        $enable = isset( $_POST['enable'] ) ? ( '1' === $_POST['enable'] || 'true' === $_POST['enable'] ) : null;
+        if ( null === $enable ) {
+            $enable = ! (bool) get_option( 'cs_perf_debug_logging', false );
+        }
+
+        if ( $enable ) {
+            update_option( 'cs_perf_debug_logging', 1, false );
+        } else {
+            delete_option( 'cs_perf_debug_logging' );
+        }
+
+        wp_send_json_success( [
+            'enabled' => $enable,
+            'message' => $enable
+                ? 'Debug logging enabled. Reload the page to start capturing logs.'
+                : 'Debug logging disabled.',
+        ] );
+    }
+
+    /* ==================================================================
+       PERFORMANCE MONITOR — Log data
+       ================================================================== */
+
+    /**
+     * Reads the WordPress debug.log file (last 500 lines) and merges with
+     * in-memory PHP errors captured by perf_error_handler().
+     *
+     * Each entry: { ts, level, message, source }
+     *   source: 'debug_log' | 'php_handler'
+     *
+     * @return array
+     */
+    private static function perf_build_log_data(): array {
+        $entries = [];
+
+        // ── 1. Read debug.log ──────────────────────────────────────────────────
+        $log_file = defined( 'WP_DEBUG_LOG' ) && is_string( WP_DEBUG_LOG )
+            ? WP_DEBUG_LOG
+            : WP_CONTENT_DIR . '/debug.log';
+
+        if ( is_readable( $log_file ) ) {
+            $lines = [];
+            $fp    = fopen( $log_file, 'r' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+            if ( $fp ) {
+                // Read last 600 lines efficiently.
+                $all = [];
+                while ( ! feof( $fp ) ) {
+                    $all[] = fgets( $fp );
+                }
+                fclose( $fp ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+                $lines = array_slice( $all, -600 );
+            }
+
+            // Merge continuation lines (stack traces) into their parent entry.
+            $buffer = '';
+            $flush  = function ( string $buf ) use ( &$entries ): void {
+                if ( '' === $buf ) return;
+                // WordPress debug.log format: [DD-Mon-YYYY HH:MM:SS UTC] PHP Level: message
+                if ( preg_match( '/^\[([^\]]+)\]\s+PHP\s+(\w[\w\s]*?):\s+(.*)/s', $buf, $m ) ) {
+                    $entries[] = [
+                        'ts'      => $m[1],
+                        'level'   => strtolower( trim( $m[2] ) ),
+                        'message' => trim( $m[3] ),
+                        'source'  => 'debug_log',
+                    ];
+                } elseif ( preg_match( '/^\[([^\]]+)\]\s+(.*)/s', $buf, $m ) ) {
+                    $entries[] = [
+                        'ts'      => $m[1],
+                        'level'   => 'info',
+                        'message' => trim( $m[2] ),
+                        'source'  => 'debug_log',
+                    ];
+                }
+            };
+
+            foreach ( $lines as $line ) {
+                $line = rtrim( (string) $line );
+                if ( preg_match( '/^\[/', $line ) && '' !== $buffer ) {
+                    $flush( $buffer );
+                    $buffer = $line;
+                } else {
+                    $buffer .= ( '' === $buffer ? '' : "\n" ) . $line;
+                }
+            }
+            $flush( $buffer );
+        }
+
+        // ── 2. Merge in-memory PHP errors (captured this request) ──────────────
+        foreach ( self::$perf_php_errors as $e ) {
+            $entries[] = [
+                'ts'      => gmdate( 'd-M-Y H:i:s' ) . ' UTC',
+                'level'   => isset( $e['type'] ) ? strtolower( $e['type'] ) : 'notice',
+                'message' => ( isset( $e['message'] ) ? $e['message'] : '' )
+                             . ( ! empty( $e['file'] ) ? ' in ' . $e['file'] . ':' . ( $e['line'] ?? '' ) : '' ),
+                'source'  => 'php_handler',
+            ];
+        }
+
+        // Sort by timestamp desc — keep last 500.
+        $entries = array_slice( $entries, -500 );
+        return array_reverse( $entries );
+    }
+
+    /* ==================================================================
+       PERFORMANCE MONITOR — Panel HTML scaffold
+       ================================================================== */
+
+    /**
+     * Returns the performance monitor panel HTML.
+     *
+     * All data rendering is handled client-side by cs-perf-monitor.js
+     * which reads window.csPerfData.
+     *
+     * @return string HTML markup.
+     */
+    private static function perf_panel_html(): string {
+        return '<div id="cs-perf" class="cs-perf-collapsed" role="complementary" aria-label="' . esc_attr__( 'CloudScale Performance Monitor', 'cloudscale-code-block' ) . '">'
+            . '<div id="cs-perf-resize" title="Drag to resize"></div>'
+            . '<div id="cs-perf-header">'
+                . '<div class="cs-perf-hl">'
+                    . '<button id="cs-perf-toggle" class="cs-perf-monitor-btn" title="Toggle panel (Ctrl+Shift+M)" aria-expanded="false">'
+                        . '<span class="cs-perf-logo">&#9889;</span>'
+                        . '<span class="cs-perf-name">CS&nbsp;Monitor</span>'
+                        . '<span id="cs-perf-toggle-arrow" class="cs-perf-toggle-arrow">&#9650;</span>'
+                    . '</button>'
+                    . '<span id="cs-pb-db"  class="cs-perf-badge cs-pb-db"  title="Database queries">DB&nbsp;<em>0</em></span>'
+                    . '<span id="cs-pb-http" class="cs-perf-badge cs-pb-http" title="HTTP / REST calls">HTTP&nbsp;<em>0</em></span>'
+                    . '<span id="cs-pb-log"  class="cs-perf-badge cs-pb-log"  title="Log entries" style="display:none">LOG&nbsp;<em>0</em></span>'
+                . '</div>'
+                . '<div class="cs-perf-hr">'
+                    . '<span id="cs-perf-ttl" class="cs-perf-total"></span>'
+                    . '<button id="cs-perf-export" class="cs-perf-btn" title="Export data as JSON (download)">&#8595;&nbsp;JSON</button>'
+                    . '<button id="cs-perf-help-btn" class="cs-perf-btn cs-perf-help-btn" title="What am I looking at?">?</button>'
+                . '</div>'
+            . '</div>'
+            . '<div id="cs-perf-help" class="cs-perf-help" style="display:none">'
+                . '<button id="cs-perf-help-close" class="cs-perf-help-close" aria-label="Close help">&times;</button>'
+                . '<h3 class="cs-help-title">&#9889; CS Monitor — What you\'re looking at</h3>'
+                . '<div class="cs-help-grid">'
+                    . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title cs-help-db">&#128200; DB Queries</div>'
+                        . '<p>Every database query WordPress and your plugins ran to build this page. Slow queries hurt page speed. N+1 means the same query is looping — a common plugin performance bug.</p>'
+                    . '</div>'
+                    . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title cs-help-http">&#127758; HTTP / REST</div>'
+                        . '<p>Outbound HTTP calls made during page load — licence checks, remote APIs, update pings. These add latency because PHP waits for the response before continuing.</p>'
+                    . '</div>'
+                    . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title cs-help-log">&#128196; Logs</div>'
+                        . '<p>All entries from wp-content/debug.log plus PHP warnings and notices captured during this request. Filter by level (error, warning, notice, deprecated) to focus on what matters.</p>'
+                    . '</div>'
+                    . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title cs-help-sum">&#9650; Summary</div>'
+                        . '<p>Which plugin is responsible for the most DB time, the slowest queries, N+1 patterns, and duplicate queries — the fastest way to find what\'s slowing your site.</p>'
+                    . '</div>'
+                . '</div>'
+                . '<div class="cs-help-legend">'
+                    . '<div class="cs-help-legend-title">Query speed colour coding</div>'
+                    . '<div class="cs-help-swatches">'
+                        . '<span class="cs-hs cs-hs-fast"></span><span>Fast (&lt;10ms)</span>'
+                        . '<span class="cs-hs cs-hs-med"></span><span>Medium (10–50ms)</span>'
+                        . '<span class="cs-hs cs-hs-slow"></span><span>Slow (50–200ms)</span>'
+                        . '<span class="cs-hs cs-hs-crit"></span><span>Critical (&gt;200ms)</span>'
+                        . '<span class="cs-hs cs-hs-dupe"></span><span>Duplicate query</span>'
+                        . '<span class="cs-hs cs-hs-n1"></span><span>N+1 pattern (same query looping)</span>'
+                    . '</div>'
+                . '</div>'
+            . '</div>'
+            . '<div id="cs-perf-body">'
+                . '<div id="cs-perf-ctx" aria-label="Page context"></div>'
+                . '<div id="cs-perf-tabs" role="tablist">'
+                    . '<button class="cs-ptab active" data-tab="db"      role="tab" aria-selected="true">DB Queries <span id="cs-ptc-db">0</span></button>'
+                    . '<button class="cs-ptab"         data-tab="http"    role="tab" aria-selected="false">HTTP / REST <span id="cs-ptc-http">0</span></button>'
+                    . '<button class="cs-ptab"         data-tab="logs"    role="tab" aria-selected="false">Logs <span id="cs-ptc-log">0</span></button>'
+                    . '<button class="cs-ptab"         data-tab="summary" role="tab" aria-selected="false">Summary</button>'
+                . '</div>'
+                . '<div id="cs-perf-filters">'
+                    . '<input type="search" id="cs-pf-search" placeholder="Filter&#8230;" aria-label="Filter rows">'
+                    . '<select id="cs-pf-plugin" aria-label="Filter by plugin"><option value="">All plugins</option></select>'
+                    . '<select id="cs-pf-speed" aria-label="Filter by speed">'
+                        . '<option value="0">Any speed</option>'
+                        . '<option value="10">Slow &gt;10ms</option>'
+                        . '<option value="50">Slow &gt;50ms</option>'
+                        . '<option value="100">Critical &gt;100ms</option>'
+                    . '</select>'
+                    . '<label class="cs-pf-dupe-lbl"><input type="checkbox" id="cs-pf-dupe"> Dupes only</label>'
+                . '</div>'
+                . '<div id="cs-pp-db" class="cs-ppane active" role="tabpanel">'
+                    . '<div class="cs-tbl-wrap">'
+                        . '<table class="cs-ptable"><thead><tr>'
+                            . '<th class="c-n">#</th>'
+                            . '<th class="c-q">Query</th>'
+                            . '<th class="c-p cs-sortable" data-sort="plugin">Plugin&nbsp;&#8597;</th>'
+                            . '<th class="c-r cs-sortable" data-sort="rows">Rows&nbsp;&#8597;</th>'
+                            . '<th class="c-t cs-sortable cs-sort-active" data-sort="time">Time&nbsp;&#8595;</th>'
+                        . '</tr></thead><tbody id="cs-db-rows"></tbody></table>'
+                    . '</div>'
+                . '</div>'
+                . '<div id="cs-pp-http" class="cs-ppane" role="tabpanel">'
+                    . '<div class="cs-tbl-wrap">'
+                        . '<table class="cs-ptable"><thead><tr>'
+                            . '<th class="c-n">#</th>'
+                            . '<th class="c-m">Method</th>'
+                            . '<th class="c-u">URL</th>'
+                            . '<th class="c-p">Plugin</th>'
+                            . '<th class="c-s">Status</th>'
+                            . '<th class="c-t cs-sortable" data-sort="time">Time&nbsp;&#8597;</th>'
+                        . '</tr></thead><tbody id="cs-http-rows"></tbody></table>'
+                    . '</div>'
+                . '</div>'
+                . '<div id="cs-pp-logs" class="cs-ppane" role="tabpanel">'
+                    . '<div id="cs-debug-bar" class="cs-debug-bar">'
+                        . '<span id="cs-debug-status" class="cs-debug-status"></span>'
+                        . '<button id="cs-debug-toggle" class="cs-debug-toggle-btn">Enable debug logging</button>'
+                        . '<span id="cs-debug-msg" class="cs-debug-msg"></span>'
+                    . '</div>'
+                    . '<div class="cs-log-filters">'
+                        . '<input type="search" id="cs-lf-search" placeholder="Filter logs&#8230;" aria-label="Filter log entries">'
+                        . '<select id="cs-lf-level" aria-label="Filter by level">'
+                            . '<option value="">All levels</option>'
+                            . '<option value="fatal error">Fatal</option>'
+                            . '<option value="error">Error</option>'
+                            . '<option value="warning">Warning</option>'
+                            . '<option value="notice">Notice</option>'
+                            . '<option value="deprecated">Deprecated</option>'
+                            . '<option value="info">Info</option>'
+                        . '</select>'
+                        . '<select id="cs-lf-source" aria-label="Filter by source">'
+                            . '<option value="">All sources</option>'
+                            . '<option value="debug_log">debug.log file</option>'
+                            . '<option value="php_handler">This request</option>'
+                        . '</select>'
+                    . '</div>'
+                    . '<div id="cs-log-list" class="cs-log-list"></div>'
+                . '</div>'
+                . '<div id="cs-pp-summary" class="cs-ppane" role="tabpanel">'
+                    . '<div id="cs-summary-wrap" class="cs-tbl-wrap"></div>'
+                . '</div>'
+                . '<div id="cs-perf-foot"><span id="cs-perf-foot-txt"></span></div>'
+            . '</div>'
+        . '</div>' . "\n";
     }
 }
 

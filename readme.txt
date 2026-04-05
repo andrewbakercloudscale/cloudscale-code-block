@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.7.22
+Stable tag: 1.7.35
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,14 +79,11 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.7.22 =
-* Fixed: readme.txt tags reduced from 8 to 5 (WordPress.org maximum)
-* Fixed: readme.txt short description trimmed to 141 chars (maximum is 150)
-* Fixed: readme.txt Requires at least updated to 6.0 to match plugin header
-* Fixed: phpcs:ignore comments added on POST reads validated via custom methods
-* Fixed: inline onclick removed from toast button in cs-convert.js; replaced with addEventListener
-* Fixed: .catch() added to clipboard promise chain in cs-code-block.js
-* Fixed: console.error() added to settings save catch block in cs-admin-settings.js
+= 1.7.35 =
+* Fixed: decodeClipboardText() in editor.js now correctly handles \n, \t, \r, \\, and \uXXXX escape sequences — previously JSON.parse failed silently when \u0022 decoded to " inside the string, storing literal n and u0022 in the database instead of newlines and double-quotes
+* Fixed: null guard added to attributes.content.split() in editor.js to prevent a TypeError if content is null
+* Fixed: migrateAllBtn inline opacity/pointer-events styles removed from PHP HTML — they were never cleared when the button was re-enabled; disabled state now handled via CSS :disabled selector
+* Fixed: printf format string in render_migrate_panel() no longer uses esc_html__() on the outer string when HTML is injected via %s placeholder
 
 = 1.7.20 =
 * Security: is_safe_query() now rejects queries containing semicolons, preventing statement stacking

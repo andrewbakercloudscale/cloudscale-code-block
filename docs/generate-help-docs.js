@@ -15,6 +15,8 @@ helpLib.run({
     downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-code-block.zip',
     adminUrl:   `${process.env.WP_BASE_URL}/wp-admin/tools.php?page=cloudscale-code-sql`,
 
+    pluginFile: `${__dirname}/../cs-code-block.php`,
+
     sections: [
         { id: 'code-block',  label: 'Code Block Overview',  file: 'panel-code-block.png'  },
         { id: 'sql-tool',    label: 'SQL Query Tool',        file: 'panel-sql-tool.png'    },

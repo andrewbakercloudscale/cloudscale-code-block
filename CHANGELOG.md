@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.7.25] - 2026-03-23
+
+### Fixed
+- `editor.js`: `onPasteCode` now handles both the toolbar Paste button and the browser's native paste event (Ctrl+V) — previously Ctrl+V completely bypassed `decodeClipboardText()`, meaning escape-sequence decoding never ran on keyboard pastes; textarea now has `onPaste` handler that calls `event.preventDefault()` and reads from `event.clipboardData` synchronously
+
+## [1.7.24] - 2026-03-23
+
+### Fixed
+- `editor.js`: `decodeClipboardText()` replaced broken `JSON.parse` approach with direct regex-based decoding — `JSON.parse` was silently failing when `\u0022` decoded to `"` inside the JSON string, causing `\n` to be stored as literal `n` and `\u0022` to be stored as literal `u0022` in the database; now handles `\n`, `\t`, `\r`, `\\`, `\uXXXX`, and bare `uXXXX` correctly
+- `editor.js`: Added `(attributes.content || '')` null guard on `.split('\n')` row calculation to prevent TypeError on null content
+- `cs-code-block.php`: Removed `opacity:.5;pointer-events:none` inline styles from the Migrate All button — inline styles were never cleared when the button was re-enabled via JS, leaving it visually disabled
+- `assets/cs-code-migrate.css`: Added `.cs-btn-orange:disabled` and `.cs-btn-primary:disabled` CSS rules to handle disabled state declaratively
+- `cs-code-block.php`: Fixed `printf()` in `render_migrate_panel()` — outer format string was wrapped in `esc_html__()` while `%s` was replaced with raw HTML; outer string now uses `__()` with a `phpcs:ignore` annotation
+- `blocks/code/block.json`: Synced `version` field from `1.7.18` to `1.7.23`
+
 ## [1.7.21] - 2026-03-22
 
 ### Fixed

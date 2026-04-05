@@ -1,0 +1,1099 @@
+/* ==========================================================================
+   CloudScale Performance Monitor — DevTools-style bottom panel
+   ========================================================================== */
+
+/* ── Panel shell ─────────────────────────────────────────────────────────── */
+#cs-perf {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 99999;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #d4d4d4;
+    background: #1e1e1e;
+    border-top: 2px solid #007acc;
+    box-shadow: 0 -4px 24px rgba(0,0,0,.6);
+    display: flex;
+    flex-direction: column;
+    transition: height .2s ease;
+    /* Default (collapsed): only header visible */
+    height: 48px;
+    overflow: hidden;
+}
+#cs-perf.cs-perf-open {
+    height: 320px; /* overridden by JS from localStorage */
+}
+
+/* ── Resize handle ───────────────────────────────────────────────────────── */
+#cs-perf-resize {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    cursor: ns-resize;
+    z-index: 1;
+}
+#cs-perf-resize:hover {
+    background: rgba(0,122,204,.35);
+}
+
+/* ── Header bar (always visible) ─────────────────────────────────────────── */
+#cs-perf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    padding: 0 10px;
+    background: #252526;
+    flex-shrink: 0;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+    gap: 8px;
+}
+.cs-perf-hl,
+.cs-perf-hr {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ── CS Monitor toggle button (pill) ─────────────────────────────────────── */
+.cs-perf-monitor-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #2d2d30;
+    border: 1px solid #555;
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background .15s, border-color .15s;
+    flex-shrink: 0;
+    min-height: 34px;
+}
+.cs-perf-monitor-btn:hover { background: #3c3c3c; border-color: #007acc; }
+.cs-perf-logo {
+    font-size: 16px;
+    line-height: 1;
+    color: #e8c74a;
+}
+.cs-perf-name {
+    font-weight: 600;
+    font-size: 12px;
+    color: #cccccc;
+    white-space: nowrap;
+}
+.cs-perf-toggle-arrow {
+    font-size: 9px;
+    color: #888;
+    margin-left: 2px;
+}
+
+/* ── Header badges ───────────────────────────────────────────────────────── */
+.cs-perf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: default;
+}
+.cs-pb-db   { background: #1a3a5c; color: #5aa8e8; }
+.cs-pb-http { background: #3a1a5c; color: #b07ae8; }
+.cs-pb-log  { background: #1a3a2a; color: #4ec9b0; }
+.cs-perf-badge em { font-style: normal; font-weight: 700; }
+
+/* ── Total time chip ─────────────────────────────────────────────────────── */
+.cs-perf-total {
+    font-size: 11px;
+    color: #888;
+    white-space: nowrap;
+}
+
+/* ── Help button ─────────────────────────────────────────────────────────── */
+.cs-perf-help-btn {
+    font-weight: 700;
+    font-size: 12px;
+    width: 24px;
+    padding: 0;
+    text-align: center;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* ── Help overlay panel ──────────────────────────────────────────────────── */
+#cs-perf-help {
+    position: absolute;
+    bottom: 48px;
+    right: 10px;
+    width: min(520px, calc(100vw - 20px));
+    background: #252526;
+    border: 1px solid #007acc;
+    border-radius: 8px;
+    padding: 16px;
+    z-index: 100000;
+    box-shadow: 0 -6px 32px rgba(0,0,0,.7);
+}
+.cs-perf-help-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: none;
+    border: none;
+    color: #888;
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+}
+.cs-perf-help-close:hover { color: #fff; }
+.cs-help-title {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #e8c74a;
+}
+.cs-help-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+@media (max-width: 500px) { .cs-help-grid { grid-template-columns: 1fr; } }
+.cs-help-card {
+    background: #1e1e1e;
+    border-radius: 6px;
+    padding: 10px;
+}
+.cs-help-card p {
+    margin: 4px 0 0;
+    font-size: 11px;
+    color: #aaa;
+    line-height: 1.5;
+}
+.cs-help-card-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+.cs-help-db   { color: #5aa8e8; }
+.cs-help-http { color: #b07ae8; }
+.cs-help-log  { color: #4ec9b0; }
+.cs-help-sum  { color: #4ec9b0; }
+.cs-help-legend { border-top: 1px solid #3c3c3c; padding-top: 10px; }
+.cs-help-legend-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #888;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+.cs-help-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 14px;
+    font-size: 11px;
+    color: #aaa;
+}
+.cs-hs {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.cs-hs-fast { background: #4ec9b0; }
+.cs-hs-med  { background: #dcdcaa; }
+.cs-hs-slow { background: #ce9178; }
+.cs-hs-crit { background: #f44747; }
+.cs-hs-dupe { background: #dcdcaa; opacity: .6; }
+.cs-hs-n1   { background: #c586c0; }
+
+/* ── Action buttons (JSON export etc) ────────────────────────────────────── */
+.cs-perf-btn {
+    background: none;
+    border: 1px solid #555;
+    color: #aaa;
+    cursor: pointer;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    line-height: 1.6;
+    transition: background .15s, color .15s;
+    flex-shrink: 0;
+}
+.cs-perf-btn:hover { background: #3c3c3c; color: #fff; border-color: #777; }
+
+/* ── Panel body ──────────────────────────────────────────────────────────── */
+#cs-perf-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+#cs-perf-tabs {
+    display: flex;
+    background: #2d2d30;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+.cs-ptab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #aaa;
+    cursor: pointer;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.cs-ptab:hover { color: #ddd; }
+.cs-ptab.active { color: #fff; border-bottom-color: #007acc; }
+.cs-ptab span {
+    background: #3c3c3c;
+    color: #aaa;
+    border-radius: 8px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 700;
+}
+.cs-ptab.active span { background: #007acc; color: #fff; }
+
+/* ── Filter bar ──────────────────────────────────────────────────────────── */
+#cs-perf-filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    background: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+#cs-pf-search {
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #d4d4d4;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 3px 8px;
+    width: 160px;
+    outline: none;
+}
+#cs-pf-search:focus { border-color: #007acc; }
+#cs-pf-search::-webkit-search-cancel-button { filter: invert(.6); cursor: pointer; }
+#cs-pf-plugin,
+#cs-pf-speed {
+    background: #3c3c3c;
+    border: 1px solid #555;
+    border-radius: 4px;
+    color: #d4d4d4;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 3px 6px;
+    cursor: pointer;
+    outline: none;
+}
+#cs-pf-plugin:focus, #cs-pf-speed:focus { border-color: #007acc; }
+.cs-pf-dupe-lbl {
+    color: #aaa;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.cs-pf-dupe-lbl input { cursor: pointer; accent-color: #007acc; }
+
+/* ── Tab panes ───────────────────────────────────────────────────────────── */
+.cs-ppane {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.cs-ppane.active { display: flex; flex-direction: column; }
+
+/* ── Table wrapper (scrollable) ──────────────────────────────────────────── */
+.cs-tbl-wrap {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+.cs-tbl-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+.cs-tbl-wrap::-webkit-scrollbar-track { background: #1e1e1e; }
+.cs-tbl-wrap::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+/* ── Data table ──────────────────────────────────────────────────────────── */
+.cs-ptable {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+.cs-ptable thead tr {
+    background: #2d2d30;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.cs-ptable th {
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #aaa;
+    text-align: left;
+    border-bottom: 1px solid #3c3c3c;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cs-ptable th.cs-sortable { cursor: pointer; }
+.cs-ptable th.cs-sortable:hover { color: #fff; }
+.cs-ptable th.cs-sort-active { color: #fff; border-bottom: 2px solid #007acc; }
+.cs-ptable tbody tr {
+    border-bottom: 1px solid #2a2a2a;
+    transition: background .1s;
+}
+.cs-ptable tbody tr:hover { background: #2a2d2e; }
+/* Row accent: visible left border + tinted background */
+.cs-ptable tbody tr.cs-row-slow > td:first-child     { border-left: 3px solid #ce9178; }
+.cs-ptable tbody tr.cs-row-critical > td:first-child { border-left: 3px solid #f44747; }
+.cs-ptable tbody tr.cs-row-dupe > td:first-child     { border-left: 3px solid #dcdcaa; }
+.cs-ptable tbody tr.cs-row-slow     { background: rgba(206,145,120,.12); }
+.cs-ptable tbody tr.cs-row-critical { background: rgba(244,71,71,.14); }
+.cs-ptable tbody tr.cs-row-dupe     { background: rgba(220,220,170,.10); }
+.cs-ptable td {
+    padding: 4px 8px;
+    vertical-align: top;
+    font-size: 11px;
+    color: #d4d4d4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Expandable row: click to toggle full SQL */
+.cs-ptable tbody tr.cs-expandable { cursor: pointer; }
+.cs-ptable td.c-q { white-space: nowrap; }
+.cs-row-detail td {
+    background: #141414;
+    padding: 6px 8px 8px 24px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    font-size: 11px;
+    color: #c8c8c8;
+    border-bottom: 1px solid #333;
+}
+
+/* ── Column widths ───────────────────────────────────────────────────────── */
+/* DB table */
+#cs-perf-body .c-n   { width: 30px;  min-width: 30px;  }
+#cs-perf-body .c-q   { width: auto;  }
+#cs-perf-body .c-p   { width: 160px; min-width: 100px; }
+#cs-perf-body .c-r   { width: 50px;  min-width: 40px;  text-align: right; }
+#cs-perf-body .c-t   { width: 120px; min-width: 90px;  }
+/* HTTP table */
+#cs-perf-body .c-m   { width: 60px;  min-width: 50px;  }
+#cs-perf-body .c-u   { width: auto;  }
+#cs-perf-body .c-s   { width: 55px;  min-width: 45px;  text-align: center; }
+
+/* ── Latency bar ─────────────────────────────────────────────────────────── */
+.cs-time-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.cs-lat-bar {
+    display: inline-block;
+    height: 8px;
+    min-width: 2px;
+    border-radius: 2px;
+    flex-shrink: 0;
+    transition: width .2s;
+}
+.cs-lat-fast     { background: #4ec9b0; }
+.cs-lat-medium   { background: #dcdcaa; }
+.cs-lat-slow     { background: #ce9178; }
+.cs-lat-critical { background: #f44747; animation: cs-pulse 1.4s ease-in-out infinite; }
+@keyframes cs-pulse {
+    0%,100% { opacity: 1; }
+    50%      { opacity: .5; }
+}
+.cs-time-val { font-size: 11px; font-variant-numeric: tabular-nums; }
+.cs-time-val.cs-tv-fast     { color: #4ec9b0; }
+.cs-time-val.cs-tv-medium   { color: #dcdcaa; }
+.cs-time-val.cs-tv-slow     { color: #ce9178; }
+.cs-time-val.cs-tv-critical { color: #f44747; font-weight: 700; }
+
+/* ── Badges on rows ──────────────────────────────────────────────────────── */
+.cs-tag {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    vertical-align: middle;
+    line-height: 1.5;
+}
+.cs-tag-slow     { background: #5a2c1a; color: #ce9178; }
+.cs-tag-critical { background: #5a1a1a; color: #f44747; }
+.cs-tag-dupe     { background: #3a3a00; color: #dcdcaa; }
+.cs-tag-cached   { background: #1a3a1a; color: #4ec9b0; }
+.cs-tag-error    { background: #5a1a1a; color: #f44747; }
+.cs-tag-warn     { background: #3a2a00; color: #dcdcaa; }
+
+/* ── Plugin chip ─────────────────────────────────────────────────────────── */
+.cs-plugin-chip {
+    display: inline-block;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #9cdcfe;
+    font-size: 11px;
+    vertical-align: middle;
+}
+.cs-plugin-core { color: #888; }
+
+/* ── SQL keyword colouring ───────────────────────────────────────────────── */
+.cs-kw-select { color: #569cd6; font-weight: 600; }
+.cs-kw-insert { color: #4ec9b0; font-weight: 600; }
+.cs-kw-update { color: #dcdcaa; font-weight: 600; }
+.cs-kw-delete { color: #f44747; font-weight: 600; }
+.cs-kw-other  { color: #c586c0; font-weight: 600; }
+
+/* ── HTTP status colours ─────────────────────────────────────────────────── */
+.cs-status-2xx { color: #4ec9b0; font-weight: 600; }
+.cs-status-3xx { color: #9cdcfe; font-weight: 600; }
+.cs-status-4xx { color: #dcdcaa; font-weight: 600; }
+.cs-status-5xx { color: #f44747; font-weight: 600; }
+.cs-status-err { color: #f44747; font-weight: 600; }
+
+/* ── Method badge ────────────────────────────────────────────────────────── */
+.cs-method {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: inherit;
+}
+.cs-method-get    { background: #1a3a5c; color: #5aa8e8; }
+.cs-method-post   { background: #1a3a1a; color: #4ec9b0; }
+.cs-method-put    { background: #3a2a00; color: #dcdcaa; }
+.cs-method-patch  { background: #2a1a3a; color: #c586c0; }
+.cs-method-delete { background: #5c1a1a; color: #f44747; }
+.cs-method-other  { background: #3c3c3c; color: #aaa; }
+
+/* ── Error list ──────────────────────────────────────────────────────────── */
+#cs-err-list {
+    padding: 8px 10px;
+    overflow-y: auto;
+    flex: 1;
+}
+/* ── Debug toggle bar ───────────────────────────────────────────────────── */
+#cs-debug-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: #1e1e1e;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.cs-debug-status {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.cs-debug-on  { color: #4ec9b0; }
+.cs-debug-off { color: #666; }
+.cs-debug-toggle-btn {
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    white-space: nowrap;
+}
+.cs-debug-btn-on  { background: #1a3a2a; color: #4ec9b0; border-color: #4ec9b0; }
+.cs-debug-btn-on:hover  { background: #25503a; }
+.cs-debug-btn-off { background: #3a1a1a; color: #e87a7a; border-color: #e87a7a; }
+.cs-debug-btn-off:hover { background: #4a2020; }
+.cs-debug-toggle-btn:disabled { opacity: .5; cursor: default; }
+.cs-debug-msg {
+    font-size: 11px;
+    color: #4ec9b0;
+    flex: 1;
+}
+
+/* ── Log filters bar ─────────────────────────────────────────────────────── */
+.cs-log-filters {
+    display: flex;
+    gap: 6px;
+    padding: 6px 8px;
+    background: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.cs-log-filters input,
+.cs-log-filters select {
+    background: #3c3c3c;
+    border: 1px solid #555;
+    color: #d4d4d4;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    height: 26px;
+}
+.cs-log-filters input { flex: 1; min-width: 120px; }
+
+/* ── Log list ────────────────────────────────────────────────────────────── */
+.cs-log-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 4px 6px;
+}
+.cs-log-entry {
+    padding: 5px 8px;
+    margin-bottom: 3px;
+    border-left: 3px solid #3c3c3c;
+    border-radius: 0 4px 4px 0;
+    background: #252526;
+    font-size: 11px;
+    line-height: 1.4;
+}
+.cs-log-fatal    { border-left-color: #f44747; background: rgba(244,71,71,.08); }
+.cs-log-error    { border-left-color: #f44747; background: rgba(244,71,71,.05); }
+.cs-log-warning  { border-left-color: #dcdcaa; background: rgba(220,220,170,.06); }
+.cs-log-notice   { border-left-color: #5aa8e8; }
+.cs-log-deprecated { border-left-color: #c586c0; }
+.cs-log-info     { border-left-color: #3c3c3c; }
+.cs-log-level {
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    margin-right: 6px;
+    color: #aaa;
+}
+.cs-log-fatal .cs-log-level,
+.cs-log-error .cs-log-level    { color: #f44747; }
+.cs-log-warning .cs-log-level  { color: #dcdcaa; }
+.cs-log-notice .cs-log-level   { color: #5aa8e8; }
+.cs-log-deprecated .cs-log-level { color: #c586c0; }
+.cs-log-ts {
+    font-size: 10px;
+    color: #555;
+    margin-right: 8px;
+}
+.cs-log-src-tag {
+    font-size: 9px;
+    background: #007acc;
+    color: #fff;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-right: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+.cs-log-msg {
+    color: #d4d4d4;
+    word-break: break-word;
+    margin-top: 2px;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    font-size: 10px;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.cs-empty {
+    text-align: center;
+    padding: 24px 10px;
+    color: #555;
+    font-size: 12px;
+}
+.cs-empty-icon { font-size: 24px; display: block; margin-bottom: 6px; opacity: .4; }
+
+/* ── Footer stats bar ────────────────────────────────────────────────────── */
+#cs-perf-foot {
+    background: #252526;
+    border-top: 1px solid #3c3c3c;
+    padding: 3px 10px;
+    font-size: 10px;
+    color: #666;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#cs-perf-foot .cs-foot-warn { color: #ce9178; }
+#cs-perf-foot .cs-foot-crit { color: #f44747; font-weight: 700; }
+
+/* ── No data / SAVEQUERIES notice ────────────────────────────────────────── */
+.cs-notice {
+    padding: 10px 14px;
+    background: #2d2d30;
+    border-left: 3px solid #007acc;
+    margin: 8px;
+    border-radius: 0 4px 4px 0;
+    font-size: 11px;
+    color: #aaa;
+}
+
+/* ==========================================================================
+   CALL STACK TRACE
+   ========================================================================== */
+
+.cs-stack-trace {
+    margin-top: 8px;
+    border-top: 1px solid #333;
+    padding-top: 6px;
+}
+.cs-stack-hdr {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #555;
+    margin-bottom: 4px;
+}
+.cs-stack-frames { display: flex; flex-direction: column; gap: 1px; }
+
+.cs-sf {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    font-size: 10px;
+    line-height: 1.5;
+}
+.cs-sf-indent { padding-left: 12px; }
+
+/* Connector line */
+.cs-sf::before {
+    content: '↳';
+    color: #444;
+    font-size: 9px;
+    flex-shrink: 0;
+    width: 12px;
+}
+.cs-sf:first-child::before { content: '●'; color: #666; }
+
+/* Frame name */
+.cs-sf-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Frame type badge */
+.cs-sf-type {
+    font-size: 9px;
+    font-family: -apple-system, sans-serif;
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    flex-shrink: 0;
+    opacity: .85;
+}
+
+/* Type-specific colours */
+.cs-sf-hook   .cs-sf-name { color: #4ec9b0; }
+.cs-sf-hook   .cs-sf-type { background: #0e2e28; color: #4ec9b0; }
+
+.cs-sf-code   .cs-sf-name { color: #d4d4d4; }
+.cs-sf-code   .cs-sf-type { background: #2d2d30; color: #9cdcfe; }
+
+.cs-sf-plugin .cs-sf-name { color: #9cdcfe; }
+.cs-sf-plugin .cs-sf-type { background: #0e1e30; color: #5aa8e8; }
+
+.cs-sf-theme  .cs-sf-name { color: #c586c0; }
+.cs-sf-theme  .cs-sf-type { background: #20102e; color: #c586c0; }
+
+.cs-sf-file   .cs-sf-name { color: #555; }
+.cs-sf-file   .cs-sf-type { background: #222; color: #555; }
+
+.cs-sf-wp     .cs-sf-name { color: #555; }
+.cs-sf-wp     .cs-sf-type { background: #222; color: #555; }
+
+.cs-sf-db     .cs-sf-name { color: #444; }
+.cs-sf-db     .cs-sf-type { display: none; }  /* wpdb is implied, skip badge */
+
+/* ── Page context strip (below header) ──────────────────────────────────── */
+#cs-perf-ctx {
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+    padding: 3px 10px;
+    font-size: 10px;
+    color: #555;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+#cs-perf-ctx .cs-ctx-url  { color: #888; }
+#cs-perf-ctx .cs-ctx-sep  { color: #333; }
+#cs-perf-ctx .cs-ctx-page { color: #666; }
+#cs-perf-ctx .cs-ctx-tmpl { color: #555; font-family: monospace; }
+
+/* ── Scrollbar (Firefox) ─────────────────────────────────────────────────── */
+.cs-tbl-wrap, #cs-err-list, #cs-summary-wrap {
+    scrollbar-width: thin;
+    scrollbar-color: #555 #1e1e1e;
+}
+#cs-summary-wrap::-webkit-scrollbar { width: 6px; }
+#cs-summary-wrap::-webkit-scrollbar-track { background: #1e1e1e; }
+#cs-summary-wrap::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+/* ── Row number ──────────────────────────────────────────────────────────── */
+td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
+
+/* ==========================================================================
+   SUMMARY TAB
+   ========================================================================== */
+
+#cs-summary-wrap {
+    overflow-y: auto;
+    flex: 1;
+    padding: 10px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ── Stat cards row ─────────────────────────────────────────────────────── */
+.cs-sum-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+@media (max-width: 640px) {
+    .cs-sum-cards { grid-template-columns: 1fr; }
+}
+.cs-sum-card {
+    background: #252526;
+    border: 1px solid #3c3c3c;
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+.cs-sum-card-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #666;
+    margin-bottom: 6px;
+}
+.cs-sum-card-stat {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+    font-variant-numeric: tabular-nums;
+}
+.cs-sum-card-sub {
+    font-size: 11px;
+    color: #777;
+    line-height: 1.6;
+}
+.cs-sum-card-sub span { display: block; }
+.cs-sum-card-sub .cs-s-warn { color: #ce9178; }
+.cs-sum-card-sub .cs-s-crit { color: #f44747; font-weight: 700; }
+.cs-sum-card-sub .cs-s-ok   { color: #4ec9b0; }
+
+/* Card accent colours */
+.cs-sum-card-db   .cs-sum-card-stat { color: #5aa8e8; }
+.cs-sum-card-http .cs-sum-card-stat { color: #b07ae8; }
+.cs-sum-card-log  .cs-sum-card-stat { color: #4ec9b0; }
+.cs-sum-card-page .cs-sum-card-stat { color: #4ec9b0; }
+
+/* ── Section headings ───────────────────────────────────────────────────── */
+.cs-sum-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #555;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #333;
+    margin-bottom: 6px;
+}
+
+/* ── Leaderboard rows (plugin offenders) ────────────────────────────────── */
+.cs-sum-lb-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid #2a2a2a;
+    font-size: 11px;
+}
+.cs-sum-lb-row:last-child { border-bottom: none; }
+.cs-sum-lb-rank {
+    color: #555;
+    width: 18px;
+    text-align: right;
+    flex-shrink: 0;
+    font-size: 10px;
+}
+.cs-sum-lb-name {
+    color: #9cdcfe;
+    min-width: 120px;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.cs-sum-lb-bar-wrap {
+    flex: 1;
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 40px;
+}
+.cs-sum-lb-bar {
+    height: 100%;
+    border-radius: 3px;
+    background: #5aa8e8;
+    transition: width .3s ease;
+}
+.cs-sum-lb-val {
+    color: #888;
+    white-space: nowrap;
+    font-size: 10px;
+    min-width: 60px;
+    text-align: right;
+}
+
+/* ── Slowest queries / HTTP list ────────────────────────────────────────── */
+.cs-sum-top-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid #2a2a2a;
+    font-size: 11px;
+    cursor: default;
+}
+.cs-sum-top-row:last-child { border-bottom: none; }
+.cs-sum-top-time {
+    flex-shrink: 0;
+    min-width: 52px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.cs-sum-top-sql {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #d4d4d4;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    font-size: 10px;
+}
+.cs-sum-top-plugin {
+    color: #9cdcfe;
+    font-size: 10px;
+    min-width: 80px;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ── N+1 tag ────────────────────────────────────────────────────────────── */
+.cs-tag-n1 { background: #2a1a3a; color: #c586c0; }
+
+/* ── EXPLAIN button (inside expanded detail row) ────────────────────────── */
+.cs-explain-btn {
+    background: #1a3a5c;
+    border: 1px solid #2a5a8c;
+    color: #5aa8e8;
+    cursor: pointer;
+    font-size: 10px;
+    font-family: inherit;
+    font-weight: 700;
+    letter-spacing: .04em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-top: 6px;
+    display: inline-block;
+    transition: background .15s;
+}
+.cs-explain-btn:hover  { background: #1e4a70; }
+.cs-explain-btn:disabled { opacity: .5; cursor: default; }
+
+/* ── EXPLAIN result table ────────────────────────────────────────────────── */
+.cs-explain-result { margin-top: 8px; }
+.cs-explain-loading { color: #666; font-size: 11px; padding: 4px 0; }
+.cs-explain-error   { color: #f44747; font-size: 11px; padding: 4px 0; }
+.cs-explain-empty   { color: #555; font-size: 11px; padding: 4px 0; }
+
+.cs-explain-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    margin-top: 4px;
+}
+.cs-explain-table th {
+    background: #2d2d30;
+    color: #888;
+    font-weight: 600;
+    padding: 3px 6px;
+    text-align: left;
+    border: 1px solid #3c3c3c;
+    font-size: 10px;
+    white-space: nowrap;
+}
+.cs-explain-table td {
+    padding: 3px 6px;
+    border: 1px solid #2a2a2a;
+    color: #d4d4d4;
+    white-space: nowrap;
+}
+/* Colour coding for type column and row counts */
+.cs-exp-good { color: #4ec9b0; font-weight: 700; }
+.cs-exp-warn { color: #dcdcaa; font-weight: 700; }
+.cs-exp-bad  { color: #f44747; font-weight: 700; background: rgba(244,71,71,.08); }
+
+/* ── SAVEQUERIES disabled notice ─────────────────────────────────────────── */
+.cs-sq-warning {
+    margin: 10px;
+    padding: 10px 14px;
+    background: #2d2d30;
+    border-left: 3px solid #dcdcaa;
+    border-radius: 0 4px 4px 0;
+    font-size: 11px;
+    color: #aaa;
+    line-height: 1.6;
+}
+.cs-sq-warning strong { color: #dcdcaa; }
+
+/* ── N+1 patterns section in Summary ────────────────────────────────────── */
+.cs-sum-n1-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid #2a2a2a;
+    font-size: 11px;
+}
+.cs-sum-n1-row:last-child { border-bottom: none; }
+.cs-sum-n1-count {
+    flex-shrink: 0;
+    min-width: 36px;
+    text-align: center;
+    background: #2a1a3a;
+    color: #c586c0;
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 700;
+}
+.cs-sum-n1-sql {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #aaa;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    font-size: 10px;
+}
+.cs-sum-n1-plugin {
+    color: #9cdcfe;
+    font-size: 10px;
+    min-width: 80px;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ── Duplicate queries section ──────────────────────────────────────────── */
+.cs-sum-dupe-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    border-bottom: 1px solid #2a2a2a;
+    font-size: 11px;
+}
+.cs-sum-dupe-row:last-child { border-bottom: none; }
+.cs-sum-dupe-count {
+    flex-shrink: 0;
+    min-width: 30px;
+    text-align: center;
+    background: #3a3a00;
+    color: #dcdcaa;
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 700;
+}
+.cs-sum-dupe-sql {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #aaa;
+    font-family: "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+    font-size: 10px;
+}
+.cs-sum-dupe-avg {
+    color: #888;
+    font-size: 10px;
+    min-width: 50px;
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ── Mobile / narrow viewport ────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    /* Header: hide total time text to save space */
+    .cs-perf-total { display: none; }
+
+    /* DB table: hide Plugin & Rows columns, keep Query + Time */
+    .cs-ptable th.c-p,
+    .cs-ptable td.c-p { display: none; }
+    .cs-ptable th.c-r,
+    .cs-ptable td.c-r { display: none; }
+}
+

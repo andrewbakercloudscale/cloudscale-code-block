@@ -400,6 +400,14 @@
     margin: 0 5px;
 }
 
+/* Disabled button state */
+.cs-btn-orange:disabled,
+.cs-btn-primary:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: not-allowed;
+}
+
 /* Loading spinner */
 .cs-loading {
     display: inline-flex;

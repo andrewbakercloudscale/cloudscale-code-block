@@ -58,7 +58,7 @@
 
             var d = resp.data;
             status.textContent = '✓ Success';
-            status.style.color = '#1a7a34';
+            status.style.color = '#1.7.35';
             meta.textContent   = d.count + ' row' + ( d.count !== 1 ? 's' : '' ) + ' in ' + d.elapsed + 'ms';
 
             if ( ! d.rows || d.rows.length === 0 ) {

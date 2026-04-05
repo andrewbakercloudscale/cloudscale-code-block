@@ -179,24 +179,43 @@
 
             function decodeClipboardText( text ) {
                 // Gutenberg sometimes JSON-encodes clipboard text internally,
-                // producing unicode escapes like u003c for < and u0022 for ".
-                // Attempt to detect and decode that form before setting content.
+                // producing escape sequences like \n, \u0022, or bare u003c.
                 if ( typeof text !== 'string' ) return text;
-                // If it looks like a JSON string value (wrapped in quotes), parse it
                 var trimmed = text.trim();
+                // Case 1: Already a full JSON string value (wrapped in quotes) — parse directly.
                 if ( trimmed.charAt(0) === '"' && trimmed.charAt( trimmed.length - 1 ) === '"' ) {
                     try { return JSON.parse( trimmed ); } catch(e) {}
                 }
-                // If it contains bare unicode escapes (u003c style without backslash),
-                // reconstruct as a quoted JSON string and parse
+                // Case 2: Contains backslash escape sequences (\n, \t, \r, \\, \uXXXX).
+                // Decode directly instead of via JSON.parse, which fails when \u0022
+                // decodes to " and creates an unterminated string literal.
+                if ( /\\[ntr\\]|\\u[0-9a-fA-F]{4}/.test( trimmed ) ) {
+                    return trimmed.replace( /\\([ntr\\]|u[0-9a-fA-F]{4})/g, function( _, seq ) {
+                        if ( seq === 'n' ) return '\n';
+                        if ( seq === 't' ) return '\t';
+                        if ( seq === 'r' ) return '\r';
+                        if ( seq === '\\' ) return '\\';
+                        return String.fromCharCode( parseInt( seq.slice(1), 16 ) );
+                    } );
+                }
+                // Case 3: Bare unicode escapes without backslash (u003c style).
+                // Decode directly for the same reason as Case 2.
                 if ( /(?:^|[^\\])u[0-9a-fA-F]{4}/.test( trimmed ) ) {
-                    try { return JSON.parse( '"' + trimmed.replace( /"/g, '\\"' ) + '"' ); } catch(e) {}
+                    return trimmed.replace( /u([0-9a-fA-F]{4})/g, function( _, hex ) {
+                        return String.fromCharCode( parseInt( hex, 16 ) );
+                    } );
                 }
                 return text;
             }
 
-            function onPasteCode() {
-                if ( navigator.clipboard && navigator.clipboard.readText ) {
+            function onPasteCode( event ) {
+                // Called both from the toolbar Paste button (no event) and the
+                // textarea's onPaste handler (event.clipboardData available).
+                if ( event && event.clipboardData ) {
+                    event.preventDefault();
+                    var text = event.clipboardData.getData( 'text' );
+                    props.setAttributes( { content: decodeClipboardText( text ) } );
+                } else if ( navigator.clipboard && navigator.clipboard.readText ) {
                     navigator.clipboard.readText().then( function( text ) {
                         props.setAttributes( { content: decodeClipboardText( text ) } );
                     } ).catch( function() {} );
@@ -269,8 +288,9 @@
                         value: attributes.content,
                         onChange: onChangeCode,
                         onKeyDown: onKeyDown,
+                        onPaste: onPasteCode,
                         placeholder: __( 'Paste or type your code here...', 'cs-code-block' ),
-                        rows: Math.max( 8, ( attributes.content.split( '\n' ).length || 1 ) + 2 ),
+                        rows: Math.max( 8, ( ( attributes.content || '' ).split( '\n' ).length || 1 ) + 2 ),
                         spellCheck: false,
                         autoComplete: 'off',
                         autoCorrect: 'off',

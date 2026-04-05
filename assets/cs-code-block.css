@@ -61,22 +61,30 @@
     border-bottom: 1px solid var(--cs-toolbar-border);
 }
 
-/* 3. BRAND LINK */
-.cs-code-brand {
+/* 3. BRAND LINK — use wrapper specificity to override theme a{color} rules */
+.cs-code-wrapper .cs-code-brand {
     font-size: 0.65rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     text-decoration: none;
     flex-shrink: 0;
-    color: #61afef;
+    color: #61afef !important;
     opacity: 0.85;
     transition: opacity 0.15s ease, color 0.15s ease;
 }
 
-.cs-code-brand:hover {
+.cs-code-wrapper .cs-code-brand:hover {
     opacity: 1;
-    color: #0fb8e0;
+    color: #0fb8e0 !important;
+}
+
+.cs-code-wrapper[data-active-theme="light"] .cs-code-brand {
+    color: #2271b1 !important;
+}
+
+.cs-code-wrapper[data-active-theme="light"] .cs-code-brand:hover {
+    color: #135e96 !important;
 }
 
 .cs-brand-bolt {
