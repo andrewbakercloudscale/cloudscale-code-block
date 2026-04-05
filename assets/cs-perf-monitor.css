@@ -108,6 +108,12 @@
     color: #cccccc;
     white-space: nowrap;
 }
+.cs-perf-name-short {
+    display: none;
+    font-weight: 600;
+    font-size: 12px;
+    color: #cccccc;
+}
 .cs-perf-toggle-arrow {
     font-size: 9px;
     color: #888;
@@ -1159,9 +1165,10 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
 
 /* ── Mobile / narrow viewport ────────────────────────────────────────────── */
 @media (max-width: 600px) {
-    /* Header: hide total time text and button label to save space */
-    .cs-perf-total { display: none; }
-    .cs-perf-name  { display: none; }
+    /* Header: hide total time and full label; show short "CS" label instead */
+    .cs-perf-total      { display: none; }
+    .cs-perf-name       { display: none; }
+    .cs-perf-name-short { display: inline; }
 
     /* Tighten up the toggle button on mobile */
     .cs-perf-monitor-btn { padding: 6px 8px; gap: 4px; }

@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.46
+ * Version: 1.7.47
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) ) {
  */
 class CloudScale_Code_Block {
 
-    const VERSION      = '1.7.46';
+    const VERSION      = '1.7.47';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
@@ -2363,6 +2363,7 @@ class CloudScale_Code_Block {
                 . '<button id="cs-perf-toggle" class="cs-perf-monitor-btn" title="Toggle panel (Ctrl+Shift+M)" aria-expanded="false">'
                         . '<span class="cs-perf-logo">&#9889;</span>'
                         . '<span class="cs-perf-name">CS&nbsp;Monitor</span>'
+                        . '<span class="cs-perf-name-short">CS</span>'
                         . '<span id="cs-perf-toggle-arrow" class="cs-perf-toggle-arrow">&#9650;</span>'
                     . '</button>'
                     . '<span id="cs-pb-db"  class="cs-perf-badge cs-pb-db"  title="Database queries">DB&nbsp;<em>0</em></span>'
