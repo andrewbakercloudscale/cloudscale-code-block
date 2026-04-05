@@ -38,6 +38,10 @@
                     setTimeout( function() {
                         savedMsg.classList.remove( 'visible' );
                     }, 2000 );
+                    var perfPanel = document.getElementById( 'cs-perf' );
+                    if ( perfPanel ) {
+                        perfPanel.style.display = resp.data.perf_enabled === '1' ? '' : 'none';
+                    }
                 }
             } )
             .catch( function( e ) {
