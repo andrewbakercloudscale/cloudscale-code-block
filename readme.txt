@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.7.35
+Stable tag: 1.7.37
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,13 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.7.37 =
+* Added: CS Monitor — Assets tab showing all enqueued JS and CSS files with plugin attribution, type filter, and search
+* Added: CS Monitor — Hooks tab showing top 50 hooks by cumulative time, with sortable columns and search
+* Added: CS Monitor — Object cache stats card in Summary (hit rate, hits/misses, persistent cache detection)
+* Added: CS Monitor — Slowest Hooks section in Summary showing top 8 hooks by total time
+* Added: CS Monitor — Assets summary card showing JS/CSS counts
 
 = 1.7.35 =
 * Fixed: decodeClipboardText() in editor.js now correctly handles \n, \t, \r, \\, and \uXXXX escape sequences — previously JSON.parse failed silently when \u0022 decoded to " inside the string, storing literal n and u0022 in the database instead of newlines and double-quotes

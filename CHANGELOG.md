@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.7.36] - 2026-04-05
+
+### Added
+- CS Monitor: **Assets tab** — all enqueued JS and CSS files, attributed to plugin/theme/wp-core, with type filter and search
+- CS Monitor: **Hooks tab** — top 50 WordPress hooks by cumulative execution time; sortable by count, total, or max time; search filter
+- CS Monitor: **Object cache stats** card in Summary — hit rate, hit/miss counts, persistent cache detection (Redis/Memcache)
+- CS Monitor: **Slowest Hooks** section in Summary — top 8 hooks by total time with bar chart
+- CS Monitor: **Assets** summary card showing JS + CSS counts
+
 ## [1.7.25] - 2026-03-23
 
 ### Fixed

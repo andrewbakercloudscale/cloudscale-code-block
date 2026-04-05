@@ -23,7 +23,7 @@
     var N1_THRESH  = 3;
 
     // ── State ─────────────────────────────────────────────────────────────────
-    var data      = window.csPerfData || { queries: [], http: [], errors: [], logs: [], meta: {} };
+    var data      = window.csPerfData || { queries: [], http: [], errors: [], logs: [], assets: { scripts: [], styles: [] }, cache: {}, hooks: [], meta: {} };
     var meta      = data.meta || {};
     var sortCol   = 'time';
     var sortDir   = 'desc';
@@ -33,6 +33,10 @@
     var filteredHTTP = [];
     var n1Patterns   = {};
 
+    // Hooks sort state
+    var hookSortCol = 'total_ms';
+    var hookSortDir = 'desc';
+
     // ── DOM refs ──────────────────────────────────────────────────────────────
     var panel, toggleBtn, exportBtn, resizeHandle, footTxt, totalTxt, ctxStrip;
     var tabBtns, panes, filterBar;
@@ -41,6 +45,8 @@
     var dbCount, httpCount, logCount;
     var badgeDB, badgeHTTP, badgeLOG;
     var logSearch, logLevel, logSource;
+    var assetsTbody, assetsCount, assetSearch, assetType, assetPlugin;
+    var hooksTbody, hooksCount, hookSearch;
 
     // ── Bootstrap ─────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
@@ -71,16 +77,27 @@
         logSearch    = document.getElementById('cs-lf-search');
         logLevel     = document.getElementById('cs-lf-level');
         logSource    = document.getElementById('cs-lf-source');
+        assetsTbody  = document.getElementById('cs-assets-rows');
+        assetsCount  = document.getElementById('cs-ptc-assets');
+        assetSearch  = document.getElementById('cs-af-search');
+        assetType    = document.getElementById('cs-af-type');
+        assetPlugin  = document.getElementById('cs-af-plugin');
+        hooksTbody   = document.getElementById('cs-hooks-rows');
+        hooksCount   = document.getElementById('cs-ptc-hooks');
+        hookSearch   = document.getElementById('cs-hkf-search');
 
         if (!panel) return;
 
         computeN1Patterns();
         populatePluginFilter();
+        populateAssetPluginFilter();
         updateBadges();
         updateTotalTime();
         renderPageContext();
         applyFilters();
         renderLogs();
+        renderAssets();
+        renderHooks();
         renderSummary();
         restoreState();
         bindEvents();
@@ -171,8 +188,12 @@
         var showFilters = tab === 'db' || tab === 'http';
         filterBar.style.display = showFilters ? '' : 'none';
         if (dupeChk) dupeChk.parentElement.style.display = tab === 'db' ? '' : 'none';
-        var logFiltersEl = document.querySelector('.cs-log-filters');
-        if (logFiltersEl) logFiltersEl.style.display = tab === 'logs' ? '' : 'none';
+        var logFiltersEl    = document.querySelector('.cs-log-filters');
+        var assetsFiltersEl = document.querySelector('.cs-assets-filters');
+        var hooksFiltersEl  = document.querySelector('.cs-hooks-filters');
+        if (logFiltersEl)    logFiltersEl.style.display    = tab === 'logs'   ? '' : 'none';
+        if (assetsFiltersEl) assetsFiltersEl.style.display = tab === 'assets' ? '' : 'none';
+        if (hooksFiltersEl)  hooksFiltersEl.style.display  = tab === 'hooks'  ? '' : 'none';
     }
 
     // ── Plugin filter dropdown ────────────────────────────────────────────────
@@ -185,6 +206,122 @@
             opt.value = name; opt.text = name;
             pluginSel.appendChild(opt);
         });
+    }
+
+    function populateAssetPluginFilter() {
+        if (!assetPlugin) return;
+        var seen = {};
+        var assets = data.assets || {};
+        (assets.scripts || []).forEach(function (a) { seen[a.plugin] = 1; });
+        (assets.styles  || []).forEach(function (a) { seen[a.plugin] = 1; });
+        Object.keys(seen).sort().forEach(function (name) {
+            var opt   = document.createElement('option');
+            opt.value = name; opt.text = name;
+            assetPlugin.appendChild(opt);
+        });
+    }
+
+    // ── Assets tab ────────────────────────────────────────────────────────────
+    function renderAssets() {
+        if (!assetsTbody) return;
+        var assets  = data.assets || {};
+        var scripts = assets.scripts || [];
+        var styles  = assets.styles  || [];
+
+        var typeFilter   = assetType   ? assetType.value   : '';
+        var pluginFilter = assetPlugin ? assetPlugin.value : '';
+        var search       = assetSearch ? assetSearch.value.toLowerCase().trim() : '';
+
+        var rows = [];
+        if (!typeFilter || typeFilter === 'scripts') {
+            scripts.forEach(function (s) { rows.push({ type: 'JS', handle: s.handle, src: s.src, plugin: s.plugin, ver: s.ver }); });
+        }
+        if (!typeFilter || typeFilter === 'styles') {
+            styles.forEach(function (s)  { rows.push({ type: 'CSS', handle: s.handle, src: s.src, plugin: s.plugin, ver: s.ver }); });
+        }
+
+        rows = rows.filter(function (r) {
+            if (pluginFilter && r.plugin !== pluginFilter) return false;
+            if (search && r.handle.toLowerCase().indexOf(search) === -1
+                       && r.src.toLowerCase().indexOf(search) === -1
+                       && r.plugin.toLowerCase().indexOf(search) === -1) return false;
+            return true;
+        });
+
+        if (rows.length === 0) {
+            assetsTbody.innerHTML = '<tr><td colspan="4" class="cs-empty">'
+                + '<span class="cs-empty-icon">&#128190;</span>No assets match the filters.'
+                + '</td></tr>';
+            return;
+        }
+
+        // Sort: plugin then type then handle
+        rows.sort(function (a, b) {
+            var pc = a.plugin.localeCompare(b.plugin);
+            if (pc !== 0) return pc;
+            var tc = a.type.localeCompare(b.type);
+            return tc !== 0 ? tc : a.handle.localeCompare(b.handle);
+        });
+
+        var html = '';
+        rows.forEach(function (r) {
+            var srcShort = r.src ? truncateUrl(r.src, 55) : '—';
+            html += '<tr>'
+                + '<td class="c-at"><span class="cs-asset-type-' + r.type.toLowerCase() + '">' + r.type + '</span></td>'
+                + '<td class="c-ah" title="' + esc(r.handle) + '">' + esc(r.handle) + (r.ver ? '<span class="cs-asset-ver"> v' + esc(r.ver) + '</span>' : '') + '</td>'
+                + '<td class="c-ap">' + pluginChip(r.plugin) + '</td>'
+                + '<td class="c-au" title="' + esc(r.src) + '"><span class="cs-asset-src">' + esc(srcShort) + '</span></td>'
+                + '</tr>';
+        });
+        assetsTbody.innerHTML = html;
+    }
+
+    // ── Hooks tab ─────────────────────────────────────────────────────────────
+    function renderHooks() {
+        if (!hooksTbody) return;
+        var hooks  = data.hooks || [];
+        var search = hookSearch ? hookSearch.value.toLowerCase().trim() : '';
+
+        var filtered = hooks.filter(function (h) {
+            return !search || h.hook.toLowerCase().indexOf(search) !== -1;
+        });
+
+        // Sort
+        filtered = filtered.slice().sort(function (a, b) {
+            var aVal = a[hookSortCol] !== undefined ? a[hookSortCol] : 0;
+            var bVal = b[hookSortCol] !== undefined ? b[hookSortCol] : 0;
+            if (typeof aVal === 'string') {
+                var cmp = aVal.localeCompare(bVal);
+                return hookSortDir === 'asc' ? cmp : -cmp;
+            }
+            return hookSortDir === 'desc' ? bVal - aVal : aVal - bVal;
+        });
+
+        if (filtered.length === 0) {
+            hooksTbody.innerHTML = '<tr><td colspan="5" class="cs-empty">'
+                + '<span class="cs-empty-icon">&#128279;</span>'
+                + (hooks.length === 0 ? 'No hooks captured.' : 'No hooks match the filter.')
+                + '</td></tr>';
+            return;
+        }
+
+        var maxMs = filtered.length > 0 ? filtered[0].total_ms : 1;
+        var html  = '';
+        filtered.forEach(function (h) {
+            var barW = maxMs > 0 ? Math.max(2, Math.round((h.total_ms / maxMs) * 60)) : 2;
+            var cls  = speedClass(h.max_ms);
+            html += '<tr>'
+                + '<td class="c-hk" title="' + esc(h.hook) + '">' + esc(h.hook) + '</td>'
+                + '<td class="c-hc" style="color:#888">' + h.count + '</td>'
+                + '<td class="c-ht"><div class="cs-time-cell">'
+                    + '<span class="cs-lat-bar cs-lat-' + cls + '" style="width:' + barW + 'px"></span>'
+                    + '<span class="cs-time-val cs-tv-' + cls + '">' + fmtMs(h.total_ms) + '</span>'
+                    + '</div></td>'
+                + '<td class="c-hm cs-tv-' + speedClass(h.max_ms) + '">' + fmtMs(h.max_ms) + '</td>'
+                + '<td class="c-ha" style="color:#888">' + fmtMs(h.avg_ms) + '</td>'
+                + '</tr>';
+        });
+        hooksTbody.innerHTML = html;
     }
 
     // ── Badges ────────────────────────────────────────────────────────────────
@@ -237,7 +374,12 @@
     function updateTabCounts() {
         dbCount.textContent   = filteredDB.length;
         httpCount.textContent = filteredHTTP.length;
-        if (logCount) logCount.textContent = (data.logs || []).length;
+        if (logCount)    logCount.textContent    = (data.logs || []).length;
+        if (assetsCount) {
+            var assets = data.assets || {};
+            assetsCount.textContent = ((assets.scripts || []).length + (assets.styles || []).length);
+        }
+        if (hooksCount) hooksCount.textContent = (data.hooks || []).length;
     }
 
     // ── Multi-column sort ─────────────────────────────────────────────────────
@@ -619,6 +761,30 @@
             + (logs.length === 0 ? '<span class="cs-s-ok">&#10003; No log entries</span>' : '')
             + '</div></div>';
 
+        // Cache card
+        var cache = data.cache || {};
+        if (cache.available) {
+            var hitRateStr = cache.hit_rate !== null ? cache.hit_rate + '%' : '–';
+            var cacheClass = cache.hit_rate !== null ? (cache.hit_rate >= 80 ? 'cs-s-ok' : cache.hit_rate >= 50 ? 'cs-s-warn' : 'cs-s-crit') : '';
+            html += '<div class="cs-sum-card cs-sum-card-cache"><div class="cs-sum-card-title">&#9889; Object Cache</div>'
+                + '<div class="cs-sum-card-stat">' + hitRateStr + '</div>'
+                + '<div class="cs-sum-card-sub">'
+                + (cache.hit_rate !== null ? '<span class="' + cacheClass + '">&#9679; ' + hitRateStr + ' hit rate</span>' : '')
+                + '<span>' + (cache.hits || 0) + ' hits &middot; ' + (cache.misses || 0) + ' misses</span>'
+                + (cache.persistent ? '<span class="cs-s-ok">Persistent cache active</span>' : '<span style="color:#888">Non-persistent (no Redis/Memcache)</span>')
+                + '</div></div>';
+        }
+
+        // Assets card
+        var assets = data.assets || {};
+        var jsCount  = (assets.scripts || []).length;
+        var cssCount = (assets.styles  || []).length;
+        html += '<div class="cs-sum-card cs-sum-card-assets"><div class="cs-sum-card-title">&#128190; Assets</div>'
+            + '<div class="cs-sum-card-stat">' + (jsCount + cssCount) + '</div>'
+            + '<div class="cs-sum-card-sub">'
+            + '<span>' + jsCount + ' JS &middot; ' + cssCount + ' CSS</span>'
+            + '</div></div>';
+
         html += '</div>'; // cards
 
         if (pluginList.length > 0) {
@@ -683,6 +849,22 @@
                     + '<span class="cs-sum-dupe-count">&times;' + g.count + '</span>'
                     + '<span class="cs-sum-dupe-sql">' + esc(truncate(g.sql, 80)) + '</span>'
                     + '<span class="cs-sum-dupe-avg">' + fmtMs(g.count > 0 ? g.total_ms / g.count : 0) + ' avg</span>'
+                    + '</div>';
+            });
+            html += '</div>';
+        }
+
+        // Top hooks
+        var topHooks = (data.hooks || []).slice(0, 8);
+        if (topHooks.length > 0) {
+            var maxHookMs = topHooks[0].total_ms || 1;
+            html += '<div><div class="cs-sum-section-title">Slowest Hooks (top 8 by total time)</div>';
+            topHooks.forEach(function (h) {
+                var bar = maxHookMs > 0 ? Math.max(2, Math.round((h.total_ms / maxHookMs) * 100)) : 2;
+                html += '<div class="cs-sum-lb-row">'
+                    + '<span class="cs-sum-lb-name" title="' + esc(h.hook) + '">' + esc(h.hook) + '</span>'
+                    + '<div class="cs-sum-lb-bar-wrap"><div class="cs-sum-lb-bar cs-sum-lb-bar-hook" style="width:' + bar + '%"></div></div>'
+                    + '<span class="cs-sum-lb-val">' + h.count + '× &middot; ' + fmtMs(h.total_ms) + ' total &middot; max ' + fmtMs(h.max_ms) + '</span>'
                     + '</div>';
             });
             html += '</div>';
@@ -852,6 +1034,42 @@
                 xhr.send('action=cs_perf_debug_toggle&nonce=' + encodeURIComponent(meta.debug_nonce) + '&enable=' + (enable ? '1' : '0'));
             });
         }
+
+        // Assets filters
+        [assetSearch, assetType, assetPlugin].forEach(function (el) {
+            if (!el) return;
+            el.addEventListener('input',  renderAssets);
+            el.addEventListener('change', renderAssets);
+            el.addEventListener('click',  function (e) { e.stopPropagation(); });
+        });
+        var assetsFiltersEl = document.querySelector('.cs-assets-filters');
+        if (assetsFiltersEl) assetsFiltersEl.addEventListener('click', function (e) { e.stopPropagation(); });
+
+        // Hooks filter
+        if (hookSearch) {
+            hookSearch.addEventListener('input',  renderHooks);
+            hookSearch.addEventListener('click',  function (e) { e.stopPropagation(); });
+        }
+        var hooksFiltersEl = document.querySelector('.cs-hooks-filters');
+        if (hooksFiltersEl) hooksFiltersEl.addEventListener('click', function (e) { e.stopPropagation(); });
+
+        // Hooks sort headers
+        Array.prototype.forEach.call(document.querySelectorAll('#cs-pp-hooks .cs-sortable'), function (th) {
+            th.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var col = th.dataset.sort;
+                if (hookSortCol === col) hookSortDir = hookSortDir === 'desc' ? 'asc' : 'desc';
+                else { hookSortCol = col; hookSortDir = 'desc'; }
+                // Update hook sort header arrows
+                Array.prototype.forEach.call(document.querySelectorAll('#cs-pp-hooks .cs-sortable'), function (h) {
+                    var hCol = h.dataset.sort;
+                    var labels = { total_ms: 'Total', count: 'Count', max_ms: 'Max' };
+                    var arrow = hCol !== hookSortCol ? '&#8597;' : (hookSortDir === 'desc' ? '&#8595;' : '&#8593;');
+                    h.innerHTML = (labels[hCol] || hCol) + '&nbsp;' + arrow;
+                });
+                renderHooks();
+            });
+        });
 
         bindResizeHandle();
         bindSortHeaders();

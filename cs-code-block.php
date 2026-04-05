@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.35
+ * Version: 1.7.37
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) ) {
  */
 class CloudScale_Code_Block {
 
-    const VERSION      = '1.7.35';
+    const VERSION      = '1.7.37';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
@@ -200,6 +200,12 @@ class CloudScale_Code_Block {
     private static $perf_prev_error_handler = null;
     /** @var string Template filename captured via template_include filter. */
     private static $perf_template = '';
+    /** @var array Hook fire stats: [ hook => ['count'=>int,'total_ms'=>float,'max_ms'=>float] ] */
+    private static $perf_hooks = [];
+    /** @var float|null Timestamp of last hook fire (ms). */
+    private static $perf_hook_last_ms = null;
+    /** @var string|null Name of last hook fired. */
+    private static $perf_hook_last_name = null;
 
     /**
      * Registers all plugin hooks.
@@ -267,6 +273,13 @@ class CloudScale_Code_Block {
 
         // Capture the active template filename for the page-context strip.
         add_filter( 'template_include', [ __CLASS__, 'perf_capture_template' ], 9999 );
+
+        // Hook timing tracker — fires on every action/filter.
+        add_action( 'all', [ __CLASS__, 'perf_hook_tracker' ] );
+
+        // Scripts & styles — collect at footer time (after everything is enqueued).
+        add_action( 'admin_footer', [ __CLASS__, 'perf_capture_assets' ], 1 );
+        add_action( 'wp_footer',    [ __CLASS__, 'perf_capture_assets' ], 1 );
     }
 
     /* ==================================================================
@@ -1648,6 +1661,204 @@ class CloudScale_Code_Block {
     }
 
     /**
+     * Tracks every action/filter fire for hook timing.
+     * Called via add_action('all', ...) so receives the current hook name automatically.
+     *
+     * @return void
+     */
+    public static function perf_hook_tracker(): void {
+        $hook = current_filter();
+        $now  = microtime( true ) * 1000;
+
+        // Close out the previous hook's timing.
+        if ( null !== self::$perf_hook_last_ms && null !== self::$perf_hook_last_name ) {
+            $elapsed = $now - self::$perf_hook_last_ms;
+            $prev    = self::$perf_hook_last_name;
+            if ( ! isset( self::$perf_hooks[ $prev ] ) ) {
+                self::$perf_hooks[ $prev ] = [ 'count' => 0, 'total_ms' => 0.0, 'max_ms' => 0.0 ];
+            }
+            self::$perf_hooks[ $prev ]['count']++;
+            self::$perf_hooks[ $prev ]['total_ms'] += $elapsed;
+            if ( $elapsed > self::$perf_hooks[ $prev ]['max_ms'] ) {
+                self::$perf_hooks[ $prev ]['max_ms'] = $elapsed;
+            }
+        }
+
+        self::$perf_hook_last_ms   = $now;
+        self::$perf_hook_last_name = $hook;
+    }
+
+    /**
+     * Captures all enqueued scripts and styles at footer time (priority 1).
+     *
+     * @return void
+     */
+    public static function perf_capture_assets(): void {
+        // Only needs to run once; admin_footer and wp_footer both call this.
+        static $done = false;
+        if ( $done ) {
+            return;
+        }
+        $done = true;
+    }
+
+    /**
+     * Builds the scripts & styles payload for the panel.
+     *
+     * @return array{ scripts: array, styles: array }
+     */
+    private static function perf_build_assets_data(): array {
+        $scripts_obj = wp_scripts();
+        $styles_obj  = wp_styles();
+
+        $scripts = [];
+        foreach ( $scripts_obj->done as $handle ) {
+            if ( ! isset( $scripts_obj->registered[ $handle ] ) ) {
+                continue;
+            }
+            $dep = $scripts_obj->registered[ $handle ];
+            $src = $dep->src ?? '';
+            $scripts[] = [
+                'handle' => $handle,
+                'src'    => $src,
+                'plugin' => self::perf_attr_asset( $src ),
+                'ver'    => $dep->ver ?? '',
+                'deps'   => $dep->deps ?? [],
+            ];
+        }
+
+        $styles = [];
+        foreach ( $styles_obj->done as $handle ) {
+            if ( ! isset( $styles_obj->registered[ $handle ] ) ) {
+                continue;
+            }
+            $dep = $styles_obj->registered[ $handle ];
+            $src = $dep->src ?? '';
+            $styles[] = [
+                'handle' => $handle,
+                'src'    => $src,
+                'plugin' => self::perf_attr_asset( $src ),
+                'ver'    => $dep->ver ?? '',
+            ];
+        }
+
+        return [ 'scripts' => $scripts, 'styles' => $styles ];
+    }
+
+    /**
+     * Attributes an asset URL to a plugin or theme slug.
+     *
+     * @param  string $src Asset URL or path.
+     * @return string      Plugin slug, 'theme', 'wp-core', or 'unknown'.
+     */
+    private static function perf_attr_asset( string $src ): string {
+        if ( empty( $src ) ) {
+            return 'unknown';
+        }
+        $content_url = content_url();
+        // Strip the site URL to get a relative path for easier matching.
+        $rel = str_replace( site_url(), '', $src );
+
+        if ( false !== strpos( $rel, '/plugins/' ) ) {
+            if ( preg_match( '#/plugins/([^/]+)/#', $rel, $m ) ) {
+                return $m[1];
+            }
+        }
+        if ( false !== strpos( $rel, '/themes/' ) ) {
+            return 'theme';
+        }
+        if ( false !== strpos( $rel, '/wp-includes/' ) || false !== strpos( $rel, '/wp-admin/' ) ) {
+            return 'wp-core';
+        }
+        return 'unknown';
+    }
+
+    /**
+     * Builds the object-cache stats payload.
+     *
+     * @return array
+     */
+    private static function perf_build_cache_data(): array {
+        global $wp_object_cache;
+
+        if ( ! is_object( $wp_object_cache ) ) {
+            return [ 'available' => false ];
+        }
+
+        // Standard WP internal cache (non-persistent).
+        $hits   = method_exists( $wp_object_cache, 'cache_hits' )
+            ? $wp_object_cache->cache_hits
+            : ( $wp_object_cache->hits ?? null );
+        $misses = method_exists( $wp_object_cache, 'cache_misses' )
+            ? $wp_object_cache->cache_misses
+            : ( $wp_object_cache->misses ?? null );
+
+        // Fallback: try public properties directly (most object cache plugins expose these).
+        if ( null === $hits )   { $hits   = $wp_object_cache->cache_hits   ?? $wp_object_cache->hits   ?? null; }
+        if ( null === $misses ) { $misses = $wp_object_cache->cache_misses ?? $wp_object_cache->misses ?? null; }
+
+        $total    = (int) $hits + (int) $misses;
+        $hit_rate = $total > 0 ? round( ( (int) $hits / $total ) * 100, 1 ) : null;
+
+        // Redis / Memcache info string if available.
+        $info = null;
+        if ( method_exists( $wp_object_cache, 'info' ) ) {
+            $raw = $wp_object_cache->info();
+            $info = is_string( $raw ) ? $raw : wp_json_encode( $raw );
+        }
+
+        // Group stats — available on persistent caches (e.g. Redis Object Cache plugin).
+        $groups = [];
+        if ( isset( $wp_object_cache->stats ) && is_array( $wp_object_cache->stats ) ) {
+            foreach ( $wp_object_cache->stats as $group => $stat ) {
+                if ( is_array( $stat ) ) {
+                    $groups[] = [
+                        'group'   => $group,
+                        'hits'    => $stat['hits']   ?? 0,
+                        'misses'  => $stat['misses'] ?? 0,
+                        'bytes'   => $stat['bytes']  ?? 0,
+                    ];
+                }
+            }
+        }
+
+        return [
+            'available'  => true,
+            'persistent' => ( defined( 'WP_REDIS_VERSION' ) || defined( 'MEMCACHE_VERSION' ) ),
+            'hits'       => (int) $hits,
+            'misses'     => (int) $misses,
+            'hit_rate'   => $hit_rate,
+            'info'       => $info,
+            'groups'     => $groups,
+        ];
+    }
+
+    /**
+     * Builds the top-N hooks timing payload.
+     *
+     * @return array
+     */
+    private static function perf_build_hooks_data(): array {
+        $hooks = self::$perf_hooks;
+        // Sort by total_ms descending.
+        uasort( $hooks, static function ( $a, $b ) {
+            return $b['total_ms'] <=> $a['total_ms'];
+        } );
+
+        $result = [];
+        foreach ( array_slice( $hooks, 0, 50, true ) as $name => $stat ) {
+            $result[] = [
+                'hook'     => $name,
+                'count'    => $stat['count'],
+                'total_ms' => round( $stat['total_ms'], 2 ),
+                'max_ms'   => round( $stat['max_ms'], 2 ),
+                'avg_ms'   => $stat['count'] > 0 ? round( $stat['total_ms'] / $stat['count'], 2 ) : 0,
+            ];
+        }
+        return $result;
+    }
+
+    /**
      * Enqueues performance monitor CSS and JS on frontend pages for admin users.
      *
      * @return void
@@ -1689,6 +1900,9 @@ class CloudScale_Code_Block {
         $http    = self::$perf_http_calls;
         $errors  = self::$perf_php_errors;
         $logs    = self::perf_build_log_data();
+        $assets  = self::perf_build_assets_data();
+        $cache   = self::perf_build_cache_data();
+        $hooks   = self::perf_build_hooks_data();
 
         $q_total = 0.0;
         foreach ( $queries as $q ) {
@@ -1709,6 +1923,9 @@ class CloudScale_Code_Block {
             'http'    => $http,
             'errors'  => $errors,
             'logs'    => $logs,
+            'assets'  => $assets,
+            'cache'   => $cache,
+            'hooks'   => $hooks,
             'meta'    => [
                 'query_count'    => count( $queries ),
                 'query_total_ms' => round( $q_total, 2 ),
@@ -1716,6 +1933,9 @@ class CloudScale_Code_Block {
                 'http_total_ms'  => round( $h_total, 2 ),
                 'error_count'    => count( $errors ),
                 'log_count'      => count( $logs ),
+                'script_count'   => count( $assets['scripts'] ),
+                'style_count'    => count( $assets['styles'] ),
+                'hook_count'     => count( $hooks ),
                 'page_load_ms'       => $page_ms,
                 'is_admin'           => is_admin(),
                 'url'                => isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',
@@ -2169,6 +2389,14 @@ class CloudScale_Code_Block {
                         . '<p>All entries from wp-content/debug.log plus PHP warnings and notices captured during this request. Filter by level (error, warning, notice, deprecated) to focus on what matters.</p>'
                     . '</div>'
                     . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title cs-help-assets">&#128190; Assets</div>'
+                        . '<p>Every JS and CSS file WordPress loaded on this page, grouped by plugin. Use this to find plugin asset bloat, duplicate libraries, or unexpected front-end includes.</p>'
+                    . '</div>'
+                    . '<div class="cs-help-card">'
+                        . '<div class="cs-help-card-title cs-help-hooks">&#128279; Hooks</div>'
+                        . '<p>WordPress action and filter hooks fired during this request, sorted by cumulative time. Slow hooks reveal expensive callbacks added by plugins or your theme.</p>'
+                    . '</div>'
+                    . '<div class="cs-help-card">'
                         . '<div class="cs-help-card-title cs-help-sum">&#9650; Summary</div>'
                         . '<p>Which plugin is responsible for the most DB time, the slowest queries, N+1 patterns, and duplicate queries — the fastest way to find what\'s slowing your site.</p>'
                     . '</div>'
@@ -2191,6 +2419,8 @@ class CloudScale_Code_Block {
                     . '<button class="cs-ptab active" data-tab="db"      role="tab" aria-selected="true">DB Queries <span id="cs-ptc-db">0</span></button>'
                     . '<button class="cs-ptab"         data-tab="http"    role="tab" aria-selected="false">HTTP / REST <span id="cs-ptc-http">0</span></button>'
                     . '<button class="cs-ptab"         data-tab="logs"    role="tab" aria-selected="false">Logs <span id="cs-ptc-log">0</span></button>'
+                    . '<button class="cs-ptab"         data-tab="assets"  role="tab" aria-selected="false">Assets <span id="cs-ptc-assets">0</span></button>'
+                    . '<button class="cs-ptab"         data-tab="hooks"   role="tab" aria-selected="false">Hooks <span id="cs-ptc-hooks">0</span></button>'
                     . '<button class="cs-ptab"         data-tab="summary" role="tab" aria-selected="false">Summary</button>'
                 . '</div>'
                 . '<div id="cs-perf-filters">'
@@ -2251,6 +2481,39 @@ class CloudScale_Code_Block {
                         . '</select>'
                     . '</div>'
                     . '<div id="cs-log-list" class="cs-log-list"></div>'
+                . '</div>'
+                . '<div id="cs-pp-assets" class="cs-ppane" role="tabpanel">'
+                    . '<div class="cs-assets-filters">'
+                        . '<input type="search" id="cs-af-search" placeholder="Filter assets&#8230;" aria-label="Filter assets">'
+                        . '<select id="cs-af-type" aria-label="Filter by type">'
+                            . '<option value="">JS &amp; CSS</option>'
+                            . '<option value="scripts">JS only</option>'
+                            . '<option value="styles">CSS only</option>'
+                        . '</select>'
+                        . '<select id="cs-af-plugin" aria-label="Filter by plugin"><option value="">All plugins</option></select>'
+                    . '</div>'
+                    . '<div class="cs-tbl-wrap">'
+                        . '<table class="cs-ptable"><thead><tr>'
+                            . '<th class="c-at">Type</th>'
+                            . '<th class="c-ah">Handle</th>'
+                            . '<th class="c-ap">Plugin</th>'
+                            . '<th class="c-au">Source</th>'
+                        . '</tr></thead><tbody id="cs-assets-rows"></tbody></table>'
+                    . '</div>'
+                . '</div>'
+                . '<div id="cs-pp-hooks" class="cs-ppane" role="tabpanel">'
+                    . '<div class="cs-hooks-filters">'
+                        . '<input type="search" id="cs-hkf-search" placeholder="Filter hooks&#8230;" aria-label="Filter hooks">'
+                    . '</div>'
+                    . '<div class="cs-tbl-wrap">'
+                        . '<table class="cs-ptable"><thead><tr>'
+                            . '<th class="c-hk cs-sortable cs-sort-hk-active" data-sort="total_ms">Hook&nbsp;&#8595;</th>'
+                            . '<th class="c-hc cs-sortable" data-sort="count">Count&nbsp;&#8597;</th>'
+                            . '<th class="c-ht cs-sortable cs-sort-hk-time" data-sort="total_ms">Total&nbsp;&#8597;</th>'
+                            . '<th class="c-hm cs-sortable" data-sort="max_ms">Max&nbsp;&#8597;</th>'
+                            . '<th class="c-ha">Avg</th>'
+                        . '</tr></thead><tbody id="cs-hooks-rows"></tbody></table>'
+                    . '</div>'
                 . '</div>'
                 . '<div id="cs-pp-summary" class="cs-ppane" role="tabpanel">'
                     . '<div id="cs-summary-wrap" class="cs-tbl-wrap"></div>'
