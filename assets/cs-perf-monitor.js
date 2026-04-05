@@ -266,9 +266,9 @@
 
         rows = rows.filter(function (r) {
             if (pluginFilter && r.plugin !== pluginFilter) return false;
-            if (search && r.handle.toLowerCase().indexOf(search) === -1
-                       && r.src.toLowerCase().indexOf(search) === -1
-                       && r.plugin.toLowerCase().indexOf(search) === -1) return false;
+            if (search && String(r.handle).toLowerCase().indexOf(search) === -1
+                       && String(r.src).toLowerCase().indexOf(search) === -1
+                       && String(r.plugin).toLowerCase().indexOf(search) === -1) return false;
             return true;
         });
 
@@ -1157,12 +1157,12 @@
     }
     function truncate(str, max) {
         if (!str) return '';
-        var s = str.replace(/\s+/g, ' ').trim();
+        var s = String(str).replace(/\s+/g, ' ').trim();
         return s.length > max ? s.slice(0, max - 1) + '\u2026' : s;
     }
     function truncateUrl(url, max) {
         try {
-            var u = new URL(url), out = u.hostname + u.pathname;
+            var u = new URL(String(url)), out = u.hostname + u.pathname;
             if (u.search) out += u.search.slice(0, 20) + (u.search.length > 20 ? '\u2026' : '');
             return out.length > max ? out.slice(0, max - 1) + '\u2026' : out;
         } catch(e) { return truncate(url, max); }

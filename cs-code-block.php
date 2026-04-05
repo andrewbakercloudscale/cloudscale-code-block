@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Code Block
  * Plugin URI: https://andrewbaker.ninja
  * Description: Syntax highlighted code block with auto language detection, clipboard copy, dark/light mode toggle, code block migrator, and read only SQL query tool. Works as a Gutenberg block and as a [cs_code] shortcode.
- * Version: 1.7.43
+ * Version: 1.7.44
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) ) {
  */
 class CloudScale_Code_Block {
 
-    const VERSION      = '1.7.43';
+    const VERSION      = '1.7.44';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-code-sql';
@@ -1712,19 +1712,20 @@ class CloudScale_Code_Block {
         $scripts_obj = wp_scripts();
         $styles_obj  = wp_styles();
 
+        // WP registers scripts/styles with src=false (inline-only); cast to string
+        // so the JS side always receives a string, never a boolean false.
         $scripts = [];
         foreach ( $scripts_obj->done as $handle ) {
             if ( ! isset( $scripts_obj->registered[ $handle ] ) ) {
                 continue;
             }
             $dep = $scripts_obj->registered[ $handle ];
-            $src = $dep->src ?? '';
+            $src = is_string( $dep->src ) ? $dep->src : '';
             $scripts[] = [
-                'handle' => $handle,
+                'handle' => (string) $handle,
                 'src'    => $src,
                 'plugin' => self::perf_attr_asset( $src ),
-                'ver'    => $dep->ver ?? '',
-                'deps'   => $dep->deps ?? [],
+                'ver'    => is_string( $dep->ver ) ? $dep->ver : ( $dep->ver ? (string) $dep->ver : '' ),
             ];
         }
 
@@ -1734,12 +1735,12 @@ class CloudScale_Code_Block {
                 continue;
             }
             $dep = $styles_obj->registered[ $handle ];
-            $src = $dep->src ?? '';
+            $src = is_string( $dep->src ) ? $dep->src : '';
             $styles[] = [
-                'handle' => $handle,
+                'handle' => (string) $handle,
                 'src'    => $src,
                 'plugin' => self::perf_attr_asset( $src ),
-                'ver'    => $dep->ver ?? '',
+                'ver'    => is_string( $dep->ver ) ? $dep->ver : ( $dep->ver ? (string) $dep->ver : '' ),
             ];
         }
 
