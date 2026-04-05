@@ -133,16 +133,22 @@
 
 /* ── Help overlay panel ──────────────────────────────────────────────────── */
 #cs-perf-help {
-    position: absolute;
-    bottom: 48px;
+    position: fixed;
+    bottom: 56px;
     right: 10px;
-    width: min(520px, calc(100vw - 20px));
+    left: 10px;
+    width: auto;
+    max-width: 520px;
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
     background: #252526;
     border: 1px solid #007acc;
     border-radius: 8px;
     padding: 16px;
     z-index: 100000;
     box-shadow: 0 -6px 32px rgba(0,0,0,.7);
+    /* Align to right on wide screens, full-width on narrow */
+    margin-left: auto;
 }
 .cs-perf-help-close {
     position: absolute;
