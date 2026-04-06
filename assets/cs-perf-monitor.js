@@ -171,14 +171,21 @@
 
     // Push the WP content area up so nothing is hidden under the fixed panel.
     function setPadding(px) {
-        // Push the right content area down.
-        document.body.style.paddingBottom = px + 'px';
-        var wpbody = document.getElementById('wpbody-content');
-        if (wpbody) wpbody.style.paddingBottom = px + 'px';
-        // Also pad the left sidebar so bottom menu items (Settings, Collapse)
-        // remain reachable by scrolling above the fixed panel.
+        // Shrink the sidebar so it ends above the panel — no scrolling needed.
         var adminMenu = document.getElementById('adminmenuwrap');
-        if (adminMenu) adminMenu.style.paddingBottom = px + 'px';
+        if (adminMenu) adminMenu.style.bottom = px + 'px';
+
+        // Shrink the main content area height so it fits above the panel.
+        var wpcontent = document.getElementById('wpcontent');
+        if (wpcontent) {
+            wpcontent.style.marginBottom = px + 'px';
+            wpcontent.style.minHeight    = 'calc(100vh - ' + (32 + px) + 'px)';
+        }
+
+        // Clear any old padding-bottom we may have set previously.
+        document.body.style.paddingBottom = '';
+        var wpbody = document.getElementById('wpbody-content');
+        if (wpbody) wpbody.style.paddingBottom = '';
     }
 
     function openPanel(h, animate) {
