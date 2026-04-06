@@ -47,6 +47,7 @@ helpLib.run({
 <li><strong>Copy to clipboard</strong> — uses the Clipboard API (<code>navigator.clipboard.writeText()</code>) with a fallback to <code>document.execCommand('copy')</code> for older browsers.</li>
 <li><strong>Line numbers</strong> — toggle per block. Line numbers are rendered via CSS counter to avoid polluting the copied text when a reader clicks Copy.</li>
 </ul>
+<p><strong>Automatic INI/TOML fragment repair:</strong> When you paste Markdown containing a fenced code block with INI or TOML content, Gutenberg intercepts bare <code>[section]</code> headers on their own line and converts them into <code>core/shortcode</code> blocks, splitting your code block into fragments. CloudScale DevTools detects this automatically and silently merges those fragments back into the preceding code block before you even see the broken state. A brief toast message ("Merged N split code block fragments") confirms when this happens. The merge is conservative — only blocks whose entire content matches a plain section header like <code>[mysql]</code> or <code>[global-settings]</code> are absorbed; real shortcodes like <code>[gallery ids="1,2"]</code> are never touched.</p>
 <p><strong>Requirements:</strong> WordPress 6.0+, PHP 7.4+. The block editor script uses <code>@wordpress/blocks</code> API version available in WordPress 5.8+, but full sidebar panel support requires 6.0.</p>`,
 
         'sql-tool': `
