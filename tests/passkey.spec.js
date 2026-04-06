@@ -21,7 +21,7 @@ const ADMIN_PASS   = process.env.WP_ADMIN_PASS || '';
 const TEST_USER    = process.env.WP_TEST_USER  || 'cs_devtools_test';
 const TEST_PASS    = process.env.WP_TEST_PASS  || 'TempTest2026!';
 const LOGIN_URL    = `${SITE}/wp-login.php`;
-const SECURITY_URL = `${SITE}/wp-admin/tools.php?page=cloudscale-code-sql&tab=login`;
+const SECURITY_URL = `${SITE}/wp-admin/tools.php?page=cloudscale-devtools&tab=login`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

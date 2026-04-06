@@ -1,10 +1,10 @@
-=== CloudScale Code Block ===
+=== CloudScale DevTools ===
 Contributors: andrewbaker
 Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.8.38
+Stable tag: 1.8.42
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Syntax highlighted code block with 14 color themes, auto language detection, cli
 
 == Description ==
 
-CloudScale Code Block is a lightweight, zero dependency Gutenberg block plugin that renders beautifully syntax highlighted code on your WordPress site using highlight.js. It includes a built in code block migrator to convert legacy WordPress code blocks in bulk, and a read only SQL query tool for database diagnostics.
+CloudScale DevTools is a lightweight, zero dependency Gutenberg block plugin that renders beautifully syntax highlighted code on your WordPress site using highlight.js. It includes a built in code block migrator to convert legacy WordPress code blocks in bulk, and a read only SQL query tool for database diagnostics.
 
 = Features =
 
@@ -39,8 +39,8 @@ CloudScale Code Block is a lightweight, zero dependency Gutenberg block plugin t
 
 1. Upload the cs-code-block folder to /wp-content/plugins/
 2. Activate the plugin through the Plugins menu in WordPress
-3. Add a CloudScale Code Block from the Gutenberg block inserter, or use the [cs_code] shortcode
-4. Configure your preferred color theme and dark/light default under Tools > CloudScale Code Block
+3. Add a CloudScale DevTools block from the Gutenberg block inserter, or use the [cs_code] shortcode
+4. Configure your preferred color theme and dark/light default under Tools > CloudScale DevTools
 
 If you were previously using the standalone CloudScale SQL Command plugin, you can deactivate and delete it after activating this version. All SQL functionality is now built in.
 
@@ -78,6 +78,10 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 4. Gutenberg editor sidebar with language, title, and theme override options
 
 == Changelog ==
+
+= 1.8.42 =
+* Changed: Admin page slug renamed from cloudscale-code-sql to cloudscale-devtools (URL is now tools.php?page=cloudscale-devtools); legacy URL redirects automatically
+* Fixed: Help page slug and title updated to cloudscale-devtools-help / CloudScale DevTools: Online Help
 
 = 1.7.57 =
 * Added: Code Block Settings now includes a checkbox to show/hide the CS Monitor performance panel

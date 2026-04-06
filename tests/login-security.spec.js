@@ -51,7 +51,7 @@ async function checkDirectStatus(path) {
     return status;
 }
 const LOGIN_URL        = `${SITE}/wp-login.php`;
-const SECURITY_TAB_URL = `${SITE}/wp-admin/tools.php?page=cloudscale-code-sql&tab=login`;
+const SECURITY_TAB_URL = `${SITE}/wp-admin/tools.php?page=cloudscale-devtools&tab=login`;
 
 /** Pause and ask the tester to type a value (2FA code, URL, etc.) */
 async function askTester(prompt) {

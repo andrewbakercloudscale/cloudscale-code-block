@@ -8,12 +8,12 @@ helpLib.run({
     restPass:   process.env.WP_REST_PASS,
     docsDir:    process.env.WP_DOCS_DIR,
 
-    pluginName: 'CloudScale Code Block',
-    pluginDesc: 'Most code block plugins for WordPress either cost money, depend on slow external CDNs, or produce ugly output you have to style yourself. CloudScale Code Block runs entirely on your server — no external CDN, no API calls, no subscription. Beautiful syntax highlighting, one-click copy, dark/light mode, and a built-in SQL query tool. Completely free.',
-    pageTitle:  'CloudScale Code Block: Online Help',
-    pageSlug:   'code-block-help',
-    downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-code-block.zip',
-    adminUrl:   `${process.env.WP_BASE_URL}/wp-admin/tools.php?page=cloudscale-code-sql`,
+    pluginName: 'CloudScale DevTools',
+    pluginDesc: 'CloudScale DevTools is a free WordPress plugin that runs entirely on your server — no external CDN, no API calls, no subscription. Beautiful syntax highlighting, one-click copy, dark/light mode, a built-in SQL query tool, hide login URL, two-factor authentication, and passkey support. Completely free.',
+    pageTitle:  'CloudScale DevTools: Online Help',
+    pageSlug:   'cloudscale-devtools-help',
+    downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
+    adminUrl:   `${process.env.WP_BASE_URL}/wp-admin/tools.php?page=cloudscale-devtools`,
 
     pluginFile: `${__dirname}/../cs-code-block.php`,
 

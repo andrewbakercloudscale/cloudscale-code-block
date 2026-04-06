@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: CloudScale Code Block
+ * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.38
+ * Version: 1.8.42
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,10 +38,10 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.7.47';
+    const VERSION      = '1.8.42';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
-    const TOOLS_SLUG   = 'cloudscale-code-sql';
+    const TOOLS_SLUG   = 'cloudscale-devtools';
     const MIGRATE_NONCE = 'cs_devtools_code_migrate_action';
 
     /**
@@ -225,6 +225,7 @@ class CloudScale_DevTools {
         add_action( 'enqueue_block_editor_assets', [ __CLASS__, 'enqueue_convert_script' ] );
         add_action( 'admin_menu', [ __CLASS__, 'add_tools_page' ] );
         add_action( 'admin_init', [ __CLASS__, 'register_settings' ] );
+        add_action( 'admin_init', [ __CLASS__, 'redirect_legacy_slug' ] );
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin_assets' ] );
 
         // Migration AJAX
@@ -708,10 +709,26 @@ class CloudScale_DevTools {
      * @since  1.6.0
      * @return void
      */
+    /**
+     * Redirects legacy ?page=cloudscale-code-sql URLs to the new slug.
+     *
+     * @since  1.8.42
+     * @return void
+     */
+    public static function redirect_legacy_slug() {
+        // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( isset( $_GET['page'] ) && $_GET['page'] === 'cloudscale-code-sql' ) {
+            $args = $_GET;
+            $args['page'] = self::TOOLS_SLUG;
+            wp_safe_redirect( add_query_arg( $args, admin_url( 'tools.php' ) ) );
+            exit;
+        }
+    }
+
     public static function add_tools_page() {
         add_management_page(
-            'CloudScale Code Block',
-            '🌩️ CloudScale Code Block',
+            'CloudScale DevTools',
+            '🌩️ CloudScale DevTools',
             'manage_options',
             self::TOOLS_SLUG,
             [ __CLASS__, 'render_tools_page' ]
@@ -829,7 +846,7 @@ class CloudScale_DevTools {
             <!-- Banner -->
             <div id="cs-banner">
                 <div>
-                    <div id="cs-banner-title">⚡ CloudScale Code Block</div>
+                    <div id="cs-banner-title">⚡ CloudScale DevTools</div>
                     <div id="cs-banner-sub"><?php esc_html_e( 'Code blocks, SQL tools, code migrator, site monitor &amp; login security', 'cloudscale-devtools' ); ?> &middot; v<?php echo esc_html( self::VERSION ); ?></div>
                 </div>
                 <div id="cs-banner-right">
