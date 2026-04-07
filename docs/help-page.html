@@ -8,11 +8,14 @@
 .cs-hero{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#0e6b8f 100%);color:#fff;border-radius:12px;padding:48px 40px;margin-bottom:40px;position:relative;overflow:hidden;}
 .cs-hero h1{font-size:2.2em;font-weight:800;margin:0 0 12px;letter-spacing:-.02em;color:#fff;}
 .cs-hero p{font-size:1.1em;margin:0;opacity:.85;max-width:680px;}
-.cs-hero .cs-badge{display:inline-block;background:rgba(255,255,255,.15);border-radius:20px;padding:4px 14px;font-size:.8em;font-weight:600;margin-bottom:16px;letter-spacing:.05em;text-transform:uppercase;}
+.cs-hero .cs-badge{display:inline-block;background:rgba(255,255,255,.15);border-radius:20px;padding:4px 14px;font-size:.8em;font-weight:600;margin-bottom:16px;letter-spacing:.05em;text-transform:uppercase;transition:transform .15s ease,box-shadow .15s ease,background .15s ease;}
+.cs-hero a.cs-badge:hover{transform:translateY(-4px) scale(1.06);box-shadow:0 12px 28px rgba(0,0,0,.45);background:rgba(255,255,255,.3);color:#fff!important;text-decoration:none!important;}
 .cs-download-btn{display:inline-block;background:#16a34a;color:#fff!important;padding:12px 26px;border-radius:8px;text-decoration:none!important;font-size:1em;font-weight:700;letter-spacing:.01em;transition:transform .15s ease,box-shadow .15s ease;}
-.cs-download-btn:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.35);color:#fff!important;text-decoration:none!important;}
-.cs-wporg-btn{display:inline-block;background:#3858e9;color:#fff!important;padding:12px 26px;border-radius:8px;text-decoration:none;font-size:1em;font-weight:700;letter-spacing:.01em;transition:transform .15s ease,box-shadow .15s ease;}
-.cs-wporg-btn:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.35);}
+.cs-download-btn:hover{transform:translateY(-6px) scale(1.04);box-shadow:0 20px 48px rgba(0,0,0,.55);color:#fff!important;text-decoration:none!important;}
+.cs-wporg-btn{display:inline-block;background:#3858e9;color:#fff!important;padding:12px 26px;border-radius:8px;text-decoration:none!important;font-size:1em;font-weight:700;letter-spacing:.01em;transition:transform .15s ease,box-shadow .15s ease;}
+.cs-wporg-btn:hover{transform:translateY(-6px) scale(1.04);box-shadow:0 20px 48px rgba(0,0,0,.55);color:#fff!important;text-decoration:none!important;}
+.cs-github-btn{display:inline-block;background:#24292f;color:#fff!important;padding:12px 26px;border-radius:8px;text-decoration:none!important;font-size:1em;font-weight:700;letter-spacing:.01em;transition:transform .15s ease,box-shadow .15s ease;}
+.cs-github-btn:hover{transform:translateY(-6px) scale(1.04);box-shadow:0 20px 48px rgba(0,0,0,.55);color:#fff!important;text-decoration:none!important;}
 .cs-toc{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:28px 36px;margin:32px 0;}
 .cs-toc-title{font-size:1em;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:0 0 16px;}
 .cs-toc ol{display:grid;grid-template-columns:1fr 1fr;gap:6px 32px;margin:0;padding-left:24px;}
@@ -34,11 +37,11 @@
 </style>
 <div class="cs-help-docs" style="max-width:900px;margin:0 auto;">
 <div class="cs-hero">
-<div class="cs-badge">Free &amp; Open Source</div>
+<a class="cs-badge" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">Free &amp; Open Source</a>
 
 <h1>CloudScale DevTools</h1>
 <p>A free WordPress developer toolkit: syntax-highlighted code blocks, read-only SQL query tool, bulk code migrator, hide login URL, two-factor authentication (TOTP, email, passkeys), and a site performance monitor. Everything runs on your server — no external APIs, no subscriptions.</p>
-<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">⬇ Download Latest Version (.zip)</a></div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"><a class="cs-download-btn" href="https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip">⬇ Download Latest Version (.zip)</a><a class="cs-github-btn" href="https://github.com/andrewbakercloudscale/cloudscale-devtools" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="vertical-align:middle;margin-right:6px;"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> View on GitHub</a></div>
 </div>
 
 <div class="cs-toc">
@@ -56,7 +59,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="code-block">Code Block Overview</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-code-block-4.jpg" alt="Code Block Overview" /></figure>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-code-block-5.jpg" alt="Code Block Overview" /></figure>
 <div class="cs-panel-body">
 <div style="background:#f0f9ff;border-left:4px solid #0e6b8f;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:28px;">
 <h2 style="margin:0 0 10px;font-size:1.3em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Why CloudScale DevTools?</h2>
@@ -86,7 +89,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="migrator">Code Block Migrator</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-migrator-4.jpg" alt="Code Block Migrator" /></figure>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-migrator-5.jpg" alt="Code Block Migrator" /></figure>
 <div class="cs-panel-body">
 <p>The <strong>Code Block Migrator</strong> converts legacy code block shortcodes and HTML from other WordPress syntax highlighting plugins to CloudScale DevTools blocks in a single batch operation — without manual copy-paste or post-by-post editing.</p>
 <p><strong>Supported source formats:</strong></p>
@@ -109,7 +112,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="sql-tool">SQL Query Tool</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-sql-tool-4.jpg" alt="SQL Query Tool" /></figure>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-sql-tool-5.jpg" alt="SQL Query Tool" /></figure>
 <div class="cs-panel-body">
 <p>The <strong>SQL Query Tool</strong> lets WordPress administrators run read-only SELECT queries against the live database from within wp-admin — without needing phpMyAdmin, Adminer, or SSH access. Results are displayed in a paginated table with column headers and query execution time.</p>
 <p><strong>Security model:</strong></p>
@@ -131,7 +134,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="hide-login">Hide Login URL</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-hide-login-4.jpg" alt="Hide Login URL" /></figure>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-hide-login-5.jpg" alt="Hide Login URL" /></figure>
 <div class="cs-panel-body">
 <p>The <strong>Hide Login URL</strong> feature moves your WordPress login page away from the default <code>/wp-login.php</code> address to a secret URL of your choosing. Bots and automated scanners that probe <code>/wp-login.php</code> receive a 404 response — they never see the login form, which eliminates the vast majority of brute-force and credential-stuffing traffic.</p>
 <p><strong>How it works:</strong></p>
@@ -153,7 +156,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="2fa">Two-Factor Auth</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-2fa-4.jpg" alt="Two-Factor Auth" /></figure>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-2fa-5.jpg" alt="Two-Factor Auth" /></figure>
 <div class="cs-panel-body">
 <p><strong>Two-Factor Authentication (2FA)</strong> requires users to prove their identity with a second factor — a one-time code — in addition to their password. Even if a password is compromised, an attacker cannot log in without also having access to the second factor.</p>
 <p><strong>Available methods:</strong></p>
@@ -173,7 +176,7 @@
 
 <div class="cs-panel-section">
 <h3 class="cs-panel-heading" id="passkeys">Passkeys (WebAuthn)</h3>
-<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-passkeys-4.jpg" alt="Passkeys (WebAuthn)" /></figure>
+<figure class="cs-screenshot"><img src="https://andrewbaker.ninja/wp-content/uploads/2026/04/panel-passkeys-5.jpg" alt="Passkeys (WebAuthn)" /></figure>
 <div class="cs-panel-body">
 <p><strong>Passkeys</strong> are FIDO2/WebAuthn credentials that replace password-based 2FA codes with a biometric or hardware-key verification. When you log in, instead of typing a 6-digit code, you authenticate with Face ID, Touch ID, Windows Hello, or a physical security key (YubiKey, etc.).</p>
 <p><strong>How passkeys work:</strong></p>

@@ -10,9 +10,10 @@ helpLib.run({
 
     pluginName: 'CloudScale DevTools',
     pluginDesc: 'A free WordPress developer toolkit: syntax-highlighted code blocks, read-only SQL query tool, bulk code migrator, hide login URL, two-factor authentication (TOTP, email, passkeys), and a site performance monitor. Everything runs on your server — no external APIs, no subscriptions.',
-    pageTitle:  'CloudScale DevTools: Online Help',
+    pageTitle:  'CloudScale DevTools',
     pageSlug:   'cloudscale-devtools-help',
     downloadUrl: 'https://andrewninjawordpress.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
+    repoUrl:     'https://github.com/andrewbakercloudscale/cloudscale-devtools',
     adminUrl:   `${process.env.WP_BASE_URL}/wp-admin/tools.php?page=cloudscale-devtools`,
 
     pluginFile: `${__dirname}/../cs-code-block.php`,

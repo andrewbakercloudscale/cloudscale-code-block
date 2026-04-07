@@ -41,20 +41,20 @@
     const twoFaSaveBtn = document.getElementById( 'cs-2fa-save' );
     const twoFaSaved   = document.getElementById( 'cs-2fa-saved' );
 
+    function collectLoginPayload() {
+        return {
+            hide_enabled:     document.getElementById( 'cs-hide-enabled' )?.checked ? '1' : '0',
+            login_slug:       document.getElementById( 'cs-login-slug' )?.value.trim() || '',
+            method:           document.querySelector( 'input[name="cs_devtools_2fa_method"]:checked' )?.value || 'off',
+            force_admins:     document.getElementById( 'cs-2fa-force' )?.checked ? '1' : '0',
+            session_duration: document.getElementById( 'cs-session-duration' )?.value || 'default',
+        };
+    }
+
     if ( hideSaveBtn ) {
         hideSaveBtn.addEventListener( 'click', () => {
-            const hide  = document.getElementById( 'cs-hide-enabled' )?.checked ? '1' : '0';
-            const slug  = document.getElementById( 'cs-login-slug' )?.value.trim() || '';
-            const method = document.querySelector( 'input[name="cs_devtools_2fa_method"]:checked' )?.value || 'off';
-            const force  = document.getElementById( 'cs-2fa-force' )?.checked ? '1' : '0';
-
             hideSaveBtn.disabled = true;
-            post( 'cs_devtools_login_save', {
-                hide_enabled: hide,
-                login_slug:   slug,
-                method,
-                force_admins: force,
-            } ).then( res => {
+            post( 'cs_devtools_login_save', collectLoginPayload() ).then( res => {
                 hideSaveBtn.disabled = false;
                 if ( res.success ) {
                     flash( hideSaved, true );
@@ -77,20 +77,30 @@
         } );
     }
 
+    const sessionSaveBtn = document.getElementById( 'cs-session-save' );
+    const sessionSaved   = document.getElementById( 'cs-session-saved' );
+
+    if ( sessionSaveBtn ) {
+        sessionSaveBtn.addEventListener( 'click', () => {
+            sessionSaveBtn.disabled = true;
+            post( 'cs_devtools_login_save', collectLoginPayload() ).then( res => {
+                sessionSaveBtn.disabled = false;
+                if ( res.success ) {
+                    flash( sessionSaved, true );
+                } else {
+                    alert( res.data || 'Save failed.' );
+                }
+            } ).catch( () => {
+                sessionSaveBtn.disabled = false;
+                alert( 'Save failed. Check your connection.' );
+            } );
+        } );
+    }
+
     if ( twoFaSaveBtn ) {
         twoFaSaveBtn.addEventListener( 'click', () => {
-            const hide   = document.getElementById( 'cs-hide-enabled' )?.checked ? '1' : '0';
-            const slug   = document.getElementById( 'cs-login-slug' )?.value.trim() || '';
-            const method = document.querySelector( 'input[name="cs_devtools_2fa_method"]:checked' )?.value || 'off';
-            const force  = document.getElementById( 'cs-2fa-force' )?.checked ? '1' : '0';
-
             twoFaSaveBtn.disabled = true;
-            post( 'cs_devtools_login_save', {
-                hide_enabled: hide,
-                login_slug:   slug,
-                method,
-                force_admins: force,
-            } ).then( res => {
+            post( 'cs_devtools_login_save', collectLoginPayload() ).then( res => {
                 twoFaSaveBtn.disabled = false;
                 if ( res.success ) {
                     flash( twoFaSaved, true );

@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.63
+ * Version: 1.8.74
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -43,6 +43,10 @@ class CloudScale_DevTools {
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
     const MIGRATE_NONCE = 'cs_devtools_code_migrate_action';
+    const CUSTOM_404_OPTION  = 'cs_devtools_custom_404';
+    const SCHEME_404_OPTION  = 'cs_devtools_404_scheme';
+    const HISCORE_NS         = 'cs-devtools/v1';
+    const SCORE_NONCE_ACTION = 'cs_devtools_score_post';
 
     /**
      * Returns the theme registry mapping slugs to CDN filenames and colour values.
@@ -212,6 +216,8 @@ class CloudScale_DevTools {
     private static $perf_template_hierarchy = [];
     /** @var array Request lifecycle milestones: [ ['label'=>string, 'ms'=>float] ] */
     private static $perf_milestones = [];
+    /** @var array|null Pending email log entry for the in-flight wp_mail() call. */
+    private static $smtp_log_pending = null;
 
     /**
      * Registers all plugin hooks.
@@ -254,10 +260,39 @@ class CloudScale_DevTools {
         add_action( 'profile_update',       [ __CLASS__, 'on_profile_update' ], 10, 2 );
         CS_DevTools_Passkey::register_hooks();
 
+        // SMTP AJAX
+        add_action( 'wp_ajax_cs_devtools_smtp_save',      [ __CLASS__, 'ajax_smtp_save' ] );
+        add_action( 'wp_ajax_cs_devtools_smtp_test',      [ __CLASS__, 'ajax_smtp_test' ] );
+        add_action( 'wp_ajax_cs_devtools_smtp_log_clear', [ __CLASS__, 'ajax_smtp_log_clear' ] );
+        add_action( 'wp_ajax_cs_devtools_smtp_log_fetch', [ __CLASS__, 'ajax_smtp_log_fetch' ] );
+
+        // Email log — always active so every wp_mail() call is tracked site-wide,
+        // regardless of whether our SMTP is enabled.
+        add_filter( 'wp_mail',        [ __CLASS__, 'smtp_log_capture' ] );
+        add_action( 'wp_mail_failed', [ __CLASS__, 'smtp_log_on_failure' ] );
+        // Priority 5 so it runs before phpmailer_configure (priority 10) and sets action_function first.
+        add_action( 'phpmailer_init', [ __CLASS__, 'smtp_log_set_callback' ], 5 );
+
+        // SMTP — configure phpmailer and override from address only when fully configured.
+        // Guard: if host is empty we skip configuration entirely so other plugins' emails
+        // continue to work via PHP mail() rather than silently failing.
+        if ( get_option( 'cs_devtools_smtp_enabled', '0' ) === '1'
+            && '' !== trim( (string) get_option( 'cs_devtools_smtp_host', '' ) )
+        ) {
+            add_action( 'phpmailer_init', [ __CLASS__, 'phpmailer_configure' ] );
+            if ( get_option( 'cs_devtools_smtp_from_email', '' ) ) {
+                add_filter( 'wp_mail_from',      [ __CLASS__, 'smtp_from_email' ] );
+            }
+            if ( get_option( 'cs_devtools_smtp_from_name', '' ) ) {
+                add_filter( 'wp_mail_from_name', [ __CLASS__, 'smtp_from_name' ] );
+            }
+        }
+
         // Login security — URL intercept / 2FA flow (early, priority 1 on init).
         add_action( 'init',        [ __CLASS__, 'login_serve_custom_slug' ], 1 );
         add_action( 'login_init',  [ __CLASS__, 'login_redirect_authenticated' ], 0 );
         add_action( 'login_init',  [ __CLASS__, 'login_block_direct_access' ], 1 );
+        add_filter( 'auth_cookie_expiration', [ __CLASS__, 'login_session_expiration' ], 10, 3 );
         add_action( 'login_init',  [ __CLASS__, 'login_2fa_handle' ] );
         add_filter( 'authenticate',        [ __CLASS__, 'login_2fa_intercept' ], 100, 3 );
         add_filter( 'login_url',           [ __CLASS__, 'login_custom_url' ], 10, 3 );
@@ -265,6 +300,11 @@ class CloudScale_DevTools {
         add_filter( 'lostpassword_url',    [ __CLASS__, 'login_custom_lostpassword_url' ], 10, 2 );
         add_filter( 'network_site_url',    [ __CLASS__, 'login_custom_network_url' ], 10, 3 );
         add_filter( 'site_url',            [ __CLASS__, 'login_custom_site_url' ], 10, 4 );
+
+        // Custom 404 page + hiscore leaderboard.
+        add_action( 'template_redirect',                        [ __CLASS__, 'maybe_custom_404' ], 1 );
+        add_action( 'rest_api_init',                            [ __CLASS__, 'register_hiscore_routes' ] );
+        add_action( 'wp_ajax_cs_devtools_save_404_settings',    [ __CLASS__, 'ajax_save_404_settings' ] );
 
         // Performance monitor — EXPLAIN endpoint.
         add_action( 'wp_ajax_cs_devtools_perf_explain',       [ __CLASS__, 'ajax_perf_explain' ] );
@@ -717,6 +757,66 @@ class CloudScale_DevTools {
             'sanitize_callback' => function ( $v ) { return '1' === $v ? '1' : '0'; },
             'default'           => '0',
         ] );
+        register_setting( 'cs_devtools_login_settings', 'cs_devtools_session_duration', [
+            'type'              => 'string',
+            'sanitize_callback' => static function ( $v ) {
+                $valid = [ 'default', '1', '7', '14', '30', '90', '365' ];
+                return in_array( $v, $valid, true ) ? $v : 'default';
+            },
+            'default' => 'default',
+        ] );
+
+        // SMTP settings
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_enabled', [
+            'type'              => 'string',
+            'sanitize_callback' => static function ( $v ) { return $v === '1' ? '1' : '0'; },
+            'default'           => '0',
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_host', [
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => '',
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_port', [
+            'type'              => 'integer',
+            'sanitize_callback' => static function ( $v ) {
+                $v = absint( $v );
+                return $v > 0 ? $v : 587;
+            },
+            'default'           => 587,
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_encryption', [
+            'type'              => 'string',
+            'sanitize_callback' => static function ( $v ) {
+                return in_array( $v, [ 'tls', 'ssl', 'none' ], true ) ? $v : 'tls';
+            },
+            'default'           => 'tls',
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_auth', [
+            'type'              => 'string',
+            'sanitize_callback' => static function ( $v ) { return $v === '1' ? '1' : '0'; },
+            'default'           => '1',
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_user', [
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => '',
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_pass', [
+            'type'              => 'string',
+            'sanitize_callback' => static function ( $v ) { return $v; },
+            'default'           => '',
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_from_email', [
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_email',
+            'default'           => '',
+        ] );
+        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_from_name', [
+            'type'              => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default'           => '',
+        ] );
     }
 
     /* ==================================================================
@@ -863,6 +963,38 @@ class CloudScale_DevTools {
                 true
             );
         }
+
+        if ( $active_tab === 'mail' ) {
+            wp_enqueue_script(
+                'cs-smtp',
+                plugins_url( 'assets/cs-smtp.js', __FILE__ ),
+                [],
+                filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-smtp.js' ),
+                true
+            );
+            wp_localize_script( 'cs-smtp', 'csDevtoolsSmtp', [
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( self::SMTP_NONCE ),
+                'testTo'  => wp_get_current_user()->user_email,
+            ] );
+        }
+
+        if ( $active_tab === '404' ) {
+            wp_enqueue_script(
+                'cs-404-admin',
+                plugins_url( 'assets/cs-404-admin.js', __FILE__ ),
+                [],
+                filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-404-admin.js' ),
+                true
+            );
+            wp_localize_script( 'cs-404-admin', 'csDevtools404', [
+                'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+                'nonce'      => wp_create_nonce( 'cs_devtools_404_settings' ),
+                'custom_404' => get_option( self::CUSTOM_404_OPTION, 0 ) ? 1 : 0,
+                'scheme'     => get_option( self::SCHEME_404_OPTION, 'ocean' ),
+                'previewUrl' => home_url( '/this-page-does-not-exist' ),
+            ] );
+        }
     }
 
     /**
@@ -905,6 +1037,14 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'login' ? 'active' : ''; ?>">
                     🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=mail' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'mail' ? 'active' : ''; ?>">
+                    📧 <?php esc_html_e( 'Mail / SMTP', 'cloudscale-devtools' ); ?>
+                </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=404' ); ?>"
+                   class="cs-tab <?php echo $active_tab === '404' ? 'active' : ''; ?>">
+                    🎮 <?php esc_html_e( '404 Games', 'cloudscale-devtools' ); ?>
+                </a>
             </div>
 
             <?php if ( $active_tab === 'migrate' ) : ?>
@@ -919,6 +1059,14 @@ class CloudScale_DevTools {
             <?php elseif ( $active_tab === 'login' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_login_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'mail' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php self::render_smtp_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === '404' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php self::render_404_panel(); ?>
                 </div>
             <?php endif; ?>
 
@@ -1341,6 +1489,47 @@ class CloudScale_DevTools {
                 <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
                     <button type="button" class="cs-btn-primary" id="cs-hide-save">💾 <?php esc_html_e( 'Save Hide Login Settings', 'cloudscale-devtools' ); ?></button>
                     <span class="cs-settings-saved" id="cs-hide-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Session Duration ──────────────────────── -->
+        <?php
+        $session_duration = get_option( 'cs_devtools_session_duration', 'default' );
+        $duration_options = [
+            'default' => __( 'WordPress default (2 days / 14 days with Remember Me)', 'cloudscale-devtools' ),
+            '1'       => __( '1 day', 'cloudscale-devtools' ),
+            '7'       => __( '7 days', 'cloudscale-devtools' ),
+            '14'      => __( '14 days', 'cloudscale-devtools' ),
+            '30'      => __( '30 days', 'cloudscale-devtools' ),
+            '90'      => __( '90 days', 'cloudscale-devtools' ),
+            '365'     => __( '1 year', 'cloudscale-devtools' ),
+        ];
+        ?>
+        <div class="cs-panel" id="cs-panel-session">
+            <div class="cs-section-header cs-section-header-blue">
+                <span>⏱ SESSION DURATION</span>
+                <span class="cs-header-hint"><?php esc_html_e( 'How long login sessions stay valid', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'session-duration', 'Session Duration', [
+                    [ 'name' => 'Session Lifetime',     'rec' => 'Recommended', 'desc' => 'Sets how long the WordPress auth cookie stays valid before the user must log in again. Choose a shorter duration (1–7 days) for higher-security environments, or a longer one (30–90 days) for convenience. Leave on WordPress default if you have no specific requirement.' ],
+                    [ 'name' => 'Remember Me & timing', 'rec' => 'Note',        'desc' => "When a custom duration is set, the \"Remember Me\" checkbox is overridden — all new sessions get the same lifetime regardless.\n\nChanging this setting only affects new logins. Users who are already logged in keep their current session cookie until it expires or they log out." ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div class="cs-field-row">
+                    <div class="cs-field">
+                        <label class="cs-label" for="cs-session-duration"><?php esc_html_e( 'Session expires after:', 'cloudscale-devtools' ); ?></label>
+                        <select id="cs-session-duration" class="cs-input" style="max-width:360px">
+                            <?php foreach ( $duration_options as $val => $label ) : ?>
+                            <option value="<?php echo esc_attr( $val ); ?>" <?php selected( $session_duration, (string) $val ); ?>><?php echo esc_html( $label ); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="cs-hint"><?php esc_html_e( 'Applies from the next login. Existing sessions are not affected.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+                <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
+                    <button type="button" class="cs-btn-primary" id="cs-session-save">💾 <?php esc_html_e( 'Save Session Settings', 'cloudscale-devtools' ); ?></button>
+                    <span class="cs-settings-saved" id="cs-session-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 </div>
             </div>
         </div>
@@ -3498,6 +3687,7 @@ class CloudScale_DevTools {
     // ── Constants ────────────────────────────────────────────────────────
 
     const LOGIN_NONCE           = 'cs_devtools_login_nonce';
+    const SMTP_NONCE            = 'cs_devtools_smtp_nonce';
     const LOGIN_2FA_TRANSIENT   = 'cs_devtools_2fa_pending_';    // + random token
     const LOGIN_OTP_TRANSIENT   = 'cs_devtools_2fa_otp_';        // + user_id
     const EMAIL_VERIFY_TRANSIENT = 'cs_devtools_email_verify_';  // + random token (10 min)
@@ -3558,6 +3748,28 @@ class CloudScale_DevTools {
 
         require_once ABSPATH . 'wp-login.php'; // phpcs:ignore WPThemeReview.CoreFunctionality.FileInclude.FileIncludeFound
         exit;
+    }
+
+    /**
+     * Filters the auth cookie lifetime.
+     *
+     * When a custom session duration has been set in the Login Security settings,
+     * this overrides WordPress's default 2-day (non-remember) / 14-day (remember)
+     * lifetimes with the admin-configured value — applied uniformly regardless of
+     * whether the user ticked "Remember Me".
+     *
+     * @since  1.9.4
+     * @param  int  $expiration Default expiration in seconds.
+     * @param  int  $user_id    User ID being authenticated.
+     * @param  bool $remember   Whether "Remember Me" was checked.
+     * @return int
+     */
+    public static function login_session_expiration( int $expiration, int $user_id, bool $remember ): int {
+        $duration = get_option( 'cs_devtools_session_duration', 'default' );
+        if ( 'default' === $duration ) {
+            return $expiration;
+        }
+        return (int) $duration * DAY_IN_SECONDS;
     }
 
     /**
@@ -4171,6 +4383,14 @@ class CloudScale_DevTools {
         update_option( 'cs_devtools_2fa_method', $method );
         update_option( 'cs_devtools_2fa_force_admins', $force );
 
+        // Session duration
+        $valid_durations = [ 'default', '1', '7', '14', '30', '90', '365' ];
+        $duration        = isset( $_POST['session_duration'] ) ? sanitize_key( wp_unslash( $_POST['session_duration'] ) ) : 'default';
+        if ( ! in_array( $duration, $valid_durations, true ) ) {
+            $duration = 'default';
+        }
+        update_option( 'cs_devtools_session_duration', $duration );
+
         $new_url = $hide === '1' && $slug ? home_url( '/' . $slug . '/' ) : wp_login_url();
         wp_send_json_success( [ 'login_url' => $new_url ] );
     }
@@ -4591,6 +4811,617 @@ class CloudScale_DevTools {
         }
     }
 
+    /* ==================================================================
+       SMTP — MAIL / SMTP CONFIGURATION
+       ================================================================== */
+
+    /**
+     * Renders the Mail / SMTP settings panel.
+     *
+     * @since  1.9.0
+     * @return void
+     */
+    private static function render_smtp_panel(): void {
+        $enabled    = get_option( 'cs_devtools_smtp_enabled',    '0' ) === '1';
+        $host       = get_option( 'cs_devtools_smtp_host',       '' );
+        $port       = get_option( 'cs_devtools_smtp_port',       587 );
+        $encryption = get_option( 'cs_devtools_smtp_encryption', 'tls' );
+        $auth       = get_option( 'cs_devtools_smtp_auth',       '1' ) === '1';
+        $user       = get_option( 'cs_devtools_smtp_user',       '' );
+        $has_pass   = '' !== get_option( 'cs_devtools_smtp_pass', '' );
+        $from_email = get_option( 'cs_devtools_smtp_from_email', '' );
+        $from_name  = get_option( 'cs_devtools_smtp_from_name',  '' );
+        ?>
+
+        <!-- ── SMTP Configuration ─────────────────────────────── -->
+        <div class="cs-panel" id="cs-panel-smtp">
+            <div class="cs-section-header cs-section-header-blue">
+                <span>📧 SMTP CONFIGURATION</span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Replace PHP mail() with a real SMTP connection', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'smtp', 'SMTP Configuration', [
+                    [ 'name' => 'Enable SMTP',        'rec' => 'Recommended', 'desc' => 'Routes all WordPress emails through your own SMTP server instead of the server\'s PHP mail() function. This dramatically improves deliverability and lets you use Gmail, Outlook, or any hosted mail service.' ],
+                    [ 'name' => 'App Passwords',      'rec' => 'Note',        'desc' => 'Gmail and most modern providers require an App Password rather than your regular account password. Generate one in your Google or provider account security settings and paste it here.' ],
+                    [ 'name' => 'Send Test Email',    'rec' => 'Note',        'desc' => 'Sends a test message to your admin email using your current saved settings. If it fails, check your host, port, and encryption match your provider\'s requirements (port 587 + TLS is the safest default), and that you\'re using an App Password where required.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <p class="cs-login-desc"><?php esc_html_e( 'When enabled, all WordPress emails are sent through your SMTP server instead of the server\'s PHP mail() function. This improves deliverability and lets you use Gmail, Outlook, or any hosted mail service.', 'cloudscale-devtools' ); ?></p>
+
+                <div class="cs-toggle-row">
+                    <label class="cs-toggle-label">
+                        <input type="checkbox" id="cs-smtp-enabled" <?php checked( $enabled ); ?>>
+                        <span class="cs-toggle-switch"></span>
+                        <span class="cs-toggle-text"><?php esc_html_e( 'Enable SMTP', 'cloudscale-devtools' ); ?></span>
+                    </label>
+                </div>
+
+                <div id="cs-smtp-fields" style="margin-top:18px<?php echo $enabled ? '' : ';opacity:.5;pointer-events:none'; ?>">
+
+                    <div class="cs-field-row">
+                        <div class="cs-field">
+                            <label class="cs-label" for="cs-smtp-host"><?php esc_html_e( 'SMTP Host:', 'cloudscale-devtools' ); ?></label>
+                            <input type="text" id="cs-smtp-host" class="cs-input"
+                                   value="<?php echo esc_attr( $host ); ?>"
+                                   placeholder="smtp.gmail.com"
+                                   style="max-width:360px" autocomplete="off" spellcheck="false">
+                            <span class="cs-hint"><?php esc_html_e( 'Your SMTP server hostname, e.g. smtp.gmail.com or mail.yourdomain.com', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                    </div>
+
+                    <div class="cs-field-row" style="margin-top:14px">
+                        <div class="cs-field">
+                            <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+                                <div>
+                                    <label class="cs-label" for="cs-smtp-port"><?php esc_html_e( 'Port:', 'cloudscale-devtools' ); ?></label>
+                                    <input type="number" id="cs-smtp-port" class="cs-input"
+                                           value="<?php echo esc_attr( $port ?: 587 ); ?>"
+                                           min="1" max="65535" style="width:90px">
+                                </div>
+                                <div>
+                                    <label class="cs-label" for="cs-smtp-encryption"><?php esc_html_e( 'Encryption:', 'cloudscale-devtools' ); ?></label>
+                                    <select id="cs-smtp-encryption" class="cs-input" style="min-width:220px">
+                                        <option value="tls"  <?php selected( $encryption ?: 'tls', 'tls' ); ?>><?php esc_html_e( 'TLS (STARTTLS) — port 587', 'cloudscale-devtools' ); ?></option>
+                                        <option value="ssl"  <?php selected( $encryption ?: 'tls', 'ssl' ); ?>><?php esc_html_e( 'SSL — port 465', 'cloudscale-devtools' ); ?></option>
+                                        <option value="none" <?php selected( $encryption ?: 'tls', 'none' ); ?>><?php esc_html_e( 'None — port 25', 'cloudscale-devtools' ); ?></option>
+                                    </select>
+                                </div>
+                            </div>
+                            <span class="cs-hint"><?php esc_html_e( 'TLS on 587 is recommended for most providers. Gmail requires TLS or SSL.', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                    </div>
+
+                    <!-- Auth -->
+                    <div class="cs-toggle-row" style="margin-top:18px">
+                        <label class="cs-toggle-label">
+                            <input type="checkbox" id="cs-smtp-auth" <?php checked( $auth ); ?>>
+                            <span class="cs-toggle-switch"></span>
+                            <span class="cs-toggle-text"><?php esc_html_e( 'SMTP Authentication', 'cloudscale-devtools' ); ?></span>
+                        </label>
+                    </div>
+
+                    <div id="cs-smtp-auth-fields" style="margin-top:14px<?php echo $auth ? '' : ';display:none'; ?>">
+                        <div class="cs-field-row">
+                            <div class="cs-field">
+                                <label class="cs-label" for="cs-smtp-user"><?php esc_html_e( 'Username:', 'cloudscale-devtools' ); ?></label>
+                                <input type="text" id="cs-smtp-user" class="cs-input"
+                                       value="<?php echo esc_attr( $user ); ?>"
+                                       placeholder="you@gmail.com"
+                                       style="max-width:360px" autocomplete="off" spellcheck="false">
+                            </div>
+                        </div>
+                        <div class="cs-field-row" style="margin-top:12px">
+                            <div class="cs-field">
+                                <label class="cs-label" for="cs-smtp-pass"><?php esc_html_e( 'Password:', 'cloudscale-devtools' ); ?></label>
+                                <?php if ( $has_pass ) : ?>
+                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                                    <span style="color:#666;font-size:13px">••••••••&nbsp;<?php esc_html_e( '(password saved)', 'cloudscale-devtools' ); ?></span>
+                                    <button type="button" id="cs-smtp-pass-change" style="font-size:12px;padding:3px 10px;cursor:pointer;background:#f0f4ff;border:1.5px solid #c7d2fe;color:#2271b1;border-radius:5px">
+                                        <?php esc_html_e( 'Change', 'cloudscale-devtools' ); ?>
+                                    </button>
+                                </div>
+                                <div style="display:none;align-items:center;gap:8px" id="cs-smtp-pass-row">
+                                    <input type="password" id="cs-smtp-pass" class="cs-input"
+                                           placeholder="<?php esc_attr_e( 'Enter new password to replace', 'cloudscale-devtools' ); ?>"
+                                           style="max-width:320px" autocomplete="new-password">
+                                    <button type="button" id="cs-smtp-pass-view" style="font-size:12px;padding:3px 10px;cursor:pointer;background:#f0f4ff;border:1.5px solid #c7d2fe;color:#2271b1;border-radius:5px;white-space:nowrap">
+                                        <?php esc_html_e( 'View', 'cloudscale-devtools' ); ?>
+                                    </button>
+                                </div>
+                                <?php else : ?>
+                                <div style="display:flex;align-items:center;gap:8px">
+                                    <input type="password" id="cs-smtp-pass" class="cs-input"
+                                           placeholder="<?php esc_attr_e( 'App password or SMTP password', 'cloudscale-devtools' ); ?>"
+                                           style="max-width:320px" autocomplete="new-password">
+                                    <button type="button" id="cs-smtp-pass-view" style="font-size:12px;padding:3px 10px;cursor:pointer;background:#f0f4ff;border:1.5px solid #c7d2fe;color:#2271b1;border-radius:5px;white-space:nowrap">
+                                        <?php esc_html_e( 'View', 'cloudscale-devtools' ); ?>
+                                    </button>
+                                </div>
+                                <?php endif; ?>
+                                <span class="cs-hint"><?php esc_html_e( 'For Gmail, use an App Password (not your Google account password).', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div><!-- /#cs-smtp-fields -->
+
+                <div style="margin-top:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                    <button type="button" class="cs-btn-primary" id="cs-smtp-save">💾 <?php esc_html_e( 'Save SMTP Settings', 'cloudscale-devtools' ); ?></button>
+                    <span class="cs-settings-saved" id="cs-smtp-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                    <button type="button" class="cs-btn-primary" id="cs-smtp-test-btn" style="margin-left:6px">📨 <?php esc_html_e( 'Send Test Email', 'cloudscale-devtools' ); ?></button>
+                    <span id="cs-smtp-test-result" style="font-size:13px"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── From Address ───────────────────────────────────── -->
+        <div class="cs-panel" id="cs-panel-smtp-from">
+            <div class="cs-section-header cs-section-header-green">
+                <span>✉️ FROM ADDRESS</span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Override the sender name and email on all outgoing mail', 'cloudscale-devtools' ); ?></span>
+                <?php self::render_explain_btn( 'smtp-from', 'From Address', [
+                    [ 'name' => 'From Name & Email',  'rec' => 'Recommended', 'desc' => 'Sets the sender name and email address that recipients see in their inbox. Leave blank to keep WordPress defaults (usually the site name and admin email).' ],
+                    [ 'name' => 'SMTP Authorisation', 'rec' => 'Note',        'desc' => 'The From Email must be authorised to send via your SMTP account. Using an address your SMTP provider doesn\'t recognise will cause emails to bounce or land in spam.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <p class="cs-login-desc"><?php esc_html_e( 'Overrides the default WordPress sender details on every outgoing email. Leave blank to keep WordPress defaults.', 'cloudscale-devtools' ); ?></p>
+
+                <div class="cs-field-row">
+                    <div class="cs-field">
+                        <label class="cs-label" for="cs-smtp-from-name"><?php esc_html_e( 'From Name:', 'cloudscale-devtools' ); ?></label>
+                        <input type="text" id="cs-smtp-from-name" class="cs-input"
+                               value="<?php echo esc_attr( $from_name ); ?>"
+                               placeholder="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>"
+                               style="max-width:360px" autocomplete="off">
+                    </div>
+                </div>
+                <div class="cs-field-row" style="margin-top:14px">
+                    <div class="cs-field">
+                        <label class="cs-label" for="cs-smtp-from-email"><?php esc_html_e( 'From Email:', 'cloudscale-devtools' ); ?></label>
+                        <input type="email" id="cs-smtp-from-email" class="cs-input"
+                               value="<?php echo esc_attr( $from_email ); ?>"
+                               placeholder="no-reply@<?php echo esc_attr( wp_parse_url( home_url(), PHP_URL_HOST ) ); ?>"
+                               style="max-width:360px" autocomplete="off">
+                        <span class="cs-hint"><?php esc_html_e( 'Must be a valid email address authorised to send from your SMTP account.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+
+                <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
+                    <button type="button" class="cs-btn-primary" id="cs-smtp-from-save">💾 <?php esc_html_e( 'Save From Address', 'cloudscale-devtools' ); ?></button>
+                    <span class="cs-settings-saved" id="cs-smtp-from-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Email Activity Log ─────────────────────────────── -->
+        <div class="cs-panel" id="cs-panel-email-log">
+            <div class="cs-section-header cs-section-header-blue">
+                <span>📋 EMAIL ACTIVITY LOG</span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Last 100 emails sent by WordPress on this site', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div class="cs-panel-body">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                    <button type="button" class="cs-btn-primary" id="cs-log-refresh" style="background:#5b6a7a">🔄 <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" id="cs-log-clear" style="font-size:13px;padding:6px 14px;cursor:pointer;background:#fff0f0;border:1.5px solid #f5c6cb;color:#c0392b;border-radius:6px">🗑 <?php esc_html_e( 'Clear Log', 'cloudscale-devtools' ); ?></button>
+                </div>
+                <div id="cs-email-log-wrap">
+                    <?php self::render_email_log_table(); ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Renders the email log table rows (also used for AJAX refresh).
+     *
+     * @since  1.9.0
+     * @return void
+     */
+    private static function render_email_log_table(): void {
+        $log = get_option( self::EMAIL_LOG_OPTION, [] );
+        if ( ! is_array( $log ) || empty( $log ) ) {
+            echo '<p style="color:#888;font-size:13px;margin:0">' . esc_html__( 'No emails logged yet. Emails are recorded here as soon as WordPress sends them.', 'cloudscale-devtools' ) . '</p>';
+            return;
+        }
+        ?>
+        <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead>
+                <tr style="background:#f3f4f6;text-align:left">
+                    <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0;white-space:nowrap"><?php esc_html_e( 'Time', 'cloudscale-devtools' ); ?></th>
+                    <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0"><?php esc_html_e( 'To', 'cloudscale-devtools' ); ?></th>
+                    <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0"><?php esc_html_e( 'Subject', 'cloudscale-devtools' ); ?></th>
+                    <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0;white-space:nowrap"><?php esc_html_e( 'Via', 'cloudscale-devtools' ); ?></th>
+                    <th style="padding:7px 10px;border-bottom:1px solid #e0e0e0"><?php esc_html_e( 'Status', 'cloudscale-devtools' ); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+            <?php foreach ( $log as $i => $entry ) :
+                $bg     = $i % 2 === 0 ? '#fff' : '#fafafa';
+                $status = $entry['status'] ?? 'unknown';
+                if ( $status === 'sent' ) {
+                    $badge = '<span style="color:#2d7d46;font-weight:600">✓ Sent</span>';
+                } elseif ( $status === 'failed' ) {
+                    $err   = ! empty( $entry['error'] ) ? ' — ' . esc_html( $entry['error'] ) : '';
+                    $badge = '<span style="color:#c0392b;font-weight:600" title="' . esc_attr( $entry['error'] ?? '' ) . '">✗ Failed' . esc_html( $err ) . '</span>';
+                } else {
+                    $badge = '<span style="color:#888">— Unknown</span>';
+                }
+                $via = $entry['via'] ?? 'phpmail';
+                $via_label = $via === 'smtp'
+                    ? '<span style="background:#e8f5e9;color:#2d7d46;padding:1px 6px;border-radius:3px;font-size:11px">SMTP</span>'
+                    : '<span style="background:#f3f4f6;color:#666;padding:1px 6px;border-radius:3px;font-size:11px">PHP mail</span>';
+                ?>
+                <tr style="background:<?php echo esc_attr( $bg ); ?>">
+                    <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;white-space:nowrap;color:#666">
+                        <?php echo esc_html( wp_date( 'M j, H:i:s', $entry['ts'] ?? 0 ) ); ?>
+                    </td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        <?php echo esc_html( $entry['to'] ?? '' ); ?>
+                    </td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        <?php echo esc_html( $entry['subject'] ?? '' ); ?>
+                    </td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0"><?php echo $via_label; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+                    <td style="padding:7px 10px;border-bottom:1px solid #f0f0f0"><?php echo $badge; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+        </div>
+        <?php
+    }
+
+    /**
+     * AJAX: saves SMTP and from-address settings.
+     *
+     * @since  1.9.0
+     * @return void
+     */
+    public static function ajax_smtp_save(): void {
+        check_ajax_referer( self::SMTP_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $enabled    = isset( $_POST['enabled'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['enabled'] ) ) ? '1' : '0';
+        $host       = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( $_POST['host'] ) ) : '';
+        $port       = isset( $_POST['port'] ) ? absint( wp_unslash( $_POST['port'] ) ) : 587;
+        $encryption = isset( $_POST['encryption'] ) ? sanitize_key( wp_unslash( $_POST['encryption'] ) ) : 'tls';
+        $auth       = isset( $_POST['auth'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['auth'] ) ) ? '1' : '0';
+        $user       = isset( $_POST['user'] ) ? sanitize_text_field( wp_unslash( $_POST['user'] ) ) : '';
+        $from_email = isset( $_POST['from_email'] ) ? sanitize_email( wp_unslash( $_POST['from_email'] ) ) : '';
+        $from_name  = isset( $_POST['from_name'] ) ? sanitize_text_field( wp_unslash( $_POST['from_name'] ) ) : '';
+        $new_pass   = isset( $_POST['pass'] ) ? wp_unslash( $_POST['pass'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+
+        if ( ! in_array( $encryption, [ 'tls', 'ssl', 'none' ], true ) ) {
+            $encryption = 'tls';
+        }
+        if ( $port <= 0 || $port > 65535 ) {
+            $port = 587;
+        }
+
+        // Validate: if enabling SMTP, require a host and (if auth on) credentials.
+        if ( $enabled === '1' ) {
+            $errors = [];
+            if ( $host === '' ) {
+                $errors[] = __( 'SMTP Host is required when SMTP is enabled.', 'cloudscale-devtools' );
+            }
+            if ( $auth === '1' && $user === '' ) {
+                $errors[] = __( 'Username is required when SMTP Authentication is enabled.', 'cloudscale-devtools' );
+            }
+            $existing_pass = get_option( 'cs_devtools_smtp_pass', '' );
+            if ( $auth === '1' && $new_pass === '' && $existing_pass === '' ) {
+                $errors[] = __( 'Password is required when SMTP Authentication is enabled.', 'cloudscale-devtools' );
+            }
+            if ( ! empty( $errors ) ) {
+                wp_send_json_error( implode( ' ', $errors ) );
+            }
+        }
+
+        update_option( 'cs_devtools_smtp_enabled',    $enabled );
+        update_option( 'cs_devtools_smtp_host',       $host );
+        update_option( 'cs_devtools_smtp_port',       $port );
+        update_option( 'cs_devtools_smtp_encryption', $encryption );
+        update_option( 'cs_devtools_smtp_auth',       $auth );
+        update_option( 'cs_devtools_smtp_user',       $user );
+        update_option( 'cs_devtools_smtp_from_email', $from_email );
+        update_option( 'cs_devtools_smtp_from_name',  $from_name );
+
+        // Only update password if the user explicitly provided one.
+        if ( $new_pass !== '' ) {
+            update_option( 'cs_devtools_smtp_pass', $new_pass );
+        }
+
+        wp_send_json_success();
+    }
+
+    /**
+     * AJAX: sends a test email using current SMTP settings.
+     *
+     * @since  1.9.0
+     * @return void
+     */
+    public static function ajax_smtp_test(): void {
+        check_ajax_referer( self::SMTP_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'type' => 'auth' ], 403 );
+        }
+
+        $enabled    = get_option( 'cs_devtools_smtp_enabled', '0' );
+        $host       = trim( (string) get_option( 'cs_devtools_smtp_host', '' ) );
+        $port       = (int) get_option( 'cs_devtools_smtp_port', 587 );
+        $encryption = (string) get_option( 'cs_devtools_smtp_encryption', 'tls' );
+        $auth       = get_option( 'cs_devtools_smtp_auth', '1' ) === '1';
+        $user       = trim( (string) get_option( 'cs_devtools_smtp_user', '' ) );
+        $pass       = (string) get_option( 'cs_devtools_smtp_pass', '' );
+
+        // ── Pre-flight checks ─────────────────────────────────────────────
+        $issues = [];
+        if ( $enabled !== '1' ) {
+            $issues[] = 'SMTP is not enabled — toggle it on and save first.';
+        }
+        if ( $host === '' ) {
+            $issues[] = 'SMTP Host is empty — enter your server hostname (e.g. smtp.gmail.com).';
+        }
+        if ( $port <= 0 || $port > 65535 ) {
+            $issues[] = 'Port is invalid — use 587 (TLS), 465 (SSL), or 25 (none).';
+        }
+        if ( $auth && $user === '' ) {
+            $issues[] = 'Authentication is on but Username is empty.';
+        }
+        if ( $auth && $pass === '' ) {
+            $issues[] = 'Authentication is on but no Password is saved.';
+        }
+        if ( ! empty( $issues ) ) {
+            wp_send_json_error( [ 'type' => 'preflight', 'issues' => $issues ] );
+        }
+
+        // ── Use PHPMailer directly so we capture real SMTP debug output ───
+        require_once ABSPATH . WPINC . '/PHPMailer/PHPMailer.php';
+        require_once ABSPATH . WPINC . '/PHPMailer/SMTP.php';
+        require_once ABSPATH . WPINC . '/PHPMailer/Exception.php';
+
+        $debug_log = [];
+        $to        = wp_get_current_user()->user_email;
+        $site      = wp_specialchars_decode( get_bloginfo( 'name' ), ENT_QUOTES );
+
+        try {
+            $mail             = new PHPMailer\PHPMailer\PHPMailer( true );
+            $mail->isSMTP();
+            $mail->Host       = $host;
+            $mail->Port       = $port;
+            $mail->SMTPSecure = $encryption === 'none' ? '' : $encryption;
+            $mail->SMTPAuth   = $auth;
+            $mail->Username   = $user;
+            $mail->Password   = $pass;
+            $mail->SMTPDebug  = 2;
+            $mail->Debugoutput = static function ( string $str ) use ( &$debug_log ): void {
+                $clean = trim( $str );
+                if ( $clean !== '' ) {
+                    $debug_log[] = $clean;
+                }
+            };
+
+            $from_email = get_option( 'cs_devtools_smtp_from_email', '' ) ?: get_bloginfo( 'admin_email' );
+            $from_name  = get_option( 'cs_devtools_smtp_from_name', '' ) ?: $site;
+            $mail->setFrom( $from_email, $from_name );
+            $mail->addAddress( $to );
+            $mail->isHTML( true );
+            $mail->CharSet = 'UTF-8';
+            $mail->Subject  = sprintf( '[%s] CloudScale DevTools — SMTP Test', $site );
+            $mail->Body     = '<p>This is a test email from <strong>CloudScale DevTools</strong>.</p>'
+                            . '<p>Your SMTP configuration is working correctly.</p>';
+
+            $mail->send();
+
+            wp_send_json_success( [ 'to' => $to ] );
+
+        } catch ( PHPMailer\PHPMailer\Exception $e ) {
+            // Surface the PHPMailer error plus the last few relevant SMTP conversation lines.
+            $filtered = array_values( array_filter(
+                $debug_log,
+                static function ( string $line ): bool {
+                    // Skip lines that are just raw email body content.
+                    return ! preg_match( '/^(Date:|From:|To:|Subject:|MIME|Content-|Message-ID:|X-Mailer:|--[a-zA-Z0-9]+|<html|<body|<p>)/i', $line );
+                }
+            ) );
+
+            wp_send_json_error( [
+                'type'    => 'smtp',
+                'message' => $e->getMessage(),
+                'debug'   => array_slice( $filtered, -12 ),
+            ] );
+        }
+    }
+
+    /**
+     * Configures PHPMailer to use SMTP with saved settings.
+     * Hooked onto phpmailer_init when SMTP is enabled.
+     *
+     * @since  1.9.0
+     * @param  \PHPMailer\PHPMailer\PHPMailer $phpmailer PHPMailer instance (passed by reference).
+     * @return void
+     */
+    public static function phpmailer_configure( $phpmailer ): void {
+        $phpmailer->isSMTP();
+        $phpmailer->Host      = (string) get_option( 'cs_devtools_smtp_host', '' );
+        $port                 = (int) get_option( 'cs_devtools_smtp_port', 587 );
+        $phpmailer->Port      = $port > 0 ? $port : 587;
+        $encryption           = (string) get_option( 'cs_devtools_smtp_encryption', 'tls' );
+        $encryption           = in_array( $encryption, [ 'tls', 'ssl', 'none' ], true ) ? $encryption : 'tls';
+        $phpmailer->SMTPSecure = $encryption === 'none' ? '' : $encryption;
+        // Default auth to ON — empty/missing option means "never explicitly turned off".
+        $auth_val             = get_option( 'cs_devtools_smtp_auth', '1' );
+        $phpmailer->SMTPAuth  = $auth_val !== '0';
+        $phpmailer->Username  = (string) get_option( 'cs_devtools_smtp_user', '' );
+        $phpmailer->Password  = (string) get_option( 'cs_devtools_smtp_pass', '' );
+        $phpmailer->SMTPDebug = 0;
+    }
+
+    /**
+     * Filter: overrides wp_mail_from with configured from email.
+     *
+     * @since  1.9.0
+     * @param  string $email Default from email.
+     * @return string
+     */
+    public static function smtp_from_email( string $email ): string {
+        $configured = get_option( 'cs_devtools_smtp_from_email', '' );
+        return $configured ?: $email;
+    }
+
+    /**
+     * Filter: overrides wp_mail_from_name with configured from name.
+     *
+     * @since  1.9.0
+     * @param  string $name Default from name.
+     * @return string
+     */
+    public static function smtp_from_name( string $name ): string {
+        $configured = get_option( 'cs_devtools_smtp_from_name', '' );
+        return $configured ?: $name;
+    }
+
+    /* ==================================================================
+       EMAIL LOG
+       ================================================================== */
+
+    const EMAIL_LOG_OPTION  = 'cs_devtools_email_log';
+    const EMAIL_LOG_MAX     = 100;
+
+    /**
+     * wp_mail filter — captures outgoing email details before send.
+     *
+     * @since  1.9.0
+     * @param  array $args wp_mail arguments.
+     * @return array Unchanged.
+     */
+    public static function smtp_log_capture( array $args ): array {
+        $to = $args['to'] ?? '';
+        if ( is_array( $to ) ) {
+            $to = implode( ', ', $to );
+        }
+        self::$smtp_log_pending = [
+            'ts'      => time(),
+            'to'      => (string) $to,
+            'subject' => (string) ( $args['subject'] ?? '' ),
+            'status'  => 'pending',
+            'error'   => '',
+            'via'     => ( get_option( 'cs_devtools_smtp_enabled', '0' ) === '1'
+                          && '' !== trim( (string) get_option( 'cs_devtools_smtp_host', '' ) ) )
+                         ? 'smtp' : 'phpmail',
+        ];
+        return $args;
+    }
+
+    /**
+     * phpmailer_init (priority 5) — sets the PHPMailer action_function callback
+     * so we receive a reliable success/failure signal after every send attempt.
+     *
+     * @since  1.9.0
+     * @param  \PHPMailer\PHPMailer\PHPMailer $phpmailer PHPMailer instance.
+     * @return void
+     */
+    public static function smtp_log_set_callback( $phpmailer ): void {
+        $phpmailer->action_function = [ __CLASS__, 'smtp_log_on_send' ];
+    }
+
+    /**
+     * PHPMailer action_function callback — fires after every send attempt.
+     *
+     * @since  1.9.0
+     * @param  bool   $is_sent Whether the send succeeded.
+     * @param  array  $to      Recipient addresses.
+     * @param  array  $cc      CC addresses (unused).
+     * @param  array  $bcc     BCC addresses (unused).
+     * @param  string $subject Subject line (unused — already captured).
+     * @param  string $body    Message body (unused).
+     * @param  string $from    Sender address (unused).
+     * @return void
+     */
+    public static function smtp_log_on_send( bool $is_sent, array $to, array $cc, array $bcc, string $subject, string $body, string $from ): void {
+        if ( self::$smtp_log_pending === null ) {
+            return;
+        }
+        $entry           = self::$smtp_log_pending;
+        $entry['status'] = $is_sent ? 'sent' : 'failed';
+        self::smtp_log_write( $entry );
+        self::$smtp_log_pending = null;
+    }
+
+    /**
+     * wp_mail_failed action — fires when wp_mail() returns false (PHPMailer threw).
+     *
+     * @since  1.9.0
+     * @param  \WP_Error $error WP_Error with PHPMailer error message.
+     * @return void
+     */
+    public static function smtp_log_on_failure( \WP_Error $error ): void {
+        $entry = self::$smtp_log_pending ?? [
+            'ts'      => time(),
+            'to'      => '',
+            'subject' => '(unknown)',
+            'status'  => 'pending',
+            'error'   => '',
+            'via'     => 'unknown',
+        ];
+        $entry['status'] = 'failed';
+        $entry['error']  = $error->get_error_message();
+        self::smtp_log_write( $entry );
+        self::$smtp_log_pending = null;
+    }
+
+    /**
+     * Prepends a log entry to the stored email log (newest-first, capped at 100).
+     *
+     * @since  1.9.0
+     * @param  array $entry Log entry array.
+     * @return void
+     */
+    private static function smtp_log_write( array $entry ): void {
+        $log = get_option( self::EMAIL_LOG_OPTION, [] );
+        if ( ! is_array( $log ) ) {
+            $log = [];
+        }
+        array_unshift( $log, $entry );
+        update_option( self::EMAIL_LOG_OPTION, array_slice( $log, 0, self::EMAIL_LOG_MAX ), false );
+    }
+
+    /**
+     * AJAX: clears the email log.
+     *
+     * @since  1.9.0
+     * @return void
+     */
+    public static function ajax_smtp_log_clear(): void {
+        check_ajax_referer( self::SMTP_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        delete_option( self::EMAIL_LOG_OPTION );
+        wp_send_json_success();
+    }
+
+    /**
+     * AJAX: returns the email log as JSON for client-side refresh.
+     *
+     * @since  1.9.0
+     * @return void
+     */
+    public static function ajax_smtp_log_fetch(): void {
+        check_ajax_referer( self::SMTP_NONCE, 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $log = get_option( self::EMAIL_LOG_OPTION, [] );
+        if ( ! is_array( $log ) ) {
+            $log = [];
+        }
+        wp_send_json_success( $log );
+    }
+
     // ── Prefix migration (cs_ → cs_devtools_) ───────────────────────────────
 
     /**
@@ -4638,6 +5469,331 @@ class CloudScale_DevTools {
         }
 
         update_option( 'cs_devtools_prefix_migrated', '1' );
+    }
+
+    /* ==================================================================
+       Custom 404 page with games
+       ================================================================== */
+
+    /** Returns the 12 built-in colour scheme definitions for the 404 page. */
+    public static function get_404_schemes(): array {
+        return [
+            'ocean'    => [ 'name' => 'Ocean',    'bg1' => '#cce9fb', 'bg2' => '#a8d8f0', 'acc' => '#f57c00', 'da' => '#e65100', 'text' => '#0d2a4a', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'midnight' => [ 'name' => 'Midnight', 'bg1' => '#0f172a', 'bg2' => '#1e293b', 'acc' => '#60a5fa', 'da' => '#3b82f6', 'text' => '#e2e8f0', 'card' => 'rgba(15,23,42,0.65)',  'dm' => true  ],
+            'forest'   => [ 'name' => 'Forest',   'bg1' => '#d1fae5', 'bg2' => '#a7f3d0', 'acc' => '#059669', 'da' => '#047857', 'text' => '#064e3b', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'sunset'   => [ 'name' => 'Sunset',   'bg1' => '#fff1e6', 'bg2' => '#fde68a', 'acc' => '#ea580c', 'da' => '#c2410c', 'text' => '#7c2d12', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'slate'    => [ 'name' => 'Slate',    'bg1' => '#e2e8f0', 'bg2' => '#cbd5e1', 'acc' => '#7c3aed', 'da' => '#6d28d9', 'text' => '#1e293b', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'rose'     => [ 'name' => 'Rose',     'bg1' => '#fff1f2', 'bg2' => '#fecdd3', 'acc' => '#e11d48', 'da' => '#be123c', 'text' => '#881337', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'emerald'  => [ 'name' => 'Emerald',  'bg1' => '#ecfdf5', 'bg2' => '#d1fae5', 'acc' => '#d97706', 'da' => '#b45309', 'text' => '#064e3b', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'violet'   => [ 'name' => 'Violet',   'bg1' => '#1e1b4b', 'bg2' => '#312e81', 'acc' => '#a78bfa', 'da' => '#7c3aed', 'text' => '#ede9fe', 'card' => 'rgba(49,46,129,0.5)',   'dm' => true  ],
+            'charcoal' => [ 'name' => 'Charcoal', 'bg1' => '#1c1c1e', 'bg2' => '#2c2c2e', 'acc' => '#f57c00', 'da' => '#e65100', 'text' => '#e5e5ea', 'card' => 'rgba(44,44,46,0.6)',    'dm' => true  ],
+            'arctic'   => [ 'name' => 'Arctic',   'bg1' => '#f0fdfa', 'bg2' => '#ccfbf1', 'acc' => '#0d9488', 'da' => '#0f766e', 'text' => '#134e4a', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'copper'   => [ 'name' => 'Copper',   'bg1' => '#fdf6ec', 'bg2' => '#fde8c8', 'acc' => '#b45309', 'da' => '#92400e', 'text' => '#451a03', 'card' => 'rgba(255,255,255,0.45)', 'dm' => false ],
+            'cosmic'   => [ 'name' => 'Cosmic',   'bg1' => '#0a0015', 'bg2' => '#1a0033', 'acc' => '#e879f9', 'da' => '#d946ef', 'text' => '#fae8ff', 'card' => 'rgba(26,0,51,0.5)',     'dm' => true  ],
+        ];
+    }
+
+    /** Builds inline CSS overrides for the chosen colour scheme (empty string for default). */
+    public static function get_404_scheme_css( string $key ): string {
+        $schemes = self::get_404_schemes();
+        if ( ! isset( $schemes[ $key ] ) || 'ocean' === $key ) {
+            return '';
+        }
+        $s    = $schemes[ $key ];
+        $bg1  = esc_attr( $s['bg1'] );
+        $bg2  = esc_attr( $s['bg2'] );
+        $acc  = esc_attr( $s['acc'] );
+        $da   = esc_attr( $s['da'] );
+        $text = esc_attr( $s['text'] );
+        $card = esc_attr( $s['card'] );
+        $css  = "body{background:linear-gradient(160deg,{$bg1} 0%,{$bg2} 100%);color:{$text};}";
+        $css .= ".cs404-heading{background:linear-gradient(135deg,{$acc},{$da});-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}";
+        $css .= ".cs404-btn,.cs404-home-btn{background:linear-gradient(135deg,{$acc},{$da});box-shadow:0 4px 24px {$acc}44;}";
+        $css .= ".cs404-btn:hover,.cs404-home-btn:hover{box-shadow:0 6px 28px {$acc}66;}";
+        $css .= ".cs404-tab.active{background:linear-gradient(135deg,{$acc},{$da});box-shadow:0 2px 12px {$acc}44;}";
+        $css .= "#cs404-game{background:{$card};border-color:rgba(128,128,128,0.2);}";
+        $css .= ".cs404-lb-score{color:{$acc};}";
+        $css .= ".cs404-lb-row-gold{background:{$acc}18;}";
+        if ( $s['dm'] ) {
+            $css .= ".cs404-desc,.cs404-site-name,.cs404-tagline{color:{$text};}";
+            $css .= ".cs404-tab{background:rgba(255,255,255,0.08);color:{$text};border-color:rgba(255,255,255,0.1);}";
+            $css .= ".cs404-tab:hover{background:rgba(255,255,255,0.14);}";
+            $css .= ".cs404-miner-btn{background:rgba(255,255,255,0.1);color:{$text};border-color:rgba(255,255,255,0.15);}";
+            $css .= "#cs404-lb-panel{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);}";
+            $css .= ".cs404-lb-header{background:rgba(255,255,255,0.07);color:{$text};}";
+            $css .= ".cs404-lb-name{color:{$text};}.cs404-lb-empty{color:{$text};}";
+            $css .= ".cs404-lb-row{border-bottom-color:rgba(255,255,255,0.07);}";
+        }
+        return $css;
+    }
+
+    /**
+     * Intercepts WordPress 404 responses and outputs the custom games page.
+     *
+     * Hooked on `template_redirect` at priority 1.
+     */
+    public static function maybe_custom_404(): void {
+        if ( ! is_404() ) { return; }
+        $is_preview = isset( $_GET['cs_devtools_preview_scheme'] ) && current_user_can( 'manage_options' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( ! $is_preview && ! get_option( self::CUSTOM_404_OPTION, 0 ) ) { return; }
+
+        status_header( 404 );
+        nocache_headers();
+        header( 'Content-Type: text/html; charset=utf-8' );
+
+        $site_name    = get_bloginfo( 'name' );
+        $site_tagline = get_bloginfo( 'description' );
+        $home_url     = home_url( '/' );
+        $logo_html    = '';
+        if ( has_custom_logo() ) {
+            $logo_html = get_custom_logo();
+        } elseif ( $icon_url = get_site_icon_url( 64 ) ) {
+            $logo_html = '<img src="' . esc_url( $icon_url ) . '" alt="" width="48" height="48">';
+        }
+
+        $css_path = plugin_dir_path( __FILE__ ) . 'assets/cs-custom-404.css';
+        $js_path  = plugin_dir_path( __FILE__ ) . 'assets/cs-custom-404.js';
+        $css_url  = plugins_url( 'assets/cs-custom-404.css', __FILE__ ) . '?ver=' . self::VERSION . '.' . filemtime( $css_path );
+        $js_url   = plugins_url( 'assets/cs-custom-404.js',  __FILE__ ) . '?ver=' . self::VERSION . '.' . filemtime( $js_path );
+
+        $preview_key   = isset( $_GET['cs_devtools_preview_scheme'] ) ? sanitize_key( wp_unslash( $_GET['cs_devtools_preview_scheme'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only palette preview
+        $all_schemes   = self::get_404_schemes();
+        $active_scheme = ( $preview_key && isset( $all_schemes[ $preview_key ] ) ) ? $preview_key : get_option( self::SCHEME_404_OPTION, 'ocean' );
+        $scheme_css    = self::get_404_scheme_css( $active_scheme );
+        ?>
+<!DOCTYPE html>
+<html lang="<?php echo esc_attr( get_locale() ); ?>">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><?php echo esc_html__( 'Page Not Found', 'cloudscale-devtools' ); ?> &mdash; <?php echo esc_html( $site_name ); ?></title>
+<link rel="stylesheet" href="<?php echo esc_url( $css_url ); ?>">
+<?php if ( $scheme_css ) : ?><style><?php echo $scheme_css; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- pre-validated hex colours and static CSS property names ?></style><?php endif; ?>
+</head>
+<body>
+<div class="cs404-heading-row">
+<h1 class="cs404-heading">404 <?php echo esc_html__( 'Page Not Found', 'cloudscale-devtools' ); ?></h1>
+<a href="<?php echo esc_url( $home_url ); ?>" class="cs404-home-btn">&#8592; Home</a>
+</div>
+<div class="cs404-dots" aria-hidden="true">
+    <div class="cs404-dot" style="width:3px;height:3px;top:11%;left:7%;opacity:.7;"></div>
+    <div class="cs404-dot" style="width:2px;height:2px;top:19%;left:86%;opacity:.5;"></div>
+    <div class="cs404-dot" style="width:4px;height:4px;top:73%;left:6%;opacity:.6;"></div>
+    <div class="cs404-dot" style="width:2px;height:2px;top:81%;left:91%;opacity:.5;"></div>
+    <div class="cs404-dot" style="width:3px;height:3px;top:44%;left:3%;opacity:.4;"></div>
+    <div class="cs404-dot" style="width:2px;height:2px;top:34%;left:96%;opacity:.4;"></div>
+    <div class="cs404-dot" style="width:5px;height:5px;top:89%;left:50%;opacity:.25;background:#f57c00;"></div>
+    <div class="cs404-dot" style="width:3px;height:3px;top:5%;left:48%;opacity:.35;background:#f57c00;"></div>
+</div>
+<div class="cs404-game-wrap">
+    <div class="cs404-tabs">
+        <button class="cs404-tab active" data-game="runner">🏃 Runner</button>
+        <button class="cs404-tab" data-game="jetpack">🚀 Jetpack</button>
+        <button class="cs404-tab" data-game="racer">🚗 Racer</button>
+        <button class="cs404-tab" data-game="miner">⛏ Miner</button>
+        <button class="cs404-tab" data-game="asteroids">🌌 Asteroids</button>
+    </div>
+    <div style="position:relative;display:inline-block;max-width:100%;">
+        <canvas id="cs404-game" width="620" height="280" aria-label="404 Olympics mini-games"></canvas>
+        <div id="cs404-name-overlay" style="display:none;position:absolute;inset:0;z-index:10;background:rgba(13,42,74,0.88);border-radius:10px;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-shadow:inset 0 0 0 2px rgba(245,124,0,0.6);">
+            <p style="font-size:22px;font-weight:900;color:#f57c00;margin:0;">🏆 New High Score!</p>
+            <p style="font-size:14px;color:#cce9fb;margin:0;">Enter your name:</p>
+            <input id="cs404-name-input" type="text" maxlength="20" placeholder="Your name"
+                style="font-size:16px;padding:8px 14px;border:2px solid #f57c00;border-radius:8px;outline:none;text-align:center;width:200px;">
+            <button id="cs404-name-save"
+                style="background:linear-gradient(135deg,#f57c00,#e65100);color:#fff;border:none;border-radius:8px;padding:9px 28px;font-size:15px;font-weight:700;cursor:pointer;">
+                Save
+            </button>
+        </div>
+    </div>
+    <div id="cs404-miner-ctrl" class="cs404-miner-ctrl">
+        <button id="cs404-ml" class="cs404-miner-btn">◀</button>
+        <button id="cs404-mj" class="cs404-miner-btn">▲ Jump</button>
+        <button id="cs404-mr" class="cs404-miner-btn">▶</button>
+    </div>
+    <div id="cs404-asteroids-ctrl" class="cs404-miner-ctrl">
+        <button id="cs404-asl" class="cs404-miner-btn">◀</button>
+        <button id="cs404-asu" class="cs404-miner-btn">▲ Thrust</button>
+        <button id="cs404-ass" class="cs404-miner-btn">● Shoot</button>
+        <button id="cs404-asr" class="cs404-miner-btn">▶</button>
+    </div>
+    <div id="cs404-lb-panel">
+        <div class="cs404-lb-header">
+            <span id="cs404-lb-title">🏆 Runner — Top 10</span>
+        </div>
+        <div id="cs404-lb-body">
+            <p class="cs404-lb-empty">No scores yet — be the first!</p>
+        </div>
+    </div>
+</div>
+<div class="cs404-wrap">
+    <p class="cs404-desc"><?php echo esc_html__( "The page you're looking for doesn't exist or may have been moved.", 'cloudscale-devtools' ); ?></p>
+    <a href="<?php echo esc_url( $home_url ); ?>" class="cs404-btn">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        <?php echo esc_html__( 'Back to Home', 'cloudscale-devtools' ); ?>
+    </a>
+    <div class="cs404-brand">
+        <?php if ( $logo_html ) : ?><div class="cs404-logo"><?php echo wp_kses_post( $logo_html ); ?></div><?php endif; ?>
+        <p class="cs404-site-name"><?php echo esc_html( $site_name ); ?></p>
+        <?php if ( $site_tagline ) : ?><p class="cs404-tagline"><?php echo esc_html( $site_tagline ); ?></p><?php endif; ?>
+    </div>
+</div>
+
+<?php echo '<script>var CS_PCR_API=' . wp_json_encode( rest_url( self::HISCORE_NS ) ) . ';var CS_PCR_SCORE_NONCE=' . wp_json_encode( wp_create_nonce( self::SCORE_NONCE_ACTION ) ) . ';</script>'; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- standalone exit-page ?>
+<?php echo '<script src="' . esc_url( $js_url ) . '"></script>'; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedScript -- standalone 404 exit-page, no wp_head/wp_footer ?>
+
+</body>
+</html>
+        <?php
+        exit;
+    }
+
+    /** Registers per-game hi-score REST endpoints. */
+    public static function register_hiscore_routes(): void {
+        register_rest_route( self::HISCORE_NS, '/hiscore/(?P<game>runner|jetpack|racer|miner|asteroids)', [
+            [
+                'methods'             => 'GET',
+                'callback'            => [ __CLASS__, 'rest_get_hiscore' ],
+                'permission_callback' => '__return_true',
+                'args'                => [ 'game' => [ 'required' => true, 'type' => 'string' ] ],
+            ],
+            [
+                'methods'             => 'POST',
+                'callback'            => [ __CLASS__, 'rest_set_hiscore' ],
+                'permission_callback' => '__return_true',
+                'args'                => [
+                    'game'  => [ 'required' => true, 'type' => 'string' ],
+                    'score' => [ 'required' => true, 'type' => 'integer', 'minimum' => 1, 'maximum' => 999999 ],
+                    'name'  => [ 'required' => true, 'type' => 'string', 'maxLength' => 30 ],
+                ],
+            ],
+        ] );
+    }
+
+    /** Returns the top-10 leaderboard for one game. */
+    public static function rest_get_hiscore( WP_REST_Request $request ): WP_REST_Response {
+        $game = sanitize_key( $request->get_param( 'game' ) );
+        $raw  = get_option( 'cs_devtools_leaderboard_' . $game, '' );
+        $lb   = $raw ? json_decode( $raw, true ) : [];
+        if ( ! is_array( $lb ) ) { $lb = []; }
+        return rest_ensure_response( [ 'leaderboard' => $lb ] );
+    }
+
+    /** Inserts a score into the top-10 leaderboard for one game. */
+    public static function rest_set_hiscore( WP_REST_Request $request ) {
+        $nonce = $request->get_header( 'x_wp_score_nonce' );
+        if ( ! $nonce || ! wp_verify_nonce( sanitize_text_field( $nonce ), self::SCORE_NONCE_ACTION ) ) {
+            return new WP_Error( 'forbidden', __( 'Invalid nonce.', 'cloudscale-devtools' ), [ 'status' => 403 ] );
+        }
+        $game  = sanitize_key( $request->get_param( 'game' ) );
+        $score = (int) $request->get_param( 'score' );
+        $name  = sanitize_text_field( $request->get_param( 'name' ) );
+
+        $score_caps = [ 'runner' => 999999, 'jetpack' => 999999, 'racer' => 999999, 'miner' => 2000, 'asteroids' => 999999 ];
+        if ( isset( $score_caps[ $game ] ) && $score > $score_caps[ $game ] ) {
+            return new WP_Error( 'score_invalid', __( 'Score exceeds maximum for this game.', 'cloudscale-devtools' ), [ 'status' => 422 ] );
+        }
+
+        // Rate limit: max 5 submissions per IP per game per 10 minutes.
+        $ip     = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+        $ip_key = 'cs_devtools_rl_' . md5( $ip . $game );
+        $count  = (int) get_transient( $ip_key );
+        if ( $count >= 5 ) {
+            return new WP_Error( 'rate_limited', __( 'Too many score submissions. Try again later.', 'cloudscale-devtools' ), [ 'status' => 429 ] );
+        }
+        set_transient( $ip_key, $count + 1, 600 );
+
+        $raw = get_option( 'cs_devtools_leaderboard_' . $game, '' );
+        $lb  = $raw ? json_decode( $raw, true ) : [];
+        if ( ! is_array( $lb ) ) { $lb = []; }
+
+        foreach ( $lb as $entry ) {
+            if ( (int) $entry['score'] === $score && $entry['name'] === $name ) {
+                return rest_ensure_response( [ 'ok' => false, 'leaderboard' => $lb ] );
+            }
+        }
+        $lowest = isset( $lb[9] ) ? (int) $lb[9]['score'] : 0;
+        if ( count( $lb ) >= 10 && $score <= $lowest ) {
+            return rest_ensure_response( [ 'ok' => false, 'leaderboard' => $lb ] );
+        }
+        $lb[] = [ 'score' => $score, 'name' => $name ];
+        usort( $lb, fn( $a, $b ) => (int) $b['score'] - (int) $a['score'] );
+        $lb = array_slice( $lb, 0, 10 );
+        update_option( 'cs_devtools_leaderboard_' . $game, wp_json_encode( $lb ), false );
+        return rest_ensure_response( [ 'ok' => true, 'leaderboard' => $lb ] );
+    }
+
+    /** AJAX handler: saves the 404 enable toggle and colour scheme. */
+    public static function ajax_save_404_settings(): void {
+        check_ajax_referer( 'cs_devtools_404_settings', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Forbidden.', 'cloudscale-devtools' ) );
+        }
+
+        $custom_404 = isset( $_POST['custom_404'] ) ? ( absint( wp_unslash( $_POST['custom_404'] ) ) ? 1 : 0 ) : 0;
+        update_option( self::CUSTOM_404_OPTION, $custom_404 );
+
+        if ( isset( $_POST['scheme'] ) ) {
+            $schemes    = self::get_404_schemes();
+            $scheme_key = sanitize_key( wp_unslash( $_POST['scheme'] ) );
+            if ( isset( $schemes[ $scheme_key ] ) ) {
+                update_option( self::SCHEME_404_OPTION, $scheme_key );
+            }
+        }
+
+        wp_send_json_success( [ 'custom_404' => $custom_404, 'scheme' => get_option( self::SCHEME_404_OPTION, 'ocean' ) ] );
+    }
+
+    /** Renders the 404 Games settings panel. */
+    private static function render_404_panel(): void {
+        $current_scheme = get_option( self::SCHEME_404_OPTION, 'ocean' );
+        $enabled        = (bool) get_option( self::CUSTOM_404_OPTION, 0 );
+        ?>
+        <div class="cs-panel" id="cs-panel-404">
+            <div class="cs-section-header" style="background:linear-gradient(135deg,#f57c00,#e65100);">
+                <span>🎮 404 GAMES PAGE</span>
+                <?php self::render_explain_btn( '404-games', '404 Games Page', [
+                    [ 'name' => 'Enable',        'rec' => 'Toggle', 'desc' => 'When enabled, replaces the default WordPress 404 page with a fun interactive page featuring 5 mini-games: Runner, Jetpack, Racer, Miner, and Asteroids. No theme dependency — works even if the active theme is broken.' ],
+                    [ 'name' => 'Colour Scheme', 'rec' => 'Optional', 'desc' => 'Choose from 12 built-in colour palettes. Changes take effect immediately. Use Preview to see the result before saving.' ],
+                ] ); ?>
+            </div>
+            <div class="cs-panel-body">
+                <div class="cs-field" style="margin-bottom:20px;">
+                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+                        <input type="checkbox" id="cs-404-enabled" <?php checked( $enabled ); ?>>
+                        <span class="cs-label" style="margin:0;"><?php esc_html_e( 'Enable custom 404 games page', 'cloudscale-devtools' ); ?></span>
+                    </label>
+                    <span class="cs-hint"><?php esc_html_e( 'Replaces the default WordPress 404 with 5 playable mini-games and a global leaderboard.', 'cloudscale-devtools' ); ?></span>
+                    <div id="cs-404-toggle-msg" style="margin-top:8px;display:none;"></div>
+                </div>
+
+                <div class="cs-field" style="margin-bottom:16px;">
+                    <label class="cs-label"><?php esc_html_e( 'Colour Scheme:', 'cloudscale-devtools' ); ?></label>
+                    <div class="cs-pcr-scheme-grid" id="cs-404-scheme-grid" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;">
+                        <?php foreach ( self::get_404_schemes() as $key => $s ) : ?>
+                        <button type="button" class="cs-404-scheme-swatch<?php echo $key === $current_scheme ? ' active' : ''; ?>"
+                            data-scheme="<?php echo esc_attr( $key ); ?>"
+                            style="border:2px solid <?php echo $key === $current_scheme ? '#f57c00' : '#ddd'; ?>;border-radius:8px;padding:4px;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;width:76px;">
+                            <span style="display:block;width:60px;height:36px;border-radius:5px;background:linear-gradient(135deg,<?php echo esc_attr( $s['bg1'] ); ?>,<?php echo esc_attr( $s['bg2'] ); ?>);position:relative;">
+                                <span style="position:absolute;bottom:4px;right:4px;width:12px;height:12px;border-radius:50%;background:<?php echo esc_attr( $s['acc'] ); ?>;"></span>
+                            </span>
+                            <span style="font-size:11px;color:#333;"><?php echo esc_html( $s['name'] ); ?></span>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:10px;margin-top:16px;">
+                    <button type="button" class="cs-btn-primary" id="cs-404-save-scheme">💾 <?php esc_html_e( 'Save Scheme', 'cloudscale-devtools' ); ?></button>
+                    <a href="<?php echo esc_url( home_url( '/this-page-does-not-exist' ) ); ?>" target="_blank" rel="noopener" id="cs-404-preview-link"
+                       style="display:inline-block;padding:7px 16px;border-radius:5px;background:#555;color:#fff;text-decoration:none;font-size:13px;">
+                        <?php esc_html_e( 'Preview 404', 'cloudscale-devtools' ); ?> &rarr;
+                    </a>
+                    <span id="cs-404-scheme-msg" style="display:none;"></span>
+                </div>
+            </div>
+        </div>
+        <?php
     }
 }
 
