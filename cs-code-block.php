@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.56
+ * Version: 1.8.59
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -2196,18 +2196,17 @@ class CloudScale_DevTools {
             return;
         }
         $base = plugin_dir_path( __FILE__ ) . 'assets/';
-        $bust = filemtime( $base . 'cs-perf-monitor.css' );
         wp_enqueue_style(
             'cs-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
             [],
-            $bust
+            filemtime( $base . 'cs-perf-monitor.css' )
         );
         wp_enqueue_script(
             'cs-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
             [],
-            $bust,
+            filemtime( $base . 'cs-perf-monitor.js' ),
             true
         );
     }
@@ -2432,18 +2431,17 @@ class CloudScale_DevTools {
             return;
         }
         $base = plugin_dir_path( __FILE__ ) . 'assets/';
-        $bust = filemtime( $base . 'cs-perf-monitor.css' );
         wp_enqueue_style(
             'cs-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
             [],
-            $bust
+            filemtime( $base . 'cs-perf-monitor.css' )
         );
         wp_enqueue_script(
             'cs-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
             [],
-            $bust,
+            filemtime( $base . 'cs-perf-monitor.js' ),
             true
         );
     }

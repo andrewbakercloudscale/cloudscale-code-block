@@ -173,13 +173,20 @@
     function setPadding(px) {
         // Constrain sidebar height so it stops above the panel.
         // Use max-height (not bottom) so WP's internal menu positioning is untouched.
+        // On mobile (≤782px) WP uses a flyout overlay for the sidebar — skip these
+        // changes entirely or the menu items turn invisible on phones.
         var adminBar  = document.getElementById('wpadminbar');
         var adminBarH = adminBar ? adminBar.offsetHeight : 32;
         var adminMenu = document.getElementById('adminmenuwrap');
-        if (adminMenu) {
+        if (adminMenu && window.innerWidth > 782) {
             adminMenu.style.maxHeight  = 'calc(100vh - ' + (adminBarH + px) + 'px)';
             adminMenu.style.overflowY  = 'auto';
             adminMenu.style.bottom     = '';   // clear any previously set bottom
+        } else if (adminMenu) {
+            // Reset any previously applied styles when in mobile view.
+            adminMenu.style.maxHeight  = '';
+            adminMenu.style.overflowY  = '';
+            adminMenu.style.bottom     = '';
         }
 
         // Shrink the main content area so it fits above the panel.
