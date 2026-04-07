@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.74
+ * Version: 1.8.77
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.56';
+    const VERSION      = '1.8.77';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -5592,6 +5592,8 @@ class CloudScale_DevTools {
         <button class="cs404-tab" data-game="racer">🚗 Racer</button>
         <button class="cs404-tab" data-game="miner">⛏ Miner</button>
         <button class="cs404-tab" data-game="asteroids">🌌 Asteroids</button>
+        <button class="cs404-tab" data-game="snake">🐍 Snake</button>
+        <button class="cs404-tab" data-game="pacman">👻 Pac-Man</button>
     </div>
     <div style="position:relative;display:inline-block;max-width:100%;">
         <canvas id="cs404-game" width="620" height="280" aria-label="404 Olympics mini-games"></canvas>
@@ -5616,6 +5618,17 @@ class CloudScale_DevTools {
         <button id="cs404-asu" class="cs404-miner-btn">▲ Thrust</button>
         <button id="cs404-ass" class="cs404-miner-btn">● Shoot</button>
         <button id="cs404-asr" class="cs404-miner-btn">▶</button>
+    </div>
+    <div id="cs404-4dir-ctrl" style="display:none;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:4px;justify-content:center;margin-top:10px;">
+        <span></span>
+        <button id="cs404-4up" class="cs404-miner-btn" style="grid-column:2;grid-row:1;">▲</button>
+        <span></span>
+        <button id="cs404-4lt" class="cs404-miner-btn" style="grid-column:1;grid-row:2;">◀</button>
+        <span style="grid-column:2;grid-row:2;"></span>
+        <button id="cs404-4rt" class="cs404-miner-btn" style="grid-column:3;grid-row:2;">▶</button>
+        <span></span>
+        <button id="cs404-4dn" class="cs404-miner-btn" style="grid-column:2;grid-row:3;">▼</button>
+        <span></span>
     </div>
     <div id="cs404-lb-panel">
         <div class="cs404-lb-header">
@@ -5650,7 +5663,7 @@ class CloudScale_DevTools {
 
     /** Registers per-game hi-score REST endpoints. */
     public static function register_hiscore_routes(): void {
-        register_rest_route( self::HISCORE_NS, '/hiscore/(?P<game>runner|jetpack|racer|miner|asteroids)', [
+        register_rest_route( self::HISCORE_NS, '/hiscore/(?P<game>runner|jetpack|racer|miner|asteroids|snake|pacman)', [
             [
                 'methods'             => 'GET',
                 'callback'            => [ __CLASS__, 'rest_get_hiscore' ],
@@ -5689,7 +5702,7 @@ class CloudScale_DevTools {
         $score = (int) $request->get_param( 'score' );
         $name  = sanitize_text_field( $request->get_param( 'name' ) );
 
-        $score_caps = [ 'runner' => 999999, 'jetpack' => 999999, 'racer' => 999999, 'miner' => 2000, 'asteroids' => 999999 ];
+        $score_caps = [ 'runner' => 999999, 'jetpack' => 999999, 'racer' => 999999, 'miner' => 2000, 'asteroids' => 999999, 'snake' => 9990, 'pacman' => 99990 ];
         if ( isset( $score_caps[ $game ] ) && $score > $score_caps[ $game ] ) {
             return new WP_Error( 'score_invalid', __( 'Score exceeds maximum for this game.', 'cloudscale-devtools' ), [ 'status' => 422 ] );
         }
