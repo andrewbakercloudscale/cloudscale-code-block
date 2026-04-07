@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.8.44
+Stable tag: 1.8.59
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,7 +79,7 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.8.44 =
+= 1.8.56 =
 * Changed: Admin page slug renamed from cloudscale-code-sql to cloudscale-devtools (URL is now tools.php?page=cloudscale-devtools); legacy URL redirects automatically
 * Fixed: Help page slug and title updated to cloudscale-devtools-help / CloudScale DevTools: Online Help
 
