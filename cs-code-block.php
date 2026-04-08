@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.77
+ * Version: 1.8.78
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.77';
+    const VERSION      = '1.8.78';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2489,18 +2489,24 @@ class CloudScale_DevTools {
 
         // WP registers scripts/styles with src=false (inline-only); cast to string
         // so the JS side always receives a string, never a boolean false.
+        $in_footer = isset( $scripts_obj->in_footer ) && is_array( $scripts_obj->in_footer )
+            ? $scripts_obj->in_footer : [];
+
         $scripts = [];
         foreach ( $scripts_obj->done as $handle ) {
             if ( ! isset( $scripts_obj->registered[ $handle ] ) ) {
                 continue;
             }
-            $dep = $scripts_obj->registered[ $handle ];
-            $src = is_string( $dep->src ) ? $dep->src : '';
+            $dep      = $scripts_obj->registered[ $handle ];
+            $src      = is_string( $dep->src ) ? $dep->src : '';
+            $strategy = isset( $dep->extra['strategy'] ) ? (string) $dep->extra['strategy'] : '';
             $scripts[] = [
-                'handle' => (string) $handle,
-                'src'    => $src,
-                'plugin' => self::perf_attr_asset( $src ),
-                'ver'    => is_string( $dep->ver ) ? $dep->ver : ( $dep->ver ? (string) $dep->ver : '' ),
+                'handle'    => (string) $handle,
+                'src'       => $src,
+                'plugin'    => self::perf_attr_asset( $src ),
+                'ver'       => is_string( $dep->ver ) ? $dep->ver : ( $dep->ver ? (string) $dep->ver : '' ),
+                'in_footer' => in_array( $handle, $in_footer, true ),
+                'strategy'  => $strategy, // 'defer', 'async', or ''
             ];
         }
 
@@ -2787,6 +2793,7 @@ class CloudScale_DevTools {
             'request'    => self::perf_build_request_data(),
             'transients' => self::perf_build_transient_data(),
             'template'   => self::perf_build_template_data(),
+            'health'     => self::perf_build_health_data(),
             'milestones' => array_merge(
                 [ [ 'label' => 'Request start', 'ms' => 0.0 ] ],
                 self::$perf_milestones,
@@ -3008,6 +3015,84 @@ class CloudScale_DevTools {
     /* ==================================================================
        PERFORMANCE MONITOR — Query processing
        ================================================================== */
+
+    /**
+     * Site health snapshot: autoloaded options bloat, WP-Cron backlog, and
+     * security configuration flags. Cheap to compute — one aggregate DB query
+     * for autoload size plus in-memory checks for everything else.
+     *
+     * @return array
+     */
+    private static function perf_build_health_data(): array {
+        global $wpdb;
+
+        // ── Autoloaded options ────────────────────────────────────────────────
+        $row = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+            "SELECT SUM(LENGTH(option_value)) AS total_bytes, COUNT(*) AS total_count
+             FROM {$wpdb->options}
+             WHERE autoload = 'yes'",
+            ARRAY_A
+        );
+        $autoload_kb    = $row ? round( (float) $row['total_bytes'] / 1024, 1 ) : 0.0;
+        $autoload_count = $row ? (int) $row['total_count'] : 0;
+
+        // Top 5 largest autoloaded options (skip transients — they are ephemeral).
+        $top_rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+            "SELECT option_name, LENGTH(option_value) AS size_bytes
+             FROM {$wpdb->options}
+             WHERE autoload = 'yes'
+               AND option_name NOT LIKE '\_transient\_%'
+               AND option_name NOT LIKE '\_site\_transient\_%'
+             ORDER BY size_bytes DESC
+             LIMIT 5",
+            ARRAY_A
+        );
+        $large_autoloads = [];
+        foreach ( ( $top_rows ?: [] ) as $r ) {
+            $large_autoloads[] = [
+                'name'    => $r['option_name'],
+                'size_kb' => round( (float) $r['size_bytes'] / 1024, 1 ),
+            ];
+        }
+
+        // ── WP-Cron backlog ───────────────────────────────────────────────────
+        $cron_array   = _get_cron_array() ?: [];
+        $now          = time();
+        $cron_total   = 0;
+        $cron_overdue = 0;
+        $overdue_list = [];
+        foreach ( $cron_array as $timestamp => $hooks ) {
+            $cron_total += count( $hooks );
+            if ( (int) $timestamp < $now ) {
+                foreach ( array_keys( $hooks ) as $hook_name ) {
+                    ++$cron_overdue;
+                    if ( count( $overdue_list ) < 5 ) {
+                        $overdue_list[] = [
+                            'hook'            => $hook_name,
+                            'overdue_seconds' => $now - (int) $timestamp,
+                        ];
+                    }
+                }
+            }
+        }
+
+        // ── Security configuration ────────────────────────────────────────────
+        $wp_debug_display = defined( 'WP_DEBUG' ) && WP_DEBUG
+            && ( ! defined( 'WP_DEBUG_DISPLAY' ) || WP_DEBUG_DISPLAY );
+
+        return [
+            'autoload_kb'        => $autoload_kb,
+            'autoload_count'     => $autoload_count,
+            'large_autoloads'    => $large_autoloads,
+            'cron_total'         => $cron_total,
+            'cron_overdue'       => $cron_overdue,
+            'cron_overdue_list'  => $overdue_list,
+            'wp_debug_display'   => $wp_debug_display,
+            'disallow_file_edit' => defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT,
+            'disallow_file_mods' => defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS,
+            'site_https'         => strpos( home_url(), 'https://' ) === 0,
+        ];
+    }
 
     /**
      * Processes $wpdb->queries into a structured array for the panel.

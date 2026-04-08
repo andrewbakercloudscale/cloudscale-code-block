@@ -515,6 +515,9 @@
 .cs-tag-insecure { background: #4a2800; color: #ffaa00; }
 .cs-tag-external { background: #1a2a3a; color: #9cdcfe; }
 .cs-tag-warn     { background: #3a2a00; color: #dcdcaa; }
+.cs-tag-blocking { background: #5a1a1a; color: #f44747; }
+.cs-tag-defer    { background: #1a3a1a; color: #4ec9b0; }
+.cs-tag-footer   { background: #1a2a1a; color: #888;    }
 
 /* ── Plugin chip ─────────────────────────────────────────────────────────── */
 .cs-plugin-chip {
@@ -1446,3 +1449,36 @@ td.c-n { color: #555; font-size: 10px; text-align: right; padding-right: 6px; }
 .cs-wf-c4 { background: #b5cea8; } /* WP loaded / Query setup */
 .cs-wf-c5 { background: #ce9178; } /* Query / Template */
 .cs-wf-c6 { background: #c586c0; } /* Panel output   */
+
+/* ── Site Health rows (Summary tab) ─────────────────────────────────── */
+.cs-health-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 3px 0;
+    font-size: 11px;
+    border-bottom: 1px solid #2a2a2a;
+}
+.cs-health-row:last-child { border-bottom: none; }
+.cs-health-icon {
+    flex-shrink: 0;
+    width: 14px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 11px;
+}
+.cs-health-ok   { color: #4ec9b0; }
+.cs-health-warn { color: #e6c949; }
+.cs-health-crit { color: #f14c4c; }
+.cs-health-label {
+    flex-shrink: 0;
+    width: 170px;
+    color: #9cdcfe;
+    font-weight: 600;
+}
+.cs-health-detail {
+    color: #888;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

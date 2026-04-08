@@ -23,7 +23,7 @@
     var N1_THRESH  = 3;
 
     // ── State ─────────────────────────────────────────────────────────────────
-    var data      = window.csDevtoolsPerfData || { queries: [], http: [], errors: [], logs: [], assets: { scripts: [], styles: [] }, cache: {}, hooks: [], meta: {}, request: {}, transients: [], template: { final: '', hierarchy: [] } };
+    var data      = window.csDevtoolsPerfData || { queries: [], http: [], errors: [], logs: [], assets: { scripts: [], styles: [] }, cache: {}, hooks: [], meta: {}, request: {}, transients: [], template: { final: '', hierarchy: [] }, health: {} };
     var meta      = data.meta || {};
     var sortCol   = 'time';
     var sortDir   = 'desc';
@@ -292,10 +292,10 @@
 
         var rows = [];
         if (!typeFilter || typeFilter === 'scripts') {
-            scripts.forEach(function (s) { rows.push({ type: 'JS', handle: s.handle, src: s.src, plugin: s.plugin, ver: s.ver }); });
+            scripts.forEach(function (s) { rows.push({ type: 'JS', handle: s.handle, src: s.src, plugin: s.plugin, ver: s.ver, in_footer: s.in_footer, strategy: s.strategy || '' }); });
         }
         if (!typeFilter || typeFilter === 'styles') {
-            styles.forEach(function (s)  { rows.push({ type: 'CSS', handle: s.handle, src: s.src, plugin: s.plugin, ver: s.ver }); });
+            styles.forEach(function (s)  { rows.push({ type: 'CSS', handle: s.handle, src: s.src, plugin: s.plugin, ver: s.ver, in_footer: true, strategy: '' }); });
         }
 
         rows = rows.filter(function (r) {
@@ -323,12 +323,20 @@
 
         var html = '';
         rows.forEach(function (r) {
-            var srcShort = r.src ? truncateUrl(r.src, 55) : '—';
-            html += '<tr>'
+            var srcShort = r.src ? truncateUrl(r.src, 50) : '—';
+            // Load position badge: defer/async/footer vs blocking head
+            var loadTag = '';
+            if (r.type === 'JS') {
+                if (r.strategy === 'defer')        loadTag = '<span class="cs-tag cs-tag-defer">defer</span>';
+                else if (r.strategy === 'async')   loadTag = '<span class="cs-tag cs-tag-defer">async</span>';
+                else if (r.in_footer)              loadTag = '<span class="cs-tag cs-tag-footer">footer</span>';
+                else if (r.src)                    loadTag = '<span class="cs-tag cs-tag-blocking">blocking</span>';
+            }
+            html += '<tr' + (loadTag.indexOf('blocking') !== -1 ? ' class="cs-row-slow"' : '') + '>'
                 + '<td class="c-at"><span class="cs-asset-type-' + r.type.toLowerCase() + '">' + r.type + '</span></td>'
                 + '<td class="c-ah" title="' + esc(r.handle) + '">' + esc(r.handle) + (r.ver ? '<span class="cs-asset-ver"> v' + esc(r.ver) + '</span>' : '') + '</td>'
                 + '<td class="c-ap">' + pluginChip(r.plugin) + '</td>'
-                + '<td class="c-au" title="' + esc(r.src) + '"><span class="cs-asset-src">' + esc(srcShort) + '</span></td>'
+                + '<td class="c-au" title="' + esc(r.src) + '"><span class="cs-asset-src">' + esc(srcShort) + '</span> ' + loadTag + '</td>'
                 + '</tr>';
         });
         assetsTbody.innerHTML = html;
@@ -947,6 +955,77 @@
                 detail: (assets.scripts || []).length + ' JS · ' + (assets.styles || []).length + ' CSS', plugin: '' });
         }
 
+        // ── Site health checks ────────────────────────────────────────────────
+        var health = data.health || {};
+
+        // WP_DEBUG_DISPLAY on — PHP errors shown to all visitors
+        if (health.wp_debug_display) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'WP_DEBUG_DISPLAY is on — PHP errors exposed to all visitors',
+                detail: 'Set define(\'WP_DEBUG_DISPLAY\', false) in wp-config.php', plugin: '' });
+        }
+
+        // Site not HTTPS
+        if (health.site_https === false) {
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Site is not HTTPS',
+                detail: 'home_url() starts with http:// — auth cookies and data sent unencrypted', plugin: '' });
+        }
+
+        // Autoloaded options bloat
+        if (health.autoload_kb >= 1500) {
+            var alTop = (health.large_autoloads || []).slice(0, 3).map(function (o) { return o.name + ' (' + o.size_kb + ' KB)'; }).join(', ');
+            issuesList.push({ sev: 'critical', tab: 'summary',
+                title: 'Autoloaded options: ' + health.autoload_kb + ' KB loaded on every page request',
+                detail: alTop || health.autoload_count + ' options', plugin: '' });
+        } else if (health.autoload_kb >= 600) {
+            var alTop = (health.large_autoloads || []).slice(0, 3).map(function (o) { return o.name + ' (' + o.size_kb + ' KB)'; }).join(', ');
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'Autoloaded options: ' + health.autoload_kb + ' KB — consider auditing',
+                detail: alTop || health.autoload_count + ' options', plugin: '' });
+        }
+
+        // WP-Cron backlog
+        if (health.cron_overdue >= 10) {
+            var cronHooks = (health.cron_overdue_list || []).slice(0, 3).map(function (e) { return e.hook; }).join(', ');
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: health.cron_overdue + ' overdue cron events — WP-Cron may be backed up',
+                detail: cronHooks, plugin: '' });
+        } else if (health.cron_overdue > 0) {
+            var cronHooks = (health.cron_overdue_list || []).map(function (e) { return e.hook; }).join(', ');
+            issuesList.push({ sev: 'info', tab: 'summary',
+                title: health.cron_overdue + ' overdue cron event' + (health.cron_overdue > 1 ? 's' : ''),
+                detail: cronHooks, plugin: '' });
+        }
+
+        // File editing via wp-admin not locked down
+        if (health.disallow_file_edit === false) {
+            issuesList.push({ sev: 'warning', tab: 'summary',
+                title: 'wp-admin code editor is enabled (DISALLOW_FILE_EDIT not set)',
+                detail: 'Any admin can edit plugin/theme PHP files — add define(\'DISALLOW_FILE_EDIT\', true) to wp-config.php', plugin: '' });
+        }
+
+        // Plugin/theme installs not locked down (lower priority)
+        if (health.disallow_file_mods === false) {
+            issuesList.push({ sev: 'info', tab: 'summary',
+                title: 'DISALLOW_FILE_MODS not set — plugin/theme installs allowed',
+                detail: 'Add define(\'DISALLOW_FILE_MODS\', true) to wp-config.php for hardened servers', plugin: '' });
+        }
+
+        // Render-blocking scripts — in <head>, no defer/async
+        var renderBlocking = (data.assets && data.assets.scripts || []).filter(function (s) {
+            return s.src && !s.in_footer && s.strategy !== 'defer' && s.strategy !== 'async';
+        });
+        if (renderBlocking.length > 5) {
+            issuesList.push({ sev: 'warning', tab: 'assets',
+                title: renderBlocking.length + ' render-blocking scripts in <head> (no defer/async)',
+                detail: renderBlocking.slice(0, 4).map(function (s) { return s.handle; }).join(', ') + (renderBlocking.length > 4 ? ' …' : ''), plugin: '' });
+        } else if (renderBlocking.length > 2) {
+            issuesList.push({ sev: 'info', tab: 'assets',
+                title: renderBlocking.length + ' scripts in <head> without defer/async',
+                detail: renderBlocking.map(function (s) { return s.handle; }).join(', '), plugin: '' });
+        }
+
         // Sort: critical → warning → info
         var order = { critical: 0, warning: 1, info: 2 };
         issuesList.sort(function (a, b) { return (order[a.sev] || 0) - (order[b.sev] || 0); });
@@ -1350,6 +1429,56 @@
                     + '<span class="cs-sum-lb-val">' + h.count + '× &middot; ' + fmtMs(h.total_ms) + ' total &middot; max ' + fmtMs(h.max_ms) + '</span>'
                     + '</div>';
             });
+            html += '</div>';
+        }
+
+        // ── Site Health ────────────────────────────────────────────────────────
+        var health = data.health || {};
+        if (Object.keys(health).length > 0) {
+            html += '<div><div class="cs-sum-section-title">Site Health</div>';
+
+            // Helper: traffic-light badge
+            function hBadge(ok, warnCond, label, detail) {
+                var cls = ok ? 'cs-health-ok' : warnCond ? 'cs-health-warn' : 'cs-health-crit';
+                var icon = ok ? '&#10003;' : '&#9888;';
+                return '<div class="cs-health-row">'
+                    + '<span class="cs-health-icon ' + cls + '">' + icon + '</span>'
+                    + '<span class="cs-health-label">' + label + '</span>'
+                    + (detail ? '<span class="cs-health-detail">' + detail + '</span>' : '')
+                    + '</div>';
+            }
+
+            // HTTPS
+            html += hBadge(health.site_https, false, 'HTTPS', health.site_https ? 'Serving over HTTPS' : 'Site is HTTP — not secure');
+
+            // WP_DEBUG_DISPLAY
+            html += hBadge(!health.wp_debug_display, true, 'WP_DEBUG_DISPLAY',
+                health.wp_debug_display ? 'ON — PHP errors visible to visitors' : 'Off (safe)');
+
+            // File editing
+            html += hBadge(health.disallow_file_edit, true, 'DISALLOW_FILE_EDIT',
+                health.disallow_file_edit ? 'Set (code editor disabled)' : 'Not set — wp-admin code editor is active');
+
+            // File mods
+            html += hBadge(health.disallow_file_mods, true, 'DISALLOW_FILE_MODS',
+                health.disallow_file_mods ? 'Set (installs locked)' : 'Not set — plugin/theme installs allowed');
+
+            // Autoloaded options
+            var alOk = health.autoload_kb < 600;
+            var alWarn = health.autoload_kb >= 600 && health.autoload_kb < 1500;
+            var alTop = (health.large_autoloads || []).slice(0, 3).map(function (o) { return o.name + ' (' + o.size_kb + 'KB)'; }).join(', ');
+            html += hBadge(alOk, alWarn,
+                'Autoloaded options',
+                health.autoload_kb + ' KB (' + health.autoload_count + ' rows)' + (alTop ? ' — largest: ' + alTop : ''));
+
+            // Cron backlog
+            var cronOk = health.cron_overdue === 0;
+            var cronWarn = health.cron_overdue > 0 && health.cron_overdue < 10;
+            var cronDetail = health.cron_overdue > 0
+                ? health.cron_overdue + ' overdue of ' + health.cron_total + ' scheduled — ' + (health.cron_overdue_list || []).slice(0,2).map(function(e){return e.hook;}).join(', ')
+                : health.cron_total + ' events scheduled, none overdue';
+            html += hBadge(cronOk, cronWarn, 'WP-Cron', cronDetail);
+
             html += '</div>';
         }
 
