@@ -1102,6 +1102,243 @@
         issuesList.sort(function (a, b) { return (order[a.sev] || 0) - (order[b.sev] || 0); });
     }
 
+    // ── Issue fix database ────────────────────────────────────────────────────
+    var ISSUE_FIXES = {
+        admin_user: {
+            why: 'Credential-stuffing bots always try "admin" first. A non-obvious username dramatically reduces automated attack success.',
+            steps: [
+                'Go to <b>Users → Add New</b> in wp-admin and create a new Administrator with a unique username.',
+                'Log out, then log back in as the new administrator account.',
+                'Go to <b>Users → All Users</b>, hover the "admin" account and click <b>Delete</b>.',
+                'On the delete screen, choose <b>Attribute all content to:</b> your new account, then confirm deletion.',
+                'Verify login works with the new username before closing the browser.'
+            ]
+        },
+        db_prefix: {
+            why: 'The default wp_ prefix makes blind SQL injection attacks easier — attackers know exact table names without guessing.',
+            steps: [
+                '<b>Take a full database backup before proceeding.</b>',
+                'Choose a new prefix such as <code>wp8f3x_</code> (alphanumeric + underscore).',
+                'Via phpMyAdmin or SSH/MySQL: rename every table from <code>wp_</code> to the new prefix.',
+                'Fix option names: <code>UPDATE wp_options SET option_name = REPLACE(option_name, \'wp_\', \'newprefix_\') WHERE option_name LIKE \'wp_%\';</code>',
+                'Fix user meta keys: <code>UPDATE wp_usermeta SET meta_key = REPLACE(meta_key, \'wp_\', \'newprefix_\') WHERE meta_key LIKE \'wp_%\';</code>',
+                'In <code>wp-config.php</code> change: <code>$table_prefix = \'wp_\';</code> → <code>$table_prefix = \'newprefix_\';</code>',
+                'Test thoroughly — serialised option values may hard-code the old prefix.'
+            ],
+            note: 'Only practical on new installs. On a mature live site the risk of breaking serialised data often outweighs the gain.'
+        },
+        xmlrpc: {
+            why: 'XML-RPC\'s system.multicall method lets an attacker test hundreds of passwords in a single HTTP request, bypassing per-request rate limits.',
+            steps: [
+                'Add to a must-use plugin (<code>wp-content/mu-plugins/no-xmlrpc.php</code>):<br><code>&lt;?php add_filter( \'xmlrpc_enabled\', \'__return_false\' );</code>',
+                'Or block at the server level in Nginx: <code>location = /xmlrpc.php { deny all; return 404; }</code>',
+                'Or in Cloudflare: WAF → Create Rule → <code>http.request.uri.path eq "/xmlrpc.php"</code> → Block.',
+                'Verify: a request to <code>/xmlrpc.php</code> should return 403 or 404.'
+            ]
+        },
+        readme_exposed: {
+            why: 'Knowing the exact WordPress version lets attackers target known unpatched CVEs during disclosure windows.',
+            steps: [
+                'Delete via SSH: <code>rm /var/www/html/readme.html /var/www/html/license.txt</code>',
+                'Or block in Nginx: <code>location ~* ^/(readme|license)\\.(html|txt)$ { return 404; }</code>',
+                'Or in Apache <code>.htaccess</code>: <code>&lt;FilesMatch "^(readme|license)\\.(html|txt)$"&gt; Deny from all &lt;/FilesMatch&gt;</code>',
+                '<b>Note:</b> these files are recreated on every WP core update — add a post-update script or mu-plugin to delete them automatically.'
+            ]
+        },
+        php_eol: {
+            why: 'End-of-life PHP versions receive no security patches. Known CVEs accumulate with no fixes available from the PHP team.',
+            steps: [
+                'Check your hosting control panel (cPanel, Plesk, etc.) for a PHP version selector.',
+                'Target <b>PHP 8.3 or 8.4</b> — test on a staging environment first.',
+                'After switching, run <b>Tools → Site Health</b> in wp-admin to check plugin compatibility.',
+                'If your host doesn\'t offer 8.3+, consider migrating — current PHP support is a hard security requirement.'
+            ]
+        },
+        php_old: {
+            why: 'PHP 8.2 reaches end-of-life in December 2026. Plan migration before the deadline to stay on supported versions.',
+            steps: [
+                'Test your site on a staging environment with <b>PHP 8.3 or 8.4</b> — most WP sites are drop-in compatible.',
+                'Update via your hosting control panel before December 2026.',
+                'PHP 8.3 and 8.4 include performance improvements alongside security support.'
+            ]
+        },
+        wp_debug_display: {
+            why: 'Displaying PHP errors leaks file paths, table names, and code structure to any visitor who can trigger an error — including unauthenticated ones.',
+            steps: [
+                'Open <code>wp-config.php</code> in a text editor via SSH or SFTP.',
+                'Find <code>define( \'WP_DEBUG\', true );</code> and add below it:',
+                '<code>define( \'WP_DEBUG_DISPLAY\', false );</code>',
+                '<code>@ini_set( \'display_errors\', 0 );</code>',
+                'Errors will now go to <code>wp-content/debug.log</code> — visible in the CS Monitor Logs tab.'
+            ]
+        },
+        disallow_file_edit: {
+            why: 'Without this, any compromised admin account (or admin-level XSS) can inject PHP backdoors directly into theme or plugin files via wp-admin.',
+            steps: [
+                'Open <code>wp-config.php</code> via SSH or SFTP.',
+                'Add before the <code>/* That\'s all, stop editing! */</code> line:',
+                '<code>define( \'DISALLOW_FILE_EDIT\', true );</code>',
+                'This removes <b>Appearance → Theme File Editor</b> and <b>Plugins → Plugin File Editor</b>.',
+                'Verify by checking those menu entries are gone after saving.'
+            ]
+        },
+        disallow_file_mods: {
+            why: 'Prevents plugin/theme installs and updates from wp-admin — appropriate for hardened production servers where all changes go through deployment pipelines.',
+            steps: [
+                'Open <code>wp-config.php</code>.',
+                'Add: <code>define( \'DISALLOW_FILE_MODS\', true );</code>',
+                'This disables plugin/theme installs, updates, and the file editor in one constant.',
+                '<b>Note:</b> this also blocks core updates via wp-admin — use WP-CLI or your deployment script: <code>wp core update</code>'
+            ]
+        },
+        failed_logins: {
+            why: 'Repeated failed logins indicate credential-stuffing or brute-force attacks targeting the login endpoint.',
+            steps: [
+                'Identify the attacking IP: check Cloudflare → Security → Events, or your server access log.',
+                'Block the IP in Cloudflare: Security → WAF → Tools → IP Access Rules → Block.',
+                'Add a Cloudflare rate-limit rule: more than 5 POST requests to <code>/your-login-slug</code> within 60 seconds → Block.',
+                'Enable 2FA on all admin accounts — this plugin\'s 2FA makes stolen passwords useless.',
+                'The counter shown resets every hour — high 24h counts with a low 1h count means a slow, spread-out attack.'
+            ]
+        },
+        author_enum: {
+            why: 'Visiting /?author=1 redirects to /author/username/, revealing valid WordPress usernames which can then be used in targeted brute-force attacks.',
+            steps: [
+                'Add to a must-use plugin (<code>wp-content/mu-plugins/security.php</code>):',
+                '<code>add_filter( \'redirect_canonical\', function( $r ) { return isset( $_GET[\'author\'] ) ? false : $r; } );</code>',
+                'Verify: visiting <code>/?author=1</code> should no longer redirect to the author archive URL.',
+                'The REST API is a separate enumeration vector. To block it add: <code>add_filter( \'rest_endpoints\', function( $e ) { unset( $e[\'/wp/v2/users\'] ); return $e; } );</code>'
+            ]
+        },
+        plugin_updates: {
+            why: 'Outdated plugins are the #1 cause of WordPress compromises. Most attacks exploit known CVEs patched in the latest version.',
+            steps: [
+                'Go to <b>Dashboard → Updates</b> in wp-admin.',
+                'Select all plugins with available updates and click <b>Update Plugins</b>.',
+                'Or update via WP-CLI: <code>wp plugin update --all</code>',
+                'Test key site functionality after updating.',
+                'Enable automatic updates for security-critical plugins: Plugins → find the plugin → Enable auto-updates.'
+            ]
+        },
+        site_https: {
+            why: 'Plain HTTP transmits auth cookies, passwords, and session data in cleartext — visible to anyone on the same network.',
+            steps: [
+                'Install an SSL certificate via your hosting panel (Let\'s Encrypt is free and auto-renews).',
+                'In Cloudflare: SSL/TLS → set mode to <b>Full (Strict)</b>, then enable <b>Always Use HTTPS</b>.',
+                'In WordPress: <b>Settings → General</b> → change both WordPress Address and Site Address to https://.',
+                'Add to <code>wp-config.php</code>: <code>define( \'FORCE_SSL_ADMIN\', true );</code>',
+                'Run a search-replace to update hardcoded http:// URLs: <code>wp search-replace \'http://yourdomain.com\' \'https://yourdomain.com\'</code>'
+            ]
+        },
+        autoload_bloat: {
+            why: 'Every page load executes SELECT on all autoloaded options. Large payloads here slow every single request on the site.',
+            steps: [
+                'Check the <b>Site Health</b> section in the Summary tab to see the largest offending options.',
+                'For plugin-owned options: check the plugin\'s settings for a "clear cache" or "clear data" option.',
+                'To stop an option autoloading (WP 6.4+): <code>wp_set_options_autoload( [ \'option_name\' => false ] );</code>',
+                'Or via SQL: <code>UPDATE wp_options SET autoload=\'no\' WHERE option_name=\'option_name_here\';</code>',
+                'Plugins storing large caches in options should use transients with expiry or wp_cache_set() instead.'
+            ]
+        },
+        cron_overdue: {
+            why: 'Overdue cron events mean scheduled tasks (email sending, cleanup, index building) are not running on time.',
+            steps: [
+                'Check if WP-Cron is intentionally disabled: look for <code>define( \'DISABLE_WP_CRON\', true );</code> in <code>wp-config.php</code>.',
+                'If disabled, verify your system cron is running: <code>crontab -l</code> should show a <code>wp-cron.php</code> entry.',
+                'Add system cron if missing: <code>*/5 * * * * php /var/www/html/wp-cron.php > /dev/null 2>&1</code>',
+                'List all scheduled events: <code>wp cron event list</code>',
+                'Run overdue events immediately: <code>wp cron event run --due-now</code>'
+            ]
+        },
+        slow_query: {
+            why: 'Slow queries directly increase page load time. A query over 200ms is generally waiting on a missing index or scanning too many rows.',
+            steps: [
+                'Click the query row in the <b>DB Queries</b> tab to see the full SQL and call stack.',
+                'Click <b>EXPLAIN</b> on the query — look for <code>type: ALL</code> which means a full table scan.',
+                'Add a database index on the column(s) in the WHERE clause.',
+                'If the query is inside a loop, refactor to fetch all records at once (use <code>post__in</code>, <code>include</code>, or a single JOIN).',
+                'If owned by a plugin, check for a performance-related update or report it as a bug.'
+            ]
+        },
+        n1_pattern: {
+            why: 'N+1 happens when code runs the same query N times in a loop instead of batching — one query per post/user/term instead of one query total.',
+            steps: [
+                'Check the <b>caller</b> shown in the issue detail to identify which function is in the loop.',
+                'Replace individual <code>get_post()</code> / <code>get_user_by()</code> calls with a single <code>WP_Query</code> using <code>post__in</code>.',
+                'Use <code>wp_cache_get()</code> / <code>wp_cache_set()</code> to cache repeated single-record lookups.',
+                'For user lookups in a loop, <code>get_users( [ \'include\' => $ids ] )</code> fetches all at once.',
+                'If from a third-party plugin, report it with the normalised SQL pattern as a performance bug.'
+            ]
+        },
+        cache_hit_rate: {
+            why: 'A low hit rate means most cache reads result in database queries instead of fast in-memory retrieval.',
+            steps: [
+                'Install a persistent object cache: <b>Redis Object Cache</b> plugin + Redis server, or Memcached.',
+                'Ensure <code>define( \'WP_CACHE\', true );</code> is in <code>wp-config.php</code>.',
+                'If Redis is already running, check for eviction: <code>redis-cli info stats | grep evicted_keys</code> — increase <code>maxmemory</code> if keys are being evicted.',
+                'Check which cache groups have the worst hit rates in the Summary tab object cache section.',
+                'Run <code>wp cache info</code> via WP-CLI for a full cache health report.'
+            ]
+        },
+        render_blocking: {
+            why: 'Scripts in <head> without defer/async pause HTML parsing — the browser stops and waits before rendering anything on screen, directly increasing First Contentful Paint.',
+            steps: [
+                'For scripts you control: add <code>\'strategy\' => \'defer\'</code> to <code>wp_register_script()</code> or <code>wp_enqueue_script()</code>.',
+                'For third-party plugin scripts: check the plugin settings for a "load in footer" option.',
+                'The <b>Assets tab</b> shows which plugin owns each blocking script — check if an update fixes it.',
+                'As a last resort, use WP Rocket or Perfmatters to move scripts to footer.',
+                'Only scripts that are truly needed before render (e.g. critical analytics) should stay in <head>.'
+            ]
+        },
+        asset_bloat: {
+            why: 'Each additional script and stylesheet adds a network round-trip, parse time, and execution time — multiplied across every page load.',
+            steps: [
+                'Use the <b>Assets tab</b> to identify which plugins load the most scripts/styles.',
+                'Dequeue assets on pages where they\'re not needed — example: <code>if ( ! is_page( \'contact\' ) ) wp_dequeue_script( \'contact-form-scripts\' );</code>',
+                'Check each plugin\'s settings for a "disable on" or "load only on" option.',
+                'Consider Asset CleanUp or Perfmatters for no-code per-page asset management.',
+                'Combine/minify remaining assets if your CDN or caching layer doesn\'t handle it.'
+            ]
+        }
+    };
+
+    function getIssueFix(issue) {
+        var t = issue.title.toLowerCase();
+        if (t.indexOf('"admin"') !== -1 || (t.indexOf('username') !== -1 && t.indexOf('admin') !== -1)) return ISSUE_FIXES.admin_user;
+        if (t.indexOf('wp_') !== -1 && t.indexOf('prefix') !== -1)  return ISSUE_FIXES.db_prefix;
+        if (t.indexOf('xml-rpc') !== -1)                             return ISSUE_FIXES.xmlrpc;
+        if (t.indexOf('version disclosed') !== -1 || t.indexOf('readme') !== -1 || t.indexOf('license') !== -1) return ISSUE_FIXES.readme_exposed;
+        if (t.indexOf('end-of-life') !== -1 && t.indexOf('2026') === -1) return ISSUE_FIXES.php_eol;
+        if (t.indexOf('end-of-life december 2026') !== -1 || (t.indexOf('php') !== -1 && t.indexOf('2026') !== -1)) return ISSUE_FIXES.php_old;
+        if (t.indexOf('wp_debug_display') !== -1)                   return ISSUE_FIXES.wp_debug_display;
+        if (t.indexOf('disallow_file_edit') !== -1)                  return ISSUE_FIXES.disallow_file_edit;
+        if (t.indexOf('disallow_file_mods') !== -1)                  return ISSUE_FIXES.disallow_file_mods;
+        if (t.indexOf('failed login') !== -1 || t.indexOf('brute force') !== -1 || t.indexOf('brute-force') !== -1) return ISSUE_FIXES.failed_logins;
+        if (t.indexOf('author enum') !== -1)                         return ISSUE_FIXES.author_enum;
+        if (t.indexOf('pending update') !== -1)                      return ISSUE_FIXES.plugin_updates;
+        if (t.indexOf('not https') !== -1 || (t.indexOf('https') !== -1 && t.indexOf('not') !== -1)) return ISSUE_FIXES.site_https;
+        if (t.indexOf('autoload') !== -1)                            return ISSUE_FIXES.autoload_bloat;
+        if (t.indexOf('cron') !== -1 || t.indexOf('overdue') !== -1) return ISSUE_FIXES.cron_overdue;
+        if (t.indexOf('n+1') !== -1)                                 return ISSUE_FIXES.n1_pattern;
+        if (t.indexOf('cache hit rate') !== -1 || t.indexOf('object cache') !== -1) return ISSUE_FIXES.cache_hit_rate;
+        if (t.indexOf('render-blocking') !== -1 || t.indexOf('without defer') !== -1) return ISSUE_FIXES.render_blocking;
+        if (t.indexOf('slow query') !== -1 || t.indexOf('critical query') !== -1) return ISSUE_FIXES.slow_query;
+        if (t.indexOf('heavy asset') !== -1 || t.indexOf('asset count') !== -1) return ISSUE_FIXES.asset_bloat;
+        return null;
+    }
+
+    function buildFixHtml(fix) {
+        if (!fix) return '';
+        var h = '<div class="cs-fix-panel">';
+        if (fix.why) h += '<div class="cs-fix-why">' + fix.why + '</div>';
+        h += '<ol class="cs-fix-steps">';
+        fix.steps.forEach(function (s) { h += '<li>' + s + '</li>'; });
+        h += '</ol>';
+        if (fix.note) h += '<div class="cs-fix-note">&#9432; ' + fix.note + '</div>';
+        h += '</div>';
+        return h;
+    }
+
     function renderIssues() {
         if (!issuesWrap) return;
 
@@ -1115,27 +1352,45 @@
         var html = '';
         var lastSev = null;
         var titles  = { critical: '&#128308;&nbsp;Critical', warning: '&#128993;&nbsp;Warnings', info: '&#128994;&nbsp;Info' };
-        issuesList.forEach(function (issue) {
+        issuesList.forEach(function (issue, idx) {
             if (issue.sev !== lastSev) {
                 if (lastSev !== null) html += '</div>';
                 html += '<div class="cs-issues-group"><div class="cs-issues-group-title">' + (titles[issue.sev] || issue.sev) + '</div>';
                 lastSev = issue.sev;
             }
+            var fix = getIssueFix(issue);
+            var fixId = 'cs-fix-' + idx;
             html += '<div class="cs-issue-row cs-issue-' + esc(issue.sev) + '" data-tab="' + esc(issue.tab) + '">'
                 + '<div class="cs-issue-top">'
                     + '<span class="cs-issue-title">' + esc(issue.title) + '</span>'
                     + (issue.plugin ? pluginChip(issue.plugin) : '')
+                    + (fix ? '<button class="cs-fix-btn" data-fix="' + fixId + '">Explain</button>' : '')
                     + '<span class="cs-issue-arrow">&#8594;</span>'
                 + '</div>'
                 + (issue.detail ? '<div class="cs-issue-detail">' + esc(issue.detail) + '</div>' : '')
+                + (fix ? '<div class="cs-fix-wrap" id="' + fixId + '">' + buildFixHtml(fix) + '</div>' : '')
                 + '</div>';
         });
         if (lastSev !== null) html += '</div>';
 
         issuesWrap.innerHTML = html;
 
+        // Tab-switch on row click (not on Explain button)
         Array.prototype.forEach.call(issuesWrap.querySelectorAll('.cs-issue-row[data-tab]'), function (row) {
             row.addEventListener('click', function () { switchTab(row.getAttribute('data-tab')); });
+        });
+
+        // Explain button — toggle fix panel, stop propagation so row click doesn't fire
+        Array.prototype.forEach.call(issuesWrap.querySelectorAll('.cs-fix-btn'), function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var wrap = document.getElementById(btn.getAttribute('data-fix'));
+                if (!wrap) return;
+                var open = wrap.classList.contains('cs-fix-open');
+                wrap.classList.toggle('cs-fix-open', !open);
+                btn.classList.toggle('cs-fix-btn-active', !open);
+                btn.textContent = open ? 'Explain' : 'Close';
+            });
         });
     }
 
