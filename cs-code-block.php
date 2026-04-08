@@ -3724,6 +3724,14 @@ class CloudScale_DevTools {
             return;
         }
 
+        // Prevent any cache layer from storing this response — ensures the
+        // auth-cookie check below runs on every visit, not a cached copy.
+        nocache_headers();
+        // Tell LiteSpeed Server/Cache not to cache this response.
+        header( 'X-LiteSpeed-Cache-Control: no-cache' );
+        // Belt-and-suspenders: fire LiteSpeed Cache plugin's no-cache action.
+        do_action( 'litespeed_control_set_nocache', 'login_slug' );
+
         // Already authenticated — send straight to the dashboard.
         if ( is_user_logged_in() ) {
             wp_safe_redirect( admin_url() );
