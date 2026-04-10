@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.88
+ * Version: 1.8.90
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.88';
+    const VERSION      = '1.8.90';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -311,9 +311,11 @@ class CloudScale_DevTools {
         add_filter( 'site_url',            [ __CLASS__, 'login_custom_site_url' ], 10, 4 );
 
         // Brute-force protection — check before authentication (priority 1, before password check).
-        add_filter( 'authenticate',     [ __CLASS__, 'login_brute_force_check' ], 1, 3 );
+        add_filter( 'authenticate',    [ __CLASS__, 'login_brute_force_check' ], 1, 3 );
         // Force persistent cookie when a custom session duration is configured.
-        add_action( 'login_form_login', [ __CLASS__, 'login_force_remember' ] );
+        // Must be login_init (fires before the POST is processed) not login_form_login
+        // (which is a display hook that never fires on a successful login POST).
+        add_action( 'login_init', [ __CLASS__, 'login_force_remember' ], 5 );
         // Security monitor — always track failed logins regardless of monitor toggle.
         add_action( 'wp_login_failed', [ __CLASS__, 'perf_track_failed_login' ] );
 
@@ -4214,12 +4216,18 @@ class CloudScale_DevTools {
     }
 
     /**
-     * When a custom session duration is configured, forces "remember me" on the
-     * standard WordPress login form so the auth cookie is written as a persistent
-     * cookie (non-zero expiry) rather than a session cookie that browsers clear
-     * when closed.
+     * When a custom session duration is configured, forces "remember me" so the
+     * auth cookie is written as a persistent cookie (non-zero browser expiry)
+     * rather than a session cookie that browsers clear when closed/swiped away.
      *
-     * @since  1.9.5
+     * Hooked to `login_init` (priority 5) — fires before WordPress reads
+     * $_POST['rememberme'] when processing the login form POST, so wp_signon()
+     * receives remember=true and wp_set_auth_cookie() sets an explicit expiry.
+     *
+     * Note: login_form_login is a DISPLAY hook (fires when rendering the form)
+     * and never fires on a successful login POST — do NOT use that hook here.
+     *
+     * @since  1.8.88
      * @return void
      */
     public static function login_force_remember(): void {

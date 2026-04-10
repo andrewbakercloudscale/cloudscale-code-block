@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.8.88
+Stable tag: 1.8.90
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,7 +79,10 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.8.88 =
+= 1.8.90 =
+* Fixed: session cookie hook was wrong — login_form_login is a display hook that never fires on a successful login POST; moved to login_init so the persistent-cookie flag is set before WordPress processes credentials
+
+= 1.8.89 =
 * Added: Brute-force protection — configurable per-account lockout after N failed login attempts (default 5 attempts, 5-minute lock), with admin UI to adjust both thresholds
 * Fixed: Session persistence — login sessions now survive browser close when a custom session duration is set (auth cookie was a session cookie; now writes a persistent cookie)
 * Added: Thumbnails tab — Social Preview Diagnostics with URL checker (9-point OG/image diagnostic), recent posts auto-scan, Cloudflare WAF setup guide + crawler UA tester + cache purge, and Media Library auditor with one-click recompress for oversized images
