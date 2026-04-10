@@ -48,6 +48,7 @@
             login_slug:       document.getElementById( 'cs-login-slug' )?.value.trim() || '',
             method:           document.querySelector( 'input[name="cs_devtools_2fa_method"]:checked' )?.value || 'off',
             force_admins:     document.getElementById( 'cs-2fa-force' )?.checked ? '1' : '0',
+            grace_logins:     document.getElementById( 'cs-2fa-grace-logins' )?.value || '0',
             session_duration: document.getElementById( 'cs-session-duration' )?.value || 'default',
             bf_enabled:       document.getElementById( 'cs-bf-enabled' )?.checked ? '1' : '0',
             bf_attempts:      document.getElementById( 'cs-bf-attempts' )?.value || '5',
@@ -68,9 +69,7 @@
                         urlEl.href        = res.data.login_url;
                         urlEl.textContent = res.data.login_url;
                     }
-                    // Update slug-base preview
-                    const slugInput = document.getElementById( 'cs-login-slug' );
-                    if ( slugInput ) slugInput.value = slug;
+                    // (slug input already has the current value — no update needed)
                 } else {
                     alert( res.data || 'Save failed.' );
                 }

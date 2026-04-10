@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale DevTools
  * Plugin URI: https://andrewbaker.ninja
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.8.90
+ * Version: 1.8.95
  * Author: Andrew Baker
  * Author URI: https://andrewbaker.ninja
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.8.90';
+    const VERSION      = '1.8.95';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -775,6 +775,14 @@ class CloudScale_DevTools {
             'sanitize_callback' => function ( $v ) { return '1' === $v ? '1' : '0'; },
             'default'           => '0',
         ] );
+        register_setting( 'cs_devtools_login_settings', 'cs_devtools_2fa_grace_logins', [
+            'type'              => 'string',
+            'sanitize_callback' => static function ( $v ) {
+                $n = (int) $v;
+                return ( $n >= 0 && $n <= 10 ) ? (string) $n : '0';
+            },
+            'default' => '0',
+        ] );
         register_setting( 'cs_devtools_login_settings', 'cs_devtools_session_duration', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) {
@@ -1184,10 +1192,10 @@ class CloudScale_DevTools {
                         $bdr    = $is_on ? '#1a7a34' : ( $is_opt ? '#c3c4c7' : '#2271b1' );
                     ?>
                     <div style="border:1px solid #e0e0e0;border-radius:6px;padding:12px 14px;margin-bottom:10px">
-                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;flex-wrap:wrap">
-                            <strong style="font-size:13px"><?php echo esc_html( $item['name'] ); ?></strong>
-                            <span style="background:<?php echo esc_attr( $bg ); ?>;color:<?php echo esc_attr( $col ); ?>;border:1px solid <?php echo esc_attr( $bdr ); ?>;border-radius:4px;font-size:11px;font-weight:600;padding:1px 8px;white-space:nowrap"><?php echo esc_html( $rec ); ?></span>
+                        <div style="text-align:center;margin-bottom:6px">
+                            <span style="display:inline-block;background:<?php echo esc_attr( $bg ); ?>;color:<?php echo esc_attr( $col ); ?>;border:1px solid <?php echo esc_attr( $bdr ); ?>;border-radius:4px;font-size:11px;font-weight:600;padding:1px 8px;white-space:nowrap"><?php echo esc_html( $rec ); ?></span>
                         </div>
+                        <strong style="display:block;font-size:13px;margin-bottom:4px"><?php echo esc_html( $item['name'] ); ?></strong>
                         <p style="margin:0;color:#50575e;font-size:12px;line-height:1.5;white-space:pre-line"><?php echo esc_html( $item['desc'] ); ?></p>
                     </div>
                     <?php endforeach; ?>
@@ -1777,6 +1785,7 @@ class CloudScale_DevTools {
                     [ 'name' => 'Email Code',               'rec' => 'Optional',        'desc' => 'Requires users to enter a code sent to their email after each password login. Works out of the box with no app required.' ],
                     [ 'name' => 'Authenticator App (TOTP)', 'rec' => 'Recommended',     'desc' => 'Each user configures their own authenticator app. Most secure option — works without internet or email.' ],
                     [ 'name' => 'Force 2FA for Admins',     'rec' => 'Recommended',     'desc' => 'Blocks administrator-role users from accessing the dashboard until they have set up 2FA. Strongly recommended on any multi-user site.' ],
+                    [ 'name' => 'Grace Logins',             'rec' => 'Advanced',        'desc' => "Allows a user to log in up to N times before 2FA is required. The counter is per-user and never resets automatically.\n\nDefault is 0 (2FA always required from the first login).\n\nTip for automated test accounts: set to 1. Playwright and similar tools cannot complete a real 2FA challenge, so granting one grace login lets a test account authenticate for setup steps without disabling 2FA site-wide." ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -1819,6 +1828,16 @@ class CloudScale_DevTools {
                             <span style="font-size:13px;color:#555"><?php esc_html_e( 'Force 2FA for all administrators', 'cloudscale-devtools' ); ?></span>
                         </label>
                         <span class="cs-hint"><?php esc_html_e( 'Admins without 2FA set up will be blocked from the dashboard until they configure it.', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                </div>
+
+                <?php $grace_logins = (int) get_option( 'cs_devtools_2fa_grace_logins', '0' ); ?>
+                <div class="cs-field-row" style="margin-top:16px">
+                    <div class="cs-field">
+                        <label class="cs-label" for="cs-2fa-grace-logins"><?php esc_html_e( 'Grace logins before 2FA is required:', 'cloudscale-devtools' ); ?></label>
+                        <input type="number" id="cs-2fa-grace-logins" class="cs-input" min="0" max="10"
+                               value="<?php echo esc_attr( $grace_logins ); ?>" style="max-width:100px">
+                        <span class="cs-hint"><?php esc_html_e( 'Allow N logins without 2FA per user. 0 = 2FA required from first login. For automated test accounts use 1.', 'cloudscale-devtools' ); ?></span>
                     </div>
                 </div>
 
@@ -4503,6 +4522,17 @@ class CloudScale_DevTools {
             return $user;
         }
 
+        // Grace logins: allow up to N logins without 2FA being set up.
+        // Useful for automated test accounts or newly invited users.
+        $grace_limit = (int) get_option( 'cs_devtools_2fa_grace_logins', '0' );
+        if ( $grace_limit > 0 ) {
+            $grace_count = (int) get_user_meta( $user->ID, 'cs_devtools_2fa_grace_count', true );
+            if ( $grace_count < $grace_limit ) {
+                update_user_meta( $user->ID, 'cs_devtools_2fa_grace_count', $grace_count + 1 );
+                return $user; // Skip 2FA — grace login consumed.
+            }
+        }
+
         // Avoid triggering 2FA during a 2FA verification POST itself.
         $action = isset( $_REQUEST['action'] ) ? sanitize_key( $_REQUEST['action'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if ( $action === 'cs_devtools_2fa' ) {
@@ -4922,6 +4952,11 @@ class CloudScale_DevTools {
         update_option( 'cs_devtools_brute_force_enabled',  $bf_enabled );
         update_option( 'cs_devtools_brute_force_attempts', (string) $bf_attempts );
         update_option( 'cs_devtools_brute_force_lockout',  (string) $bf_lockout );
+
+        // Grace logins
+        $grace_logins = isset( $_POST['grace_logins'] ) ? (int) sanitize_text_field( wp_unslash( $_POST['grace_logins'] ) ) : 0;
+        if ( $grace_logins < 0 || $grace_logins > 10 ) { $grace_logins = 0; }
+        update_option( 'cs_devtools_2fa_grace_logins', (string) $grace_logins );
 
         $new_url = $hide === '1' && $slug ? home_url( '/' . $slug . '/' ) : wp_login_url();
         wp_send_json_success( [ 'login_url' => $new_url ] );

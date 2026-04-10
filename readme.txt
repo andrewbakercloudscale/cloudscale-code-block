@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.8.90
+Stable tag: 1.8.95
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,7 +79,7 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.8.90 =
+= 1.8.95 =
 * Fixed: session cookie hook was wrong — login_form_login is a display hook that never fires on a successful login POST; moved to login_init so the persistent-cookie flag is set before WordPress processes credentials
 
 = 1.8.89 =
