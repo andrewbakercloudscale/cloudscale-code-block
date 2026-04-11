@@ -1,14 +1,14 @@
 /**
  * CloudScale Code Block — Frontend Script v1.7.5
  *
- * Reads theme colours from csDevtoolsCodeConfig (set by PHP) and applies them
+ * Reads theme colours from csdtDevtoolsCodeConfig (set by PHP) and applies them
  * via CSS custom properties so any highlight.js theme pair works.
  */
 
 ( function() {
     'use strict';
 
-    var cfg = window.csDevtoolsCodeConfig || {};
+    var cfg = window.csdtDevtoolsCodeConfig || {};
     var defaultTheme = cfg.defaultTheme || 'dark';
 
     // Theme colour config from PHP

@@ -6,7 +6,7 @@
     'use strict';
 
     // Shared with cs-login.js — both are enqueued on the login tab.
-    const { ajaxUrl, nonce } = window.csDevtoolsLogin || {};
+    const { ajaxUrl, nonce } = window.csdtDevtoolsLogin || {};
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -95,7 +95,7 @@
             // 1. Get registration options from server.
             let startRes;
             try {
-                startRes = await post( 'cs_devtools_pk_register_start', {} );
+                startRes = await post( 'csdt_devtools_pk_register_start', {} );
             } catch {
                 registerBtn.disabled    = false;
                 registerBtn.textContent = 'Register';
@@ -140,7 +140,7 @@
             // 4. Send attestation to server.
             let finishRes;
             try {
-                finishRes = await post( 'cs_devtools_pk_register_finish', {
+                finishRes = await post( 'csdt_devtools_pk_register_finish', {
                     name,
                     credentialId:      buf64( cred.rawId ),
                     clientDataJSON:    buf64( cred.response.clientDataJSON ),
@@ -177,7 +177,7 @@
                 if ( ! confirm( `Remove "${name}"? You can register it again at any time.` ) ) return;
 
                 btn.disabled = true;
-                const res = await post( 'cs_devtools_pk_delete', { cred_id: btn.dataset.id } ).catch( () => null );
+                const res = await post( 'csdt_devtools_pk_delete', { cred_id: btn.dataset.id } ).catch( () => null );
 
                 if ( res?.success ) {
                     item?.remove();
@@ -219,7 +219,7 @@
 
                 try {
                     // 1. Get challenge from server.
-                    const startRes = await post( 'cs_devtools_pk_test_start', {} );
+                    const startRes = await post( 'csdt_devtools_pk_test_start', {} );
                     if ( ! startRes?.success ) throw new Error( startRes?.data || 'Could not start test.' );
                     const o = startRes.data;
 
@@ -233,11 +233,11 @@
                     }});
 
                     // 3. Send assertion to server for verification.
-                    const finishRes = await post( 'cs_devtools_pk_test_finish', {
-                        cs_devtools_pk_cred_id:    buf64( cred.rawId ),
-                        cs_devtools_pk_client_data: buf64( cred.response.clientDataJSON ),
-                        cs_devtools_pk_auth_data:  buf64( cred.response.authenticatorData ),
-                        cs_devtools_pk_signature:  buf64( cred.response.signature ),
+                    const finishRes = await post( 'csdt_devtools_pk_test_finish', {
+                        csdt_devtools_pk_cred_id:    buf64( cred.rawId ),
+                        csdt_devtools_pk_client_data: buf64( cred.response.clientDataJSON ),
+                        csdt_devtools_pk_auth_data:  buf64( cred.response.authenticatorData ),
+                        csdt_devtools_pk_signature:  buf64( cred.response.signature ),
                     });
 
                     if ( finishRes?.success ) {

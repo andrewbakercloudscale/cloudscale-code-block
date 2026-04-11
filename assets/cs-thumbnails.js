@@ -6,7 +6,7 @@
 ( function () {
     'use strict';
 
-    const { ajaxUrl, nonce, siteUrl } = window.csDevtoolsThumbs || {};
+    const { ajaxUrl, nonce, siteUrl } = window.csdtDevtoolsThumbs || {};
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@
             checkBtn.textContent = 'Running…';
             setLoading( checkResults, 'Running all diagnostic checks — this may take 10–20 seconds…' );
 
-            post( 'cs_devtools_social_check_url', { url } ).then( res => {
+            post( 'csdt_devtools_social_check_url', { url } ).then( res => {
                 checkBtn.disabled = false;
                 checkBtn.textContent = '🔍 Run Diagnostic';
                 if ( ! res.success ) {
@@ -126,7 +126,7 @@
         if ( fixAllBtn ) fixAllBtn.style.display = 'none';
         setLoading( auditResults, loadMsg );
 
-        post( 'cs_devtools_social_scan_media', { mode } ).then( res => {
+        post( 'csdt_devtools_social_scan_media', { mode } ).then( res => {
             if ( btn ) { btn.disabled = false; btn.innerHTML = origLabel; }
             if ( otherBtn ) otherBtn.disabled = false;
             if ( auditProgress ) auditProgress.textContent = '';
@@ -166,7 +166,7 @@
                 }
                 const p = fixable[ done ];
                 fixAllBtn.textContent = `Fixing ${done + 1} / ${fixable.length}…`;
-                post( 'cs_devtools_social_generate_formats', { post_id: p.post_id } ).then( () => {
+                post( 'csdt_devtools_social_generate_formats', { post_id: p.post_id } ).then( () => {
                     const fixRow = document.getElementById( `cs-scan-fix-row-${p.post_id}` );
                     if ( fixRow ) fixRow.innerHTML = '<span style="color:#276227;font-size:11px">✔ Formats generated</span>';
                     done++;
@@ -191,12 +191,12 @@
             let errored     = 0;
 
             function runBatch( offset ) {
-                post( 'cs_devtools_social_fix_all_batch', { offset } ).then( res => {
+                post( 'csdt_devtools_social_fix_all_batch', { offset } ).then( res => {
                     if ( ! res.success ) {
                         fixSiteBtn.disabled    = false;
                         fixSiteBtn.textContent = '🌐 Fix All Posts on Site';
                         if ( auditProgress ) auditProgress.textContent = '✗ Batch error — see console.';
-                        console.error( 'cs_devtools_social_fix_all_batch error', res );
+                        console.error( 'csdt_devtools_social_fix_all_batch error', res );
                         return;
                     }
                     const d = res.data;
@@ -392,7 +392,7 @@
         setLoading( checkResults, `Re-checking ${url}…` );
         checkBtn?.scrollIntoView( { behavior: 'smooth', block: 'center' } );
 
-        post( 'cs_devtools_social_check_url', { url } ).then( res => {
+        post( 'csdt_devtools_social_check_url', { url } ).then( res => {
             if ( ! res.success ) {
                 checkResults.innerHTML = `<p style="color:#8c2020">${esc( res.data?.message || 'Error' )}</p>`;
                 return;
@@ -414,7 +414,7 @@
         btn.textContent = 'Generating…';
         if ( fixRow ) fixRow.innerHTML = '<span style="color:#555;font-size:11px">⏳ Generating platform formats…</span>';
 
-        post( 'cs_devtools_social_generate_formats', { post_id: postId } ).then( res => {
+        post( 'csdt_devtools_social_generate_formats', { post_id: postId } ).then( res => {
             btn.style.display = 'none';
             if ( ! res.success ) {
                 if ( fixRow ) fixRow.innerHTML = `<span style="color:#8c2020;font-size:11px">✘ ${esc( res.data?.message || 'Failed' )}</span>`;
@@ -471,7 +471,7 @@
             cfTestBtn.textContent = 'Testing…';
             setLoading( cfTestResults, 'Sending requests with each social crawler user agent…' );
 
-            post( 'cs_devtools_social_cf_test', { url } ).then( res => {
+            post( 'csdt_devtools_social_cf_test', { url } ).then( res => {
                 cfTestBtn.disabled = false;
                 cfTestBtn.textContent = '🤖 Test Crawler Access';
                 if ( ! res.success ) {
@@ -526,7 +526,7 @@
     if ( cfSaveBtn ) {
         cfSaveBtn.addEventListener( 'click', () => {
             cfSaveBtn.disabled = true;
-            post( 'cs_devtools_cf_save', {
+            post( 'csdt_devtools_cf_save', {
                 zone_id:   cfZoneId?.value.trim() || '',
                 api_token: cfApiToken?.value || '',
             } ).then( res => {
@@ -547,7 +547,7 @@
             cfPurgeBtn.textContent = 'Purging…';
             setLoading( cfPurgeResult, 'Sending purge request to Cloudflare…' );
 
-            post( 'cs_devtools_cf_purge', { purge_url: cfPurgeUrl?.value.trim() || '' } ).then( res => {
+            post( 'csdt_devtools_cf_purge', { purge_url: cfPurgeUrl?.value.trim() || '' } ).then( res => {
                 cfPurgeBtn.disabled = false;
                 cfPurgeBtn.textContent = '🗑️ Purge Cache';
                 cfPurgeResult.style.display = 'block';
@@ -580,7 +580,7 @@
             const selected = Array.from( document.querySelectorAll( '.cs-platform-cb:checked' ) )
                 .map( cb => cb.value );
             platformSaveBtn.disabled = true;
-            const params = { nonce, action: 'cs_devtools_social_platform_save' };
+            const params = { nonce, action: 'csdt_devtools_social_platform_save' };
             selected.forEach( ( v, i ) => { params[ `platforms[${i}]` ] = v; } );
             const body = new URLSearchParams( params );
             fetch( ajaxUrl, { method: 'POST', body } )

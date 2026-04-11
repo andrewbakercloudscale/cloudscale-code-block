@@ -5,7 +5,7 @@
 ( function () {
     'use strict';
 
-    const { ajaxUrl, nonce, testTo } = window.csDevtoolsSmtp || {};
+    const { ajaxUrl, nonce, testTo } = window.csdtDevtoolsSmtp || {};
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -112,7 +112,7 @@
     if ( smtpSaveBtn ) {
         smtpSaveBtn.addEventListener( 'click', () => {
             smtpSaveBtn.disabled = true;
-            post( 'cs_devtools_smtp_save', collectSmtpPayload() ).then( res => {
+            post( 'csdt_devtools_smtp_save', collectSmtpPayload() ).then( res => {
                 smtpSaveBtn.disabled = false;
                 flash( smtpSaved, res.success );
                 if ( ! res.success ) {
@@ -134,7 +134,7 @@
         fromSaveBtn.addEventListener( 'click', () => {
             fromSaveBtn.disabled = true;
             // Re-use the same AJAX action — server saves all fields each time.
-            post( 'cs_devtools_smtp_save', collectSmtpPayload() ).then( res => {
+            post( 'csdt_devtools_smtp_save', collectSmtpPayload() ).then( res => {
                 fromSaveBtn.disabled = false;
                 flash( fromSaved, res.success );
                 if ( ! res.success ) {
@@ -206,7 +206,7 @@
                 testResult.innerHTML = '';
                 testResult.style.color = '';
             }
-            post( 'cs_devtools_smtp_test', {} ).then( res => {
+            post( 'csdt_devtools_smtp_test', {} ).then( res => {
                 testBtn.disabled    = false;
                 testBtn.textContent = '📨 Send Test Email';
                 if ( res.success ) {
@@ -238,7 +238,7 @@
 
     function refreshLog() {
         if ( ! logWrap ) return;
-        post( 'cs_devtools_smtp_log_fetch', {} ).then( res => {
+        post( 'csdt_devtools_smtp_log_fetch', {} ).then( res => {
             if ( ! res.success ) return;
             const rows = res.data;
             if ( ! rows || rows.length === 0 ) {
@@ -294,7 +294,7 @@
         logClearBtn.addEventListener( 'click', () => {
             if ( ! confirm( 'Clear all email log entries?' ) ) return;
             logClearBtn.disabled = true;
-            post( 'cs_devtools_smtp_log_clear', {} ).then( res => {
+            post( 'csdt_devtools_smtp_log_clear', {} ).then( res => {
                 logClearBtn.disabled = false;
                 if ( res.success ) refreshLog();
             } ).catch( () => { logClearBtn.disabled = false; } );

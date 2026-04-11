@@ -25,13 +25,13 @@
     function ajax(action, data, callback) {
         var fd = new FormData();
         fd.append('action', action);
-        fd.append('nonce', csDevtoolsMigrate.nonce);
+        fd.append('nonce', csdtDevtoolsMigrate.nonce);
         if (data) {
             Object.keys(data).forEach(function (k) {
                 fd.append(k, data[k]);
             });
         }
-        fetch(csDevtoolsMigrate.ajaxUrl, { method: 'POST', body: fd })
+        fetch(csdtDevtoolsMigrate.ajaxUrl, { method: 'POST', body: fd })
             .then(function (r) { return r.json(); })
             .then(function (resp) {
                 if (resp && resp.success) {
@@ -69,7 +69,7 @@
         setStatus('Scanning...', '');
         resultsArea.innerHTML = '<p class="cs-loading"><span class="cs-spinner"></span> Scanning all posts for legacy code blocks...</p>';
 
-        ajax('cs_devtools_migrate_scan', {}, function (err, data) {
+        ajax('csdt_devtools_migrate_scan', {}, function (err, data) {
             scanBtn.disabled = false;
 
             if (err) {
@@ -155,7 +155,7 @@
         modalBody.innerHTML = '<p class="cs-loading"><span class="cs-spinner"></span> Loading block preview...</p>';
         modalMigrateBtn.setAttribute('data-post-id', postId);
 
-        ajax('cs_devtools_migrate_preview', { post_id: postId }, function (err, data) {
+        ajax('csdt_devtools_migrate_preview', { post_id: postId }, function (err, data) {
             if (err) {
                 modalBody.innerHTML = '<p style="color:#d63638;">Error: ' + escHtml(err) + '</p>';
                 return;
@@ -207,7 +207,7 @@
         this.disabled = true;
         this.textContent = 'Migrating...';
 
-        ajax('cs_devtools_migrate_single', { post_id: postId }, function (err, data) {
+        ajax('csdt_devtools_migrate_single', { post_id: postId }, function (err, data) {
             modalMigrateBtn.disabled = false;
             modalMigrateBtn.innerHTML = '<span class="dashicons dashicons-yes-alt"></span> Migrate This Post';
 
@@ -232,7 +232,7 @@
         btn.disabled = true;
         btn.textContent = 'Migrating...';
 
-        ajax('cs_devtools_migrate_single', { post_id: postId }, function (err, data) {
+        ajax('csdt_devtools_migrate_single', { post_id: postId }, function (err, data) {
             if (err) {
                 btn.disabled = false;
                 btn.textContent = 'Migrate';
@@ -297,7 +297,7 @@
         migrateAllBtn.textContent = 'Migrating all...';
         setStatus('Migrating all remaining posts...', '');
 
-        ajax('cs_devtools_migrate_all', {}, function (err, data) {
+        ajax('csdt_devtools_migrate_all', {}, function (err, data) {
             migrateAllBtn.innerHTML = '<span class="dashicons dashicons-update"></span> Migrate All Remaining';
 
             if (err) {

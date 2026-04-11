@@ -10,9 +10,9 @@
 (function () {
     'use strict';
 
-    var LS_OPEN   = 'cs_devtools_perf_open';
-    var LS_HEIGHT = 'cs_devtools_perf_height';
-    var LS_TAB    = 'cs_devtools_perf_tab';
+    var LS_OPEN   = 'csdt_devtools_perf_open';
+    var LS_HEIGHT = 'csdt_devtools_perf_height';
+    var LS_TAB    = 'csdt_devtools_perf_tab';
     var DEFAULT_H = 340;
     var MIN_H     = 260;
     var MAX_H_PCT = 0.82;
@@ -23,7 +23,7 @@
     var N1_THRESH  = 3;
 
     // ── State ─────────────────────────────────────────────────────────────────
-    var data      = window.csDevtoolsPerfData || { queries: [], http: [], errors: [], logs: [], assets: { scripts: [], styles: [] }, cache: {}, hooks: [], meta: {}, request: {}, transients: [], template: { final: '', hierarchy: [] }, health: {} };
+    var data      = window.csdtDevtoolsPerfData || { queries: [], http: [], errors: [], logs: [], assets: { scripts: [], styles: [] }, cache: {}, hooks: [], meta: {}, request: {}, transients: [], template: { final: '', hierarchy: [] }, health: {} };
     var meta      = data.meta || {};
     var sortCol   = 'time';
     var sortDir   = 'desc';
@@ -694,7 +694,7 @@
             btn.disabled = false; btn.textContent = 'EXPLAIN';
             resultDiv.innerHTML = '<div class="cs-explain-error">Request failed</div>';
         };
-        xhr.send('action=cs_devtools_perf_explain&nonce=' + encodeURIComponent(meta.explain_nonce || '')
+        xhr.send('action=csdt_devtools_perf_explain&nonce=' + encodeURIComponent(meta.explain_nonce || '')
                  + '&sql=' + encodeURIComponent(sql));
     }
 
@@ -3052,7 +3052,7 @@
                     }
                 };
                 xhr.onerror = function () { debugToggleBtn.disabled = false; if (msgEl) msgEl.textContent = 'Request failed'; };
-                xhr.send('action=cs_devtools_perf_debug_toggle&nonce=' + encodeURIComponent(meta.debug_nonce) + '&enable=' + (enable ? '1' : '0'));
+                xhr.send('action=csdt_devtools_perf_debug_toggle&nonce=' + encodeURIComponent(meta.debug_nonce) + '&enable=' + (enable ? '1' : '0'));
             });
         }
 

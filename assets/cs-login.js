@@ -7,7 +7,7 @@
 ( function () {
     'use strict';
 
-    const { ajaxUrl, nonce } = window.csDevtoolsLogin || {};
+    const { ajaxUrl, nonce } = window.csdtDevtoolsLogin || {};
 
     // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -46,7 +46,7 @@
         return {
             hide_enabled:     document.getElementById( 'cs-hide-enabled' )?.checked ? '1' : '0',
             login_slug:       document.getElementById( 'cs-login-slug' )?.value.trim() || '',
-            method:           document.querySelector( 'input[name="cs_devtools_2fa_method"]:checked' )?.value || 'off',
+            method:           document.querySelector( 'input[name="csdt_devtools_2fa_method"]:checked' )?.value || 'off',
             force_admins:     document.getElementById( 'cs-2fa-force' )?.checked ? '1' : '0',
             grace_logins:     document.getElementById( 'cs-2fa-grace-logins' )?.value || '0',
             session_duration: document.getElementById( 'cs-session-duration' )?.value || 'default',
@@ -59,7 +59,7 @@
     if ( hideSaveBtn ) {
         hideSaveBtn.addEventListener( 'click', () => {
             hideSaveBtn.disabled = true;
-            post( 'cs_devtools_login_save', collectLoginPayload() ).then( res => {
+            post( 'csdt_devtools_login_save', collectLoginPayload() ).then( res => {
                 hideSaveBtn.disabled = false;
                 if ( res.success ) {
                     flash( hideSaved, true );
@@ -86,7 +86,7 @@
     if ( sessionSaveBtn ) {
         sessionSaveBtn.addEventListener( 'click', () => {
             sessionSaveBtn.disabled = true;
-            post( 'cs_devtools_login_save', collectLoginPayload() ).then( res => {
+            post( 'csdt_devtools_login_save', collectLoginPayload() ).then( res => {
                 sessionSaveBtn.disabled = false;
                 if ( res.success ) {
                     flash( sessionSaved, true );
@@ -115,7 +115,7 @@
     if ( bfSaveBtn ) {
         bfSaveBtn.addEventListener( 'click', () => {
             bfSaveBtn.disabled = true;
-            post( 'cs_devtools_login_save', collectLoginPayload() ).then( res => {
+            post( 'csdt_devtools_login_save', collectLoginPayload() ).then( res => {
                 bfSaveBtn.disabled = false;
                 if ( res.success ) {
                     flash( bfSaved, true );
@@ -132,7 +132,7 @@
     if ( twoFaSaveBtn ) {
         twoFaSaveBtn.addEventListener( 'click', () => {
             twoFaSaveBtn.disabled = true;
-            post( 'cs_devtools_login_save', collectLoginPayload() ).then( res => {
+            post( 'csdt_devtools_login_save', collectLoginPayload() ).then( res => {
                 twoFaSaveBtn.disabled = false;
                 if ( res.success ) {
                     flash( twoFaSaved, true );
@@ -170,7 +170,7 @@
             const existingWarn = document.getElementById( 'cs-email-port-warn' );
             if ( existingWarn ) existingWarn.remove();
 
-            post( 'cs_devtools_email_2fa_enable', {} ).then( res => {
+            post( 'csdt_devtools_email_2fa_enable', {} ).then( res => {
                 const d = res.data || {};
 
                 // Show port/config warning if present (success OR failure)
@@ -231,7 +231,7 @@
             const method = btn.dataset.method;
             if ( ! confirm( 'Disable ' + ( method === 'totp' ? 'Authenticator App' : 'Email' ) + ' 2FA? You can re-enable it at any time.' ) ) return;
             btn.disabled = true;
-            post( 'cs_devtools_2fa_disable', { method } ).then( res => {
+            post( 'csdt_devtools_2fa_disable', { method } ).then( res => {
                 if ( res.success ) {
                     location.reload();
                 } else {
@@ -269,7 +269,7 @@
             if ( totpCodeInput ) totpCodeInput.value = '';
 
             // Fetch secret from server
-            post( 'cs_devtools_totp_setup_start', {} ).then( res => {
+            post( 'csdt_devtools_totp_setup_start', {} ).then( res => {
                 if ( totpQrLoading ) totpQrLoading.style.display = 'none';
                 if ( ! res.success ) {
                     alert( res.data || 'Failed to start setup.' );
@@ -352,7 +352,7 @@
             totpVerifyBtn.disabled = true;
             totpVerifyBtn.textContent = 'Verifying…';
 
-            post( 'cs_devtools_totp_setup_verify', { code } ).then( res => {
+            post( 'csdt_devtools_totp_setup_verify', { code } ).then( res => {
                 totpVerifyBtn.disabled = false;
                 totpVerifyBtn.textContent = '✓ Verify & Activate';
                 if ( res.success ) {

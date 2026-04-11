@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 // ── Minimal CBOR decoder (subset needed for WebAuthn attestation/assertion) ──
 
-final class CS_DevTools_CBOR {
+final class CSDT_DevTools_CBOR {
 
     public static function decode( string $data ): mixed {
         $o = 0;
@@ -67,21 +67,21 @@ final class CS_DevTools_CBOR {
 
 // ── Passkey handler ──────────────────────────────────────────────────────────
 
-class CS_DevTools_Passkey {
+class CSDT_DevTools_Passkey {
 
-    const META_KEY          = 'cs_devtools_passkeys';
-    const CHALLENGE_PREFIX  = 'cs_devtools_pk_ch_';   // + suffix (user_id or 'login_' + token)
+    const META_KEY          = 'csdt_devtools_passkeys';
+    const CHALLENGE_PREFIX  = 'csdt_devtools_pk_ch_';   // + suffix (user_id or 'login_' + token)
     const CHALLENGE_TTL     = 120;           // seconds
-    const NONCE_ACTION      = 'cs_devtools_login_nonce';
+    const NONCE_ACTION      = 'csdt_devtools_login_nonce';
 
     // ── Hooks ────────────────────────────────────────────────────────────────
 
     public static function register_hooks(): void {
-        add_action( 'wp_ajax_cs_devtools_pk_register_start',  [ __CLASS__, 'ajax_register_start'  ] );
-        add_action( 'wp_ajax_cs_devtools_pk_register_finish', [ __CLASS__, 'ajax_register_finish' ] );
-        add_action( 'wp_ajax_cs_devtools_pk_delete',          [ __CLASS__, 'ajax_delete'          ] );
-        add_action( 'wp_ajax_cs_devtools_pk_test_start',      [ __CLASS__, 'ajax_test_start'      ] );
-        add_action( 'wp_ajax_cs_devtools_pk_test_finish',     [ __CLASS__, 'ajax_test_finish'     ] );
+        add_action( 'wp_ajax_csdt_devtools_pk_register_start',  [ __CLASS__, 'ajax_register_start'  ] );
+        add_action( 'wp_ajax_csdt_devtools_pk_register_finish', [ __CLASS__, 'ajax_register_finish' ] );
+        add_action( 'wp_ajax_csdt_devtools_pk_delete',          [ __CLASS__, 'ajax_delete'          ] );
+        add_action( 'wp_ajax_csdt_devtools_pk_test_start',      [ __CLASS__, 'ajax_test_start'      ] );
+        add_action( 'wp_ajax_csdt_devtools_pk_test_finish',     [ __CLASS__, 'ajax_test_finish'     ] );
     }
 
     // ── AJAX: Registration start ─────────────────────────────────────────────
@@ -159,7 +159,7 @@ class CS_DevTools_Passkey {
 
         // Parse attestationObject.
         try {
-            $att = CS_DevTools_CBOR::decode( self::b64u_decode( $atto_b64u ) );
+            $att = CSDT_DevTools_CBOR::decode( self::b64u_decode( $atto_b64u ) );
         } catch ( \Exception $e ) {
             wp_send_json_error( __( 'Attestation parse error.', 'cloudscale-devtools' ) );
         }
@@ -303,24 +303,24 @@ class CS_DevTools_Passkey {
             'userVerification' => 'preferred',
             'allowCredentials' => [],
         ];
-        $nonce = wp_create_nonce( 'cs_devtools_pk_login_' . $token );
+        $nonce = wp_create_nonce( 'csdt_devtools_pk_login_' . $token );
 
-        $fallback_url = add_query_arg( [ 'action' => 'cs_devtools_2fa', 'cs_devtools_token' => rawurlencode( $token ) ], wp_login_url() );
+        $fallback_url = add_query_arg( [ 'action' => 'csdt_devtools_2fa', 'csdt_devtools_token' => rawurlencode( $token ) ], wp_login_url() );
 
         login_header( __( 'Passkey Authentication', 'cloudscale-devtools' ), '', null );
         ?>
           <?php // Single form — WP's .login form CSS styles it as the white card. ?>
           <form id="cs-pk-login-form" method="post"
-                action="<?php echo esc_url( add_query_arg( [ 'action' => 'cs_devtools_2fa', 'cs_devtools_token' => rawurlencode( $token ) ], wp_login_url() ) ); ?>">
-            <input type="hidden" name="action"           value="cs_devtools_2fa">
-            <input type="hidden" name="cs_devtools_token"         value="<?php echo esc_attr( $token ); ?>">
-            <input type="hidden" name="cs_devtools_pk_nonce"      value="<?php echo esc_attr( $nonce ); ?>">
-            <input type="hidden" name="cs_devtools_pk_cred_id"    id="cs-pk-cred-id">
-            <input type="hidden" name="cs_devtools_pk_client_data" id="cs-pk-client-data">
-            <input type="hidden" name="cs_devtools_pk_auth_data"  id="cs-pk-auth-data">
-            <input type="hidden" name="cs_devtools_pk_signature"  id="cs-pk-signature">
+                action="<?php echo esc_url( add_query_arg( [ 'action' => 'csdt_devtools_2fa', 'csdt_devtools_token' => rawurlencode( $token ) ], wp_login_url() ) ); ?>">
+            <input type="hidden" name="action"           value="csdt_devtools_2fa">
+            <input type="hidden" name="csdt_devtools_token"         value="<?php echo esc_attr( $token ); ?>">
+            <input type="hidden" name="csdt_devtools_pk_nonce"      value="<?php echo esc_attr( $nonce ); ?>">
+            <input type="hidden" name="csdt_devtools_pk_cred_id"    id="cs-pk-cred-id">
+            <input type="hidden" name="csdt_devtools_pk_client_data" id="cs-pk-client-data">
+            <input type="hidden" name="csdt_devtools_pk_auth_data"  id="cs-pk-auth-data">
+            <input type="hidden" name="csdt_devtools_pk_signature"  id="cs-pk-signature">
             <?php // Fallback fields — swapped in by JS when email fallback is chosen. ?>
-            <input type="hidden" id="cs-pk-fallback-field" name="cs_devtools_pk_fallback" value="">
+            <input type="hidden" id="cs-pk-fallback-field" name="csdt_devtools_pk_fallback" value="">
 
             <div style="text-align:center;padding:8px 0 4px;">
               <div id="cs-pk-icon" style="font-size:52px;margin-bottom:14px;transition:opacity .3s"><?php echo $error ? '❌' : '🔑'; ?></div>
@@ -421,10 +421,10 @@ class CS_DevTools_Passkey {
      * @return true|\WP_Error
      */
     public static function verify_login_assertion( string $token, int $user_id ) {
-        if ( ! isset( $_POST['cs_devtools_pk_nonce'] ) ||
+        if ( ! isset( $_POST['csdt_devtools_pk_nonce'] ) ||
              ! wp_verify_nonce(
-                 sanitize_text_field( wp_unslash( $_POST['cs_devtools_pk_nonce'] ) ),
-                 'cs_devtools_pk_login_' . $token
+                 sanitize_text_field( wp_unslash( $_POST['csdt_devtools_pk_nonce'] ) ),
+                 'csdt_devtools_pk_login_' . $token
              ) ) {
             return new \WP_Error( 'nonce', __( 'Security check failed.', 'cloudscale-devtools' ) );
         }
@@ -535,10 +535,10 @@ class CS_DevTools_Passkey {
         delete_transient( self::CHALLENGE_PREFIX . $challenge_suffix );
         $expected_ch = base64_decode( $stored );
 
-        $cred_id_b64u = isset( $_POST['cs_devtools_pk_cred_id'] )      ? sanitize_text_field( wp_unslash( $_POST['cs_devtools_pk_cred_id'] ) )      : '';
-        $cdj_b64u     = isset( $_POST['cs_devtools_pk_client_data'] )  ? sanitize_text_field( wp_unslash( $_POST['cs_devtools_pk_client_data'] ) )  : '';
-        $ad_b64u      = isset( $_POST['cs_devtools_pk_auth_data'] )    ? sanitize_text_field( wp_unslash( $_POST['cs_devtools_pk_auth_data'] ) )    : '';
-        $sig_b64u     = isset( $_POST['cs_devtools_pk_signature'] )    ? sanitize_text_field( wp_unslash( $_POST['cs_devtools_pk_signature'] ) )    : '';
+        $cred_id_b64u = isset( $_POST['csdt_devtools_pk_cred_id'] )      ? sanitize_text_field( wp_unslash( $_POST['csdt_devtools_pk_cred_id'] ) )      : '';
+        $cdj_b64u     = isset( $_POST['csdt_devtools_pk_client_data'] )  ? sanitize_text_field( wp_unslash( $_POST['csdt_devtools_pk_client_data'] ) )  : '';
+        $ad_b64u      = isset( $_POST['csdt_devtools_pk_auth_data'] )    ? sanitize_text_field( wp_unslash( $_POST['csdt_devtools_pk_auth_data'] ) )    : '';
+        $sig_b64u     = isset( $_POST['csdt_devtools_pk_signature'] )    ? sanitize_text_field( wp_unslash( $_POST['csdt_devtools_pk_signature'] ) )    : '';
 
         if ( ! $cred_id_b64u || ! $cdj_b64u || ! $ad_b64u || ! $sig_b64u ) {
             return new \WP_Error( 'missing', __( 'Incomplete assertion.', 'cloudscale-devtools' ) );
@@ -635,7 +635,7 @@ class CS_DevTools_Passkey {
             $cid_len        = unpack( 'n', substr( $b, 53, 2 ) )[1];
             $r['cred_id']   = substr( $b, 55, $cid_len );
             $cose_raw       = substr( $b, 55 + $cid_len );
-            try { $r['cose_key'] = CS_DevTools_CBOR::decode( $cose_raw ); } catch ( \Exception $e ) { /* leave unset */ }
+            try { $r['cose_key'] = CSDT_DevTools_CBOR::decode( $cose_raw ); } catch ( \Exception $e ) { /* leave unset */ }
         }
         return $r;
     }

@@ -2,14 +2,14 @@
  * CloudScale DevTools — 404 Games admin panel JS.
  *
  * Handles the enable toggle and colour scheme picker.
- * Depends on csDevtools404 (ajaxUrl, nonce, custom_404, scheme, previewUrl) localised by PHP.
+ * Depends on csdtDevtools404 (ajaxUrl, nonce, custom_404, scheme, previewUrl) localised by PHP.
  */
 ( function () {
     'use strict';
 
-    var ajaxUrl    = csDevtools404.ajaxUrl;
-    var nonce      = csDevtools404.nonce;
-    var previewUrl = csDevtools404.previewUrl;
+    var ajaxUrl    = csdtDevtools404.ajaxUrl;
+    var nonce      = csdtDevtools404.nonce;
+    var previewUrl = csdtDevtools404.previewUrl;
 
     // ── Enable toggle ────────────────────────────────────────────────────────
 
@@ -17,12 +17,12 @@
     var toggleMsg  = document.getElementById( 'cs-404-toggle-msg' );
 
     if ( chkEnabled ) {
-        chkEnabled.checked = parseInt( csDevtools404.custom_404, 10 ) === 1;
+        chkEnabled.checked = parseInt( csdtDevtools404.custom_404, 10 ) === 1;
 
         chkEnabled.addEventListener( 'change', function () {
             var val = chkEnabled.checked ? 1 : 0;
             var fd  = new FormData();
-            fd.append( 'action',     'cs_devtools_save_404_settings' );
+            fd.append( 'action',     'csdt_devtools_save_404_settings' );
             fd.append( 'nonce',      nonce );
             fd.append( 'custom_404', val );
 
@@ -62,7 +62,7 @@
 
     function updatePreviewLink( scheme ) {
         if ( previewLink ) {
-            previewLink.href = previewUrl + '?cs_devtools_preview_scheme=' + encodeURIComponent( scheme );
+            previewLink.href = previewUrl + '?csdt_devtools_preview_scheme=' + encodeURIComponent( scheme );
         }
     }
 
@@ -90,7 +90,7 @@
             saveBtn.textContent = 'Saving…';
 
             var fd = new FormData();
-            fd.append( 'action',     'cs_devtools_save_404_settings' );
+            fd.append( 'action',     'csdt_devtools_save_404_settings' );
             fd.append( 'nonce',      nonce );
             fd.append( 'scheme',     scheme );
             fd.append( 'custom_404', chkEnabled && chkEnabled.checked ? 1 : 0 );

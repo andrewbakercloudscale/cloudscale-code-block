@@ -23,7 +23,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-cs-passkey.php';
 
 // Enable DB query saving only when CS Monitor is active (avoids memory overhead when disabled).
-if ( ! defined( 'SAVEQUERIES' ) && get_option( 'cs_devtools_perf_monitor_enabled', '1' ) !== '0' ) {
+if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0' ) {
     define( 'SAVEQUERIES', true );
 }
 
@@ -42,11 +42,11 @@ class CloudScale_DevTools {
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
-    const MIGRATE_NONCE = 'cs_devtools_code_migrate_action';
-    const CUSTOM_404_OPTION  = 'cs_devtools_custom_404';
-    const SCHEME_404_OPTION  = 'cs_devtools_404_scheme';
-    const HISCORE_NS         = 'cs-devtools/v1';
-    const SCORE_NONCE_ACTION = 'cs_devtools_score_post';
+    const MIGRATE_NONCE = 'csdt_devtools_code_migrate_action';
+    const CUSTOM_404_OPTION  = 'csdt_devtools_custom_404';
+    const SCHEME_404_OPTION  = 'csdt_devtools_404_scheme';
+    const HISCORE_NS         = 'csdt-devtools/v1';
+    const SCORE_NONCE_ACTION = 'csdt_devtools_score_post';
 
     /**
      * Returns the theme registry mapping slugs to CDN filenames and colour values.
@@ -238,49 +238,49 @@ class CloudScale_DevTools {
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin_assets' ] );
 
         // Migration AJAX
-        add_action( 'wp_ajax_cs_devtools_migrate_scan', [ __CLASS__, 'ajax_scan' ] );
-        add_action( 'wp_ajax_cs_devtools_migrate_preview', [ __CLASS__, 'ajax_preview' ] );
-        add_action( 'wp_ajax_cs_devtools_migrate_single', [ __CLASS__, 'ajax_migrate_single' ] );
-        add_action( 'wp_ajax_cs_devtools_migrate_all', [ __CLASS__, 'ajax_migrate_all' ] );
+        add_action( 'wp_ajax_csdt_devtools_migrate_scan', [ __CLASS__, 'ajax_scan' ] );
+        add_action( 'wp_ajax_csdt_devtools_migrate_preview', [ __CLASS__, 'ajax_preview' ] );
+        add_action( 'wp_ajax_csdt_devtools_migrate_single', [ __CLASS__, 'ajax_migrate_single' ] );
+        add_action( 'wp_ajax_csdt_devtools_migrate_all', [ __CLASS__, 'ajax_migrate_all' ] );
 
         // SQL AJAX
-        add_action( 'wp_ajax_cs_devtools_sql_run', [ __CLASS__, 'ajax_sql_run' ] );
+        add_action( 'wp_ajax_csdt_devtools_sql_run', [ __CLASS__, 'ajax_sql_run' ] );
 
         // Settings AJAX
-        add_action( 'wp_ajax_cs_devtools_save_theme_setting', [ __CLASS__, 'ajax_save_theme_setting' ] );
+        add_action( 'wp_ajax_csdt_devtools_save_theme_setting', [ __CLASS__, 'ajax_save_theme_setting' ] );
 
         // Login security AJAX
-        add_action( 'wp_ajax_cs_devtools_login_save',          [ __CLASS__, 'ajax_login_save' ] );
-        add_action( 'wp_ajax_cs_devtools_totp_setup_start',    [ __CLASS__, 'ajax_totp_setup_start' ] );
-        add_action( 'wp_ajax_cs_devtools_totp_setup_verify',   [ __CLASS__, 'ajax_totp_setup_verify' ] );
-        add_action( 'wp_ajax_cs_devtools_2fa_disable',         [ __CLASS__, 'ajax_2fa_disable' ] );
-        add_action( 'wp_ajax_cs_devtools_email_2fa_enable',    [ __CLASS__, 'ajax_email_2fa_enable' ] );
+        add_action( 'wp_ajax_csdt_devtools_login_save',          [ __CLASS__, 'ajax_login_save' ] );
+        add_action( 'wp_ajax_csdt_devtools_totp_setup_start',    [ __CLASS__, 'ajax_totp_setup_start' ] );
+        add_action( 'wp_ajax_csdt_devtools_totp_setup_verify',   [ __CLASS__, 'ajax_totp_setup_verify' ] );
+        add_action( 'wp_ajax_csdt_devtools_2fa_disable',         [ __CLASS__, 'ajax_2fa_disable' ] );
+        add_action( 'wp_ajax_csdt_devtools_email_2fa_enable',    [ __CLASS__, 'ajax_email_2fa_enable' ] );
         add_action( 'admin_init',           [ __CLASS__, 'email_2fa_confirm_check' ] );
         add_action( 'after_password_reset', [ __CLASS__, 'on_password_reset' ], 10, 1 );
         add_action( 'profile_update',       [ __CLASS__, 'on_profile_update' ], 10, 2 );
-        CS_DevTools_Passkey::register_hooks();
+        CSDT_DevTools_Passkey::register_hooks();
 
         // Thumbnails / Social Preview AJAX
-        add_action( 'wp_ajax_cs_devtools_social_check_url',   [ __CLASS__, 'ajax_social_check_url' ] );
-        add_action( 'wp_ajax_cs_devtools_social_scan_posts',  [ __CLASS__, 'ajax_social_scan_posts' ] );
-        add_action( 'wp_ajax_cs_devtools_social_scan_media',  [ __CLASS__, 'ajax_social_scan_media' ] );
-        add_action( 'wp_ajax_cs_devtools_social_fix_image',      [ __CLASS__, 'ajax_social_fix_image' ] );
-        add_action( 'wp_ajax_cs_devtools_social_generate_formats', [ __CLASS__, 'ajax_social_generate_formats' ] );
-        add_action( 'wp_ajax_cs_devtools_social_platform_save',    [ __CLASS__, 'ajax_social_platform_save' ] );
-        add_action( 'wp_ajax_cs_devtools_social_fix_all_batch',   [ __CLASS__, 'ajax_social_fix_all_batch' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_check_url',   [ __CLASS__, 'ajax_social_check_url' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_scan_posts',  [ __CLASS__, 'ajax_social_scan_posts' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_scan_media',  [ __CLASS__, 'ajax_social_scan_media' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_fix_image',      [ __CLASS__, 'ajax_social_fix_image' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_generate_formats', [ __CLASS__, 'ajax_social_generate_formats' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_platform_save',    [ __CLASS__, 'ajax_social_platform_save' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_fix_all_batch',   [ __CLASS__, 'ajax_social_fix_all_batch' ] );
         add_action( 'save_post_post',  [ __CLASS__, 'on_post_saved' ], 100, 3 );
         add_action( 'admin_notices',   [ __CLASS__, 'social_format_admin_notice' ] );
         // Serve platform-specific og:image based on crawler User-Agent.
         add_action( 'wp_head', [ __CLASS__, 'output_crawler_og_image' ], 1 );
-        add_action( 'wp_ajax_cs_devtools_social_cf_test',     [ __CLASS__, 'ajax_social_cf_test' ] );
-        add_action( 'wp_ajax_cs_devtools_cf_purge',           [ __CLASS__, 'ajax_cf_purge' ] );
-        add_action( 'wp_ajax_cs_devtools_cf_save',            [ __CLASS__, 'ajax_cf_save' ] );
+        add_action( 'wp_ajax_csdt_devtools_social_cf_test',     [ __CLASS__, 'ajax_social_cf_test' ] );
+        add_action( 'wp_ajax_csdt_devtools_cf_purge',           [ __CLASS__, 'ajax_cf_purge' ] );
+        add_action( 'wp_ajax_csdt_devtools_cf_save',            [ __CLASS__, 'ajax_cf_save' ] );
 
         // SMTP AJAX
-        add_action( 'wp_ajax_cs_devtools_smtp_save',      [ __CLASS__, 'ajax_smtp_save' ] );
-        add_action( 'wp_ajax_cs_devtools_smtp_test',      [ __CLASS__, 'ajax_smtp_test' ] );
-        add_action( 'wp_ajax_cs_devtools_smtp_log_clear', [ __CLASS__, 'ajax_smtp_log_clear' ] );
-        add_action( 'wp_ajax_cs_devtools_smtp_log_fetch', [ __CLASS__, 'ajax_smtp_log_fetch' ] );
+        add_action( 'wp_ajax_csdt_devtools_smtp_save',      [ __CLASS__, 'ajax_smtp_save' ] );
+        add_action( 'wp_ajax_csdt_devtools_smtp_test',      [ __CLASS__, 'ajax_smtp_test' ] );
+        add_action( 'wp_ajax_csdt_devtools_smtp_log_clear', [ __CLASS__, 'ajax_smtp_log_clear' ] );
+        add_action( 'wp_ajax_csdt_devtools_smtp_log_fetch', [ __CLASS__, 'ajax_smtp_log_fetch' ] );
 
         // Email log — always active so every wp_mail() call is tracked site-wide,
         // regardless of whether our SMTP is enabled.
@@ -292,14 +292,14 @@ class CloudScale_DevTools {
         // SMTP — configure phpmailer and override from address only when fully configured.
         // Guard: if host is empty we skip configuration entirely so other plugins' emails
         // continue to work via PHP mail() rather than silently failing.
-        if ( get_option( 'cs_devtools_smtp_enabled', '0' ) === '1'
-            && '' !== trim( (string) get_option( 'cs_devtools_smtp_host', '' ) )
+        if ( get_option( 'csdt_devtools_smtp_enabled', '0' ) === '1'
+            && '' !== trim( (string) get_option( 'csdt_devtools_smtp_host', '' ) )
         ) {
             add_action( 'phpmailer_init', [ __CLASS__, 'phpmailer_configure' ] );
-            if ( get_option( 'cs_devtools_smtp_from_email', '' ) ) {
+            if ( get_option( 'csdt_devtools_smtp_from_email', '' ) ) {
                 add_filter( 'wp_mail_from',      [ __CLASS__, 'smtp_from_email' ] );
             }
-            if ( get_option( 'cs_devtools_smtp_from_name', '' ) ) {
+            if ( get_option( 'csdt_devtools_smtp_from_name', '' ) ) {
                 add_filter( 'wp_mail_from_name', [ __CLASS__, 'smtp_from_name' ] );
             }
         }
@@ -329,22 +329,22 @@ class CloudScale_DevTools {
         // Custom 404 page + hiscore leaderboard.
         add_action( 'template_redirect',                        [ __CLASS__, 'maybe_custom_404' ], 1 );
         add_action( 'rest_api_init',                            [ __CLASS__, 'register_hiscore_routes' ] );
-        add_action( 'wp_ajax_cs_devtools_save_404_settings',    [ __CLASS__, 'ajax_save_404_settings' ] );
+        add_action( 'wp_ajax_csdt_devtools_save_404_settings',    [ __CLASS__, 'ajax_save_404_settings' ] );
 
         // Performance monitor — EXPLAIN endpoint.
-        add_action( 'wp_ajax_cs_devtools_perf_explain',       [ __CLASS__, 'ajax_perf_explain' ] );
-        add_action( 'wp_ajax_cs_devtools_perf_debug_toggle',  [ __CLASS__, 'ajax_perf_debug_toggle' ] );
+        add_action( 'wp_ajax_csdt_devtools_perf_explain',       [ __CLASS__, 'ajax_perf_explain' ] );
+        add_action( 'wp_ajax_csdt_devtools_perf_debug_toggle',  [ __CLASS__, 'ajax_perf_debug_toggle' ] );
 
         // Performance monitor — only register data-collection hooks when the monitor is enabled.
         // This prevents SAVEQUERIES-scale memory accumulation on every request when disabled.
-        if ( get_option( 'cs_devtools_perf_monitor_enabled', '1' ) !== '0' ) {
+        if ( get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0' ) {
             add_filter( 'pre_http_request', [ __CLASS__, 'perf_http_before' ], 10, 3 );
             add_action( 'http_api_debug',   [ __CLASS__, 'perf_http_after' ],  10, 5 );
 
             // If the user enabled debug logging via the panel, activate PHP error logging
             // using ini_set — this works regardless of WP_DEBUG in wp-config.php and
             // survives Docker container rebuilds because the setting lives in the DB.
-            if ( get_option( 'cs_devtools_perf_debug_logging', false ) ) {
+            if ( get_option( 'csdt_devtools_perf_debug_logging', false ) ) {
                 // phpcs:ignore WordPress.PHP.IniSet.Risky
                 @ini_set( 'log_errors', '1' );
                 // phpcs:ignore WordPress.PHP.IniSet.Risky
@@ -366,7 +366,7 @@ class CloudScale_DevTools {
             // Performance monitor — panel rendering (admin pages).
             add_action( 'admin_enqueue_scripts', [ __CLASS__, 'perf_enqueue' ] );
             // Inject JSON data at priority 15 — before wp_print_footer_scripts (priority 20) so
-            // cs-perf-monitor.js reads window.csDevtoolsPerfData when its IIFE runs.
+            // cs-perf-monitor.js reads window.csdtDevtoolsPerfData when its IIFE runs.
             add_action( 'admin_footer', [ __CLASS__, 'perf_inject_data' ],   15 );
             add_action( 'admin_footer', [ __CLASS__, 'perf_output_panel' ], 9999 );
 
@@ -450,7 +450,7 @@ class CloudScale_DevTools {
         );
 
         // Register both theme stylesheets from the selected pair
-        $pair_slug = get_option( 'cs_devtools_code_theme_pair', 'atom-one' );
+        $pair_slug = get_option( 'csdt_devtools_code_theme_pair', 'atom-one' );
         $registry  = self::get_theme_registry();
         $pair      = isset( $registry[ $pair_slug ] ) ? $registry[ $pair_slug ] : $registry['atom-one'];
 
@@ -468,14 +468,14 @@ class CloudScale_DevTools {
         );
 
         wp_register_style(
-            'cs-code-block-frontend',
+            'csdt-code-block-frontend',
             plugins_url( 'assets/cs-code-block.css', __FILE__ ),
             [ 'hljs-theme-dark', 'hljs-theme-light' ],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block.css' )
         );
 
         wp_register_script(
-            'cs-code-block-frontend',
+            'csdt-code-block-frontend',
             plugins_url( 'assets/cs-code-block.js', __FILE__ ),
             [ 'hljs-core' ],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block.js' ),
@@ -483,7 +483,7 @@ class CloudScale_DevTools {
         );
 
         wp_register_style(
-            'cs-code-block-editor',
+            'csdt-code-block-editor',
             plugins_url( 'assets/cs-code-block-editor.css', __FILE__ ),
             [],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block-editor.css' )
@@ -518,13 +518,13 @@ class CloudScale_DevTools {
      */
     public static function enqueue_convert_script() {
         wp_enqueue_script(
-            'cs-code-block-convert',
+            'csdt-code-block-convert',
             plugins_url( 'assets/cs-convert.js', __FILE__ ),
             [ 'wp-blocks', 'wp-data' ],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-convert.js' ),
             true
         );
-        wp_add_inline_style( 'cs-code-block-editor', self::get_convert_toast_css() );
+        wp_add_inline_style( 'csdt-code-block-editor', self::get_convert_toast_css() );
     }
 
     /**
@@ -646,16 +646,16 @@ class CloudScale_DevTools {
 
         wp_enqueue_style( 'hljs-theme-dark' );
         wp_enqueue_style( 'hljs-theme-light' );
-        wp_enqueue_style( 'cs-code-block-frontend' );
+        wp_enqueue_style( 'csdt-code-block-frontend' );
         wp_enqueue_script( 'hljs-core' );
-        wp_enqueue_script( 'cs-code-block-frontend' );
+        wp_enqueue_script( 'csdt-code-block-frontend' );
 
-        $default_theme = get_option( 'cs_devtools_code_default_theme', 'dark' );
-        $pair_slug     = get_option( 'cs_devtools_code_theme_pair', 'atom-one' );
+        $default_theme = get_option( 'csdt_devtools_code_default_theme', 'dark' );
+        $pair_slug     = get_option( 'csdt_devtools_code_theme_pair', 'atom-one' );
         $registry      = self::get_theme_registry();
         $pair          = isset( $registry[ $pair_slug ] ) ? $registry[ $pair_slug ] : $registry['atom-one'];
 
-        wp_localize_script( 'cs-code-block-frontend', 'csDevtoolsCodeConfig', [
+        wp_localize_script( 'csdt-code-block-frontend', 'csdtDevtoolsCodeConfig', [
             'defaultTheme'  => $default_theme,
             'themePair'     => $pair_slug,
             'darkBg'        => $pair['dark_bg'],
@@ -666,21 +666,21 @@ class CloudScale_DevTools {
     }
 
     /* ==================================================================
-       3. SHORTCODE [cs_devtools_code]
+       3. SHORTCODE [csdt_devtools_code]
        ================================================================== */
 
     /**
-     * Registers the [cs_devtools_code] shortcode.
+     * Registers the [csdt_devtools_code] shortcode.
      *
      * @since  1.0.0
      * @return void
      */
     public static function register_shortcode() {
-        add_shortcode( 'cs_devtools_code', [ __CLASS__, 'render_shortcode' ] );
+        add_shortcode( 'csdt_devtools_code', [ __CLASS__, 'render_shortcode' ] );
     }
 
     /**
-     * Renders the [cs_devtools_code] shortcode.
+     * Renders the [csdt_devtools_code] shortcode.
      *
      * @since  1.0.0
      * @param  array       $atts    Shortcode attributes.
@@ -692,7 +692,7 @@ class CloudScale_DevTools {
             'lang'  => '',
             'theme' => '',
             'title' => '',
-        ], $atts, 'cs_devtools_code' );
+        ], $atts, 'csdt_devtools_code' );
 
         $code = self::decode_shortcode_content( $content );
 
@@ -733,7 +733,7 @@ class CloudScale_DevTools {
      * @return void
      */
     public static function register_settings() {
-        register_setting( 'cs_devtools_code_settings', 'cs_devtools_code_default_theme', [
+        register_setting( 'csdt_devtools_code_settings', 'csdt_devtools_code_default_theme', [
             'type'              => 'string',
             'sanitize_callback' => function ( $val ) {
                 return in_array( $val, [ 'dark', 'light' ] ) ? $val : 'dark';
@@ -742,7 +742,7 @@ class CloudScale_DevTools {
         ] );
 
         $valid_themes = array_keys( self::get_theme_registry() );
-        register_setting( 'cs_devtools_code_settings', 'cs_devtools_code_theme_pair', [
+        register_setting( 'csdt_devtools_code_settings', 'csdt_devtools_code_theme_pair', [
             'type'              => 'string',
             'sanitize_callback' => function ( $val ) use ( $valid_themes ) {
                 return in_array( $val, $valid_themes, true ) ? $val : 'atom-one';
@@ -750,7 +750,7 @@ class CloudScale_DevTools {
             'default' => 'atom-one',
         ] );
 
-        register_setting( 'cs_devtools_code_settings', 'cs_devtools_perf_monitor_enabled', [
+        register_setting( 'csdt_devtools_code_settings', 'csdt_devtools_perf_monitor_enabled', [
             'type'              => 'string',
             'sanitize_callback' => function ( $val ) {
                 return '0' === $val ? '0' : '1';
@@ -759,12 +759,12 @@ class CloudScale_DevTools {
         ] );
 
         // Login security settings
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_login_hide_enabled', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_login_hide_enabled', [
             'type'              => 'string',
             'sanitize_callback' => function ( $v ) { return '1' === $v ? '1' : '0'; },
             'default'           => '0',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_login_slug', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_login_slug', [
             'type'              => 'string',
             'sanitize_callback' => function ( $v ) {
                 $slug = sanitize_title( $v );
@@ -774,19 +774,19 @@ class CloudScale_DevTools {
             },
             'default' => '',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_2fa_method', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_2fa_method', [
             'type'              => 'string',
             'sanitize_callback' => function ( $v ) {
                 return in_array( $v, [ 'off', 'email', 'totp' ], true ) ? $v : 'off';
             },
             'default' => 'off',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_2fa_force_admins', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_2fa_force_admins', [
             'type'              => 'string',
             'sanitize_callback' => function ( $v ) { return '1' === $v ? '1' : '0'; },
             'default'           => '0',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_2fa_grace_logins', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_2fa_grace_logins', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) {
                 $n = (int) $v;
@@ -794,7 +794,7 @@ class CloudScale_DevTools {
             },
             'default' => '0',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_session_duration', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_session_duration', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) {
                 $valid = [ 'default', '1', '7', '14', '30', '90', '365' ];
@@ -802,12 +802,12 @@ class CloudScale_DevTools {
             },
             'default' => 'default',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_brute_force_enabled', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_brute_force_enabled', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) { return $v === '1' ? '1' : '0'; },
             'default'           => '1',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_brute_force_attempts', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_brute_force_attempts', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) {
                 $n = (int) $v;
@@ -815,7 +815,7 @@ class CloudScale_DevTools {
             },
             'default' => '5',
         ] );
-        register_setting( 'cs_devtools_login_settings', 'cs_devtools_brute_force_lockout', [
+        register_setting( 'csdt_devtools_login_settings', 'csdt_devtools_brute_force_lockout', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) {
                 $n = (int) $v;
@@ -825,17 +825,17 @@ class CloudScale_DevTools {
         ] );
 
         // SMTP settings
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_enabled', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_enabled', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) { return $v === '1' ? '1' : '0'; },
             'default'           => '0',
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_host', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_host', [
             'type'              => 'string',
             'sanitize_callback' => 'sanitize_text_field',
             'default'           => '',
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_port', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_port', [
             'type'              => 'integer',
             'sanitize_callback' => static function ( $v ) {
                 $v = absint( $v );
@@ -843,34 +843,34 @@ class CloudScale_DevTools {
             },
             'default'           => 587,
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_encryption', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_encryption', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) {
                 return in_array( $v, [ 'tls', 'ssl', 'none' ], true ) ? $v : 'tls';
             },
             'default'           => 'tls',
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_auth', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_auth', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) { return $v === '1' ? '1' : '0'; },
             'default'           => '1',
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_user', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_user', [
             'type'              => 'string',
             'sanitize_callback' => 'sanitize_text_field',
             'default'           => '',
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_pass', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_pass', [
             'type'              => 'string',
             'sanitize_callback' => static function ( $v ) { return $v; },
             'default'           => '',
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_from_email', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_from_email', [
             'type'              => 'string',
             'sanitize_callback' => 'sanitize_email',
             'default'           => '',
         ] );
-        register_setting( 'cs_devtools_smtp_settings', 'cs_devtools_smtp_from_name', [
+        register_setting( 'csdt_devtools_smtp_settings', 'csdt_devtools_smtp_from_name', [
             'type'              => 'string',
             'sanitize_callback' => 'sanitize_text_field',
             'default'           => '',
@@ -942,7 +942,7 @@ class CloudScale_DevTools {
 
         // Tabs CSS
         wp_enqueue_style(
-            'cs-admin-tabs',
+            'csdt-admin-tabs',
             plugins_url( 'assets/cs-admin-tabs.css', __FILE__ ),
             [],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-admin-tabs.css' )
@@ -950,73 +950,73 @@ class CloudScale_DevTools {
 
         // Migrate CSS + JS
         wp_enqueue_style(
-            'cs-code-migrate',
+            'csdt-code-migrate',
             plugins_url( 'assets/cs-code-migrate.css', __FILE__ ),
             [],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-migrate.css' )
         );
         wp_enqueue_script(
-            'cs-code-migrate',
+            'csdt-code-migrate',
             plugins_url( 'assets/cs-code-migrate.js', __FILE__ ),
             [],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-migrate.js' ),
             true
         );
-        wp_localize_script( 'cs-code-migrate', 'csDevtoolsMigrate', [
+        wp_localize_script( 'csdt-code-migrate', 'csdtDevtoolsMigrate', [
             'ajaxUrl' => admin_url( 'admin-ajax.php' ),
             'nonce'   => wp_create_nonce( self::MIGRATE_NONCE ),
         ] );
 
         // Settings save JS
         wp_enqueue_script(
-            'cs-admin-settings',
+            'csdt-admin-settings',
             plugins_url( 'assets/cs-admin-settings.js', __FILE__ ),
             [],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-admin-settings.js' ),
             true
         );
-        wp_localize_script( 'cs-admin-settings', 'csDevtoolsAdminSettings', [
-            'nonce' => wp_create_nonce( 'cs_devtools_code_settings_inline' ),
+        wp_localize_script( 'csdt-admin-settings', 'csdtDevtoolsAdminSettings', [
+            'nonce' => wp_create_nonce( 'csdt_devtools_code_settings_inline' ),
         ] );
 
         // SQL editor JS
         wp_enqueue_script(
-            'cs-sql-editor',
+            'csdt-sql-editor',
             plugins_url( 'assets/cs-sql-editor.js', __FILE__ ),
             [],
             filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-sql-editor.js' ),
             true
         );
-        wp_localize_script( 'cs-sql-editor', 'csDevtoolsSqlEditor', [
-            'nonce' => wp_create_nonce( 'cs_devtools_sql_nonce' ),
+        wp_localize_script( 'csdt-sql-editor', 'csdtDevtoolsSqlEditor', [
+            'nonce' => wp_create_nonce( 'csdt_devtools_sql_nonce' ),
         ] );
 
         // Login security JS (only loaded on the login tab)
         $active_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'migrate'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if ( $active_tab === 'login' ) {
             wp_enqueue_script(
-                'cs-qrcode',
+                'csdt-qrcode',
                 plugins_url( 'assets/qrcode.min.js', __FILE__ ),
                 [],
                 filemtime( plugin_dir_path( __FILE__ ) . 'assets/qrcode.min.js' ),
                 true
             );
             wp_enqueue_script(
-                'cs-login',
+                'csdt-login',
                 plugins_url( 'assets/cs-login.js', __FILE__ ),
-                [ 'cs-qrcode' ],
+                [ 'csdt-qrcode' ],
                 filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-login.js' ),
                 true
             );
-            wp_localize_script( 'cs-login', 'csDevtoolsLogin', [
+            wp_localize_script( 'csdt-login', 'csdtDevtoolsLogin', [
                 'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
-                'nonce'       => wp_create_nonce( 'cs_devtools_login_nonce' ),
+                'nonce'       => wp_create_nonce( 'csdt_devtools_login_nonce' ),
                 'currentUser' => get_current_user_id(),
             ] );
             wp_enqueue_script(
-                'cs-passkey',
+                'csdt-passkey',
                 plugins_url( 'assets/cs-passkey.js', __FILE__ ),
-                [ 'cs-login' ],
+                [ 'csdt-login' ],
                 filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-passkey.js' ),
                 true
             );
@@ -1024,13 +1024,13 @@ class CloudScale_DevTools {
 
         if ( $active_tab === 'mail' ) {
             wp_enqueue_script(
-                'cs-smtp',
+                'csdt-smtp',
                 plugins_url( 'assets/cs-smtp.js', __FILE__ ),
                 [],
                 filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-smtp.js' ),
                 true
             );
-            wp_localize_script( 'cs-smtp', 'csDevtoolsSmtp', [
+            wp_localize_script( 'csdt-smtp', 'csdtDevtoolsSmtp', [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'nonce'   => wp_create_nonce( self::SMTP_NONCE ),
                 'testTo'  => wp_get_current_user()->user_email,
@@ -1039,15 +1039,15 @@ class CloudScale_DevTools {
 
         if ( $active_tab === '404' ) {
             wp_enqueue_script(
-                'cs-404-admin',
+                'csdt-404-admin',
                 plugins_url( 'assets/cs-404-admin.js', __FILE__ ),
                 [],
                 filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-404-admin.js' ),
                 true
             );
-            wp_localize_script( 'cs-404-admin', 'csDevtools404', [
+            wp_localize_script( 'csdt-404-admin', 'csdtDevtools404', [
                 'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
-                'nonce'      => wp_create_nonce( 'cs_devtools_404_settings' ),
+                'nonce'      => wp_create_nonce( 'csdt_devtools_404_settings' ),
                 'custom_404' => get_option( self::CUSTOM_404_OPTION, 0 ) ? 1 : 0,
                 'scheme'     => get_option( self::SCHEME_404_OPTION, 'ocean' ),
                 'previewUrl' => home_url( '/this-page-does-not-exist' ),
@@ -1057,20 +1057,20 @@ class CloudScale_DevTools {
         if ( $active_tab === 'thumbnails' ) {
             $thumb_js = plugin_dir_path( __FILE__ ) . 'assets/cs-thumbnails.js';
             wp_enqueue_script(
-                'cs-thumbnails',
+                'csdt-thumbnails',
                 plugins_url( 'assets/cs-thumbnails.js', __FILE__ ),
                 [],
                 file_exists( $thumb_js ) ? filemtime( $thumb_js ) : self::VERSION,
                 true
             );
-            wp_localize_script( 'cs-thumbnails', 'csDevtoolsThumbs', [
+            wp_localize_script( 'csdt-thumbnails', 'csdtDevtoolsThumbs', [
                 'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
-                'nonce'    => wp_create_nonce( 'cs_devtools_thumbnails' ),
+                'nonce'    => wp_create_nonce( 'csdt_devtools_thumbnails' ),
                 'siteUrl'  => home_url( '/' ),
             ] );
             // Thumbnails-tab-specific CSS — injected as inline style to avoid an
             // extra HTTP request and keep the render method free of <style> tags.
-            wp_add_inline_style( 'cs-admin-tabs', self::get_thumbnails_admin_css() );
+            wp_add_inline_style( 'csdt-admin-tabs', self::get_thumbnails_admin_css() );
         }
 
         // Email-verified modal countdown — only needed when the verification
@@ -1078,7 +1078,7 @@ class CloudScale_DevTools {
         // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if ( $active_tab === 'login' && isset( $_GET['email_verified'] ) && '1' === $_GET['email_verified'] ) {
             wp_add_inline_script(
-                'cs-admin-settings',
+                'csdt-admin-settings',
                 '(function(){' .
                 'var modal=document.getElementById("cs-email-verified-modal");' .
                 'var cd=document.getElementById("cs-modal-countdown");' .
@@ -1280,9 +1280,9 @@ class CloudScale_DevTools {
     }
 
     private static function render_settings_panel() {
-        $theme       = get_option( 'cs_devtools_code_default_theme', 'dark' );
-        $pair_slug   = get_option( 'cs_devtools_code_theme_pair', 'atom-one' );
-        $perf_on     = get_option( 'cs_devtools_perf_monitor_enabled', '1' ) !== '0';
+        $theme       = get_option( 'csdt_devtools_code_default_theme', 'dark' );
+        $pair_slug   = get_option( 'csdt_devtools_code_theme_pair', 'atom-one' );
+        $perf_on     = get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) !== '0';
         $registry    = self::get_theme_registry();
         ?>
         <div class="cs-panel" id="cs-panel-code-settings">
@@ -1298,7 +1298,7 @@ class CloudScale_DevTools {
                 <div class="cs-field-row">
                     <div class="cs-field">
                         <label class="cs-label" for="cs-settings-pair"><?php esc_html_e( 'Color Theme:', 'cloudscale-devtools' ); ?></label>
-                        <select id="cs-settings-pair" name="cs_devtools_code_theme_pair" class="cs-input">
+                        <select id="cs-settings-pair" name="csdt_devtools_code_theme_pair" class="cs-input">
                             <?php foreach ( $registry as $slug => $info ) : ?>
                                 <option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $pair_slug, $slug ); ?>>
                                     <?php echo esc_html( $info['label'] ); ?>
@@ -1309,7 +1309,7 @@ class CloudScale_DevTools {
                     </div>
                     <div class="cs-field">
                         <label class="cs-label" for="cs-settings-theme"><?php esc_html_e( 'Default Mode:', 'cloudscale-devtools' ); ?></label>
-                        <select id="cs-settings-theme" name="cs_devtools_code_default_theme" class="cs-input">
+                        <select id="cs-settings-theme" name="csdt_devtools_code_default_theme" class="cs-input">
                             <option value="dark" <?php selected( $theme, 'dark' ); ?>><?php esc_html_e( 'Dark', 'cloudscale-devtools' ); ?></option>
                             <option value="light" <?php selected( $theme, 'light' ); ?>><?php esc_html_e( 'Light', 'cloudscale-devtools' ); ?></option>
                         </select>
@@ -1319,7 +1319,7 @@ class CloudScale_DevTools {
                 <div class="cs-field" style="margin-top:14px">
                     <label class="cs-label"><?php esc_html_e( 'CS Monitor panel:', 'cloudscale-devtools' ); ?></label>
                     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                        <input type="checkbox" id="cs-settings-perf-enabled" name="cs_devtools_perf_monitor_enabled" value="1" <?php checked( $perf_on ); ?>>
+                        <input type="checkbox" id="cs-settings-perf-enabled" name="csdt_devtools_perf_monitor_enabled" value="1" <?php checked( $perf_on ); ?>>
                         <span style="font-size:13px;color:#555"><?php esc_html_e( 'Show the ⚡ CS Monitor performance panel', 'cloudscale-devtools' ); ?></span>
                     </label>
                     <span class="cs-hint"><?php esc_html_e( 'Visible to admins only. Uncheck to hide the panel on all pages.', 'cloudscale-devtools' ); ?></span>
@@ -1511,7 +1511,7 @@ class CloudScale_DevTools {
                     <button type="button" class="cs-quick-btn cs-sql-quick" data-sql="SELECT post_id, meta_key, LEFT(meta_value, 200) AS meta_value_preview FROM <?php echo esc_attr( $prefix ); ?>postmeta WHERE meta_value LIKE '%http://54.195%' LIMIT 50;">
                         🖥️ <?php esc_html_e( 'Old IP references (postmeta)', 'cloudscale-devtools' ); ?>
                     </button>
-                    <button type="button" class="cs-quick-btn cs-sql-quick" data-sql="SELECT ID, post_title, post_type FROM <?php echo esc_attr( $prefix ); ?>posts WHERE post_status = 'publish' AND ID NOT IN (SELECT post_id FROM <?php echo esc_attr( $prefix ); ?>postmeta WHERE meta_key = '_cs_devtools_seo_desc' AND meta_value != '') ORDER BY post_date DESC LIMIT 50;">
+                    <button type="button" class="cs-quick-btn cs-sql-quick" data-sql="SELECT ID, post_title, post_type FROM <?php echo esc_attr( $prefix ); ?>posts WHERE post_status = 'publish' AND ID NOT IN (SELECT post_id FROM <?php echo esc_attr( $prefix ); ?>postmeta WHERE meta_key = '_csdt_devtools_seo_desc' AND meta_value != '') ORDER BY post_date DESC LIMIT 50;">
                         📝 <?php esc_html_e( 'Posts missing meta descriptions', 'cloudscale-devtools' ); ?>
                     </button>
                 </div>
@@ -1532,13 +1532,13 @@ class CloudScale_DevTools {
      * @return void
      */
     private static function render_login_panel(): void {
-        $hide_on      = get_option( 'cs_devtools_login_hide_enabled', '0' ) === '1';
-        $slug         = get_option( 'cs_devtools_login_slug', '' );
-        $method       = get_option( 'cs_devtools_2fa_method', 'off' );
-        $force        = get_option( 'cs_devtools_2fa_force_admins', '0' ) === '1';
+        $hide_on      = get_option( 'csdt_devtools_login_hide_enabled', '0' ) === '1';
+        $slug         = get_option( 'csdt_devtools_login_slug', '' );
+        $method       = get_option( 'csdt_devtools_2fa_method', 'off' );
+        $force        = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1';
         $user_id      = get_current_user_id();
-        $totp_active  = get_user_meta( $user_id, 'cs_devtools_totp_enabled', true ) === '1';
-        $email_active = get_user_meta( $user_id, 'cs_devtools_2fa_email_enabled', true ) === '1';
+        $totp_active  = get_user_meta( $user_id, 'csdt_devtools_totp_enabled', true ) === '1';
+        $email_active = get_user_meta( $user_id, 'csdt_devtools_2fa_email_enabled', true ) === '1';
         $current_url  = empty( $slug ) ? wp_login_url() : home_url( '/' . $slug );
 
         // Success notice after email verification callback.
@@ -1617,7 +1617,7 @@ class CloudScale_DevTools {
 
         <!-- ── Session Duration ──────────────────────── -->
         <?php
-        $session_duration = get_option( 'cs_devtools_session_duration', 'default' );
+        $session_duration = get_option( 'csdt_devtools_session_duration', 'default' );
         $duration_options = [
             'default' => __( 'WordPress default (2 days / 14 days with Remember Me)', 'cloudscale-devtools' ),
             '1'       => __( '1 day', 'cloudscale-devtools' ),
@@ -1658,9 +1658,9 @@ class CloudScale_DevTools {
 
         <!-- ── Brute-Force Protection ───────────────── -->
         <?php
-        $bf_enabled  = get_option( 'cs_devtools_brute_force_enabled', '1' );
-        $bf_attempts = get_option( 'cs_devtools_brute_force_attempts', '5' );
-        $bf_lockout  = get_option( 'cs_devtools_brute_force_lockout', '5' );
+        $bf_enabled  = get_option( 'csdt_devtools_brute_force_enabled', '1' );
+        $bf_attempts = get_option( 'csdt_devtools_brute_force_attempts', '5' );
+        $bf_lockout  = get_option( 'csdt_devtools_brute_force_lockout', '5' );
         ?>
         <div class="cs-panel" id="cs-panel-brute-force">
             <div class="cs-section-header cs-section-header-red">
@@ -1719,7 +1719,7 @@ class CloudScale_DevTools {
                 <!-- Email 2FA status -->
                 <?php
                 // Check if a verification email is already pending for this user.
-                $email_pending = (bool) get_user_meta( $user_id, 'cs_devtools_email_verify_pending', true );
+                $email_pending = (bool) get_user_meta( $user_id, 'csdt_devtools_email_verify_pending', true );
                 ?>
                 <div class="cs-2fa-row" id="cs-email-row">
                     <div class="cs-2fa-row-icon">📧</div>
@@ -1844,29 +1844,29 @@ class CloudScale_DevTools {
 
                 <!-- Site-wide default -->
                 <?php
-                $has_passkeys = ! empty( CS_DevTools_Passkey::get_passkeys( $user_id ) );
+                $has_passkeys = ! empty( CSDT_DevTools_Passkey::get_passkeys( $user_id ) );
                 ?>
                 <div class="cs-field-row">
                     <div class="cs-field">
                         <label class="cs-label"><?php esc_html_e( 'Site-wide Default Method:', 'cloudscale-devtools' ); ?></label>
                         <div class="cs-2fa-method-group">
                             <label class="cs-radio-label <?php echo $method === 'off' ? 'active' : ''; ?>">
-                                <input type="radio" name="cs_devtools_2fa_method" value="off" <?php checked( $method, 'off' ); ?>>
+                                <input type="radio" name="csdt_devtools_2fa_method" value="off" <?php checked( $method, 'off' ); ?>>
                                 <span class="cs-radio-icon">🚫</span> <?php esc_html_e( 'Off', 'cloudscale-devtools' ); ?>
                             </label>
                             <label class="cs-radio-label <?php echo $method === 'email' ? 'active' : ''; ?> <?php echo ! $email_active ? 'cs-radio-disabled' : ''; ?>"
                                    <?php echo ! $email_active ? 'title="' . esc_attr__( 'Enable Email Code for your account first', 'cloudscale-devtools' ) . '"' : ''; ?>>
-                                <input type="radio" name="cs_devtools_2fa_method" value="email" <?php checked( $method, 'email' ); ?> <?php disabled( ! $email_active ); ?>>
+                                <input type="radio" name="csdt_devtools_2fa_method" value="email" <?php checked( $method, 'email' ); ?> <?php disabled( ! $email_active ); ?>>
                                 <span class="cs-radio-icon">📧</span> <?php esc_html_e( 'Email Code', 'cloudscale-devtools' ); ?>
                             </label>
                             <label class="cs-radio-label <?php echo $method === 'totp' ? 'active' : ''; ?> <?php echo ! $totp_active ? 'cs-radio-disabled' : ''; ?>"
                                    <?php echo ! $totp_active ? 'title="' . esc_attr__( 'Set up Authenticator App for your account first', 'cloudscale-devtools' ) . '"' : ''; ?>>
-                                <input type="radio" name="cs_devtools_2fa_method" value="totp" <?php checked( $method, 'totp' ); ?> <?php disabled( ! $totp_active ); ?>>
+                                <input type="radio" name="csdt_devtools_2fa_method" value="totp" <?php checked( $method, 'totp' ); ?> <?php disabled( ! $totp_active ); ?>>
                                 <span class="cs-radio-icon">📱</span> <?php esc_html_e( 'Authenticator App', 'cloudscale-devtools' ); ?>
                             </label>
                             <label class="cs-radio-label <?php echo $method === 'passkey' ? 'active' : ''; ?> <?php echo ! $has_passkeys ? 'cs-radio-disabled' : ''; ?>"
                                    <?php echo ! $has_passkeys ? 'title="' . esc_attr__( 'Register a passkey for your account first', 'cloudscale-devtools' ) . '"' : ''; ?>>
-                                <input type="radio" name="cs_devtools_2fa_method" value="passkey" <?php checked( $method, 'passkey' ); ?> <?php disabled( ! $has_passkeys ); ?>>
+                                <input type="radio" name="csdt_devtools_2fa_method" value="passkey" <?php checked( $method, 'passkey' ); ?> <?php disabled( ! $has_passkeys ); ?>>
                                 <span class="cs-radio-icon">🔑</span> <?php esc_html_e( 'Passkey', 'cloudscale-devtools' ); ?>
                             </label>
                         </div>
@@ -1882,7 +1882,7 @@ class CloudScale_DevTools {
                     </div>
                 </div>
 
-                <?php $grace_logins = (int) get_option( 'cs_devtools_2fa_grace_logins', '0' ); ?>
+                <?php $grace_logins = (int) get_option( 'csdt_devtools_2fa_grace_logins', '0' ); ?>
                 <div class="cs-field-row" style="margin-top:16px">
                     <div class="cs-field">
                         <label class="cs-label" for="cs-2fa-grace-logins"><?php esc_html_e( 'Grace logins before 2FA is required:', 'cloudscale-devtools' ); ?></label>
@@ -1912,7 +1912,7 @@ class CloudScale_DevTools {
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
-                <?php CS_DevTools_Passkey::render_section( $user_id ); ?>
+                <?php CSDT_DevTools_Passkey::render_section( $user_id ); ?>
             </div>
         </div>
 
@@ -1965,7 +1965,7 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden', 403 );
         }
-        if ( ! check_ajax_referer( 'cs_devtools_sql_nonce', 'nonce', false ) ) {
+        if ( ! check_ajax_referer( 'csdt_devtools_sql_nonce', 'nonce', false ) ) {
             wp_send_json_error( 'Bad nonce', 403 );
         }
 
@@ -2017,7 +2017,7 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Forbidden' );
         }
-        if ( ! check_ajax_referer( 'cs_devtools_code_settings_inline', 'nonce', false ) ) {
+        if ( ! check_ajax_referer( 'csdt_devtools_code_settings_inline', 'nonce', false ) ) {
             wp_send_json_error( 'Bad nonce' );
         }
 
@@ -2025,17 +2025,17 @@ class CloudScale_DevTools {
         if ( ! in_array( $theme, [ 'dark', 'light' ], true ) ) {
             $theme = 'dark';
         }
-        update_option( 'cs_devtools_code_default_theme', $theme );
+        update_option( 'csdt_devtools_code_default_theme', $theme );
 
         $valid_pairs = array_keys( self::get_theme_registry() );
         $pair        = isset( $_POST['theme_pair'] ) ? sanitize_text_field( wp_unslash( $_POST['theme_pair'] ) ) : 'atom-one';
         if ( ! in_array( $pair, $valid_pairs, true ) ) {
             $pair = 'atom-one';
         }
-        update_option( 'cs_devtools_code_theme_pair', $pair );
+        update_option( 'csdt_devtools_code_theme_pair', $pair );
 
-        $perf_enabled = isset( $_POST['cs_devtools_perf_monitor_enabled'] ) && '1' === $_POST['cs_devtools_perf_monitor_enabled'] ? '1' : '0'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
-        update_option( 'cs_devtools_perf_monitor_enabled', $perf_enabled );
+        $perf_enabled = isset( $_POST['csdt_devtools_perf_monitor_enabled'] ) && '1' === $_POST['csdt_devtools_perf_monitor_enabled'] ? '1' : '0'; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        update_option( 'csdt_devtools_perf_monitor_enabled', $perf_enabled );
 
         wp_send_json_success( [ 'theme' => $theme, 'theme_pair' => $pair, 'perf_enabled' => $perf_enabled ] );
     }
@@ -2591,13 +2591,13 @@ class CloudScale_DevTools {
         }
         $base = plugin_dir_path( __FILE__ ) . 'assets/';
         wp_enqueue_style(
-            'cs-perf-monitor',
+            'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
             [],
             filemtime( $base . 'cs-perf-monitor.css' )
         );
         wp_enqueue_script(
-            'cs-perf-monitor',
+            'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
             [],
             filemtime( $base . 'cs-perf-monitor.js' ),
@@ -2871,13 +2871,13 @@ class CloudScale_DevTools {
         }
         $base = plugin_dir_path( __FILE__ ) . 'assets/';
         wp_enqueue_style(
-            'cs-perf-monitor',
+            'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
             [],
             filemtime( $base . 'cs-perf-monitor.css' )
         );
         wp_enqueue_script(
-            'cs-perf-monitor',
+            'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
             [],
             filemtime( $base . 'cs-perf-monitor.js' ),
@@ -2890,7 +2890,7 @@ class CloudScale_DevTools {
      *
      * Hooked to admin_footer / wp_footer at priority 15, before WordPress
      * calls wp_print_footer_scripts() at priority 20. This ensures
-     * window.csDevtoolsPerfData is set before cs-perf-monitor.js IIFE runs.
+     * window.csdtDevtoolsPerfData is set before cs-perf-monitor.js IIFE runs.
      *
      * @since  1.8.112
      * @return void
@@ -2900,7 +2900,7 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
-        if ( get_option( 'cs_devtools_perf_monitor_enabled', '1' ) === '0' ) {
+        if ( get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) === '0' ) {
             return;
         }
 
@@ -2948,10 +2948,10 @@ class CloudScale_DevTools {
                 'is_admin'           => is_admin(),
                 'url'                => isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '',
                 'ajax_url'           => admin_url( 'admin-ajax.php' ),
-                'explain_nonce'      => wp_create_nonce( 'cs_devtools_perf_explain' ),
-                'debug_nonce'        => wp_create_nonce( 'cs_devtools_perf_debug' ),
-                'wp_debug'           => (bool) get_option( 'cs_devtools_perf_debug_logging', false ),
-                'wp_debug_log'       => (bool) get_option( 'cs_devtools_perf_debug_logging', false ),
+                'explain_nonce'      => wp_create_nonce( 'csdt_devtools_perf_explain' ),
+                'debug_nonce'        => wp_create_nonce( 'csdt_devtools_perf_debug' ),
+                'wp_debug'           => (bool) get_option( 'csdt_devtools_perf_debug_logging', false ),
+                'wp_debug_log'       => (bool) get_option( 'csdt_devtools_perf_debug_logging', false ),
                 'savequeries_active' => defined( 'SAVEQUERIES' ) && SAVEQUERIES,
                 // Page-context strip: what screen / template is this?
                 'wp_screen'          => ( is_admin() && function_exists( 'get_current_screen' ) && get_current_screen() )
@@ -2982,7 +2982,7 @@ class CloudScale_DevTools {
             ),
         ];
 
-        wp_add_inline_script( 'cs-perf-monitor', 'window.csDevtoolsPerfData=' . wp_json_encode( $data ) . ';', 'before' );
+        wp_add_inline_script( 'csdt-perf-monitor', 'window.csdtDevtoolsPerfData=' . wp_json_encode( $data ) . ';', 'before' );
     }
 
     /**
@@ -2998,7 +2998,7 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
         }
-        if ( get_option( 'cs_devtools_perf_monitor_enabled', '1' ) === '0' ) {
+        if ( get_option( 'csdt_devtools_perf_monitor_enabled', '1' ) === '0' ) {
             return;
         }
         // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static HTML, no user data
@@ -3363,8 +3363,8 @@ class CloudScale_DevTools {
         $php_old = ! $php_eol && version_compare( PHP_VERSION, '8.2', '==' ); // 8.2 EOL Dec 2026
 
         // ── Failed logins (brute-force signal) ────────────────────────────────
-        $failed_logins_1h  = (int) get_transient( 'cs_devtools_failed_logins_1h' );
-        $failed_logins_24h = (int) get_transient( 'cs_devtools_failed_logins_24h' );
+        $failed_logins_1h  = (int) get_transient( 'csdt_devtools_failed_logins_1h' );
+        $failed_logins_24h = (int) get_transient( 'csdt_devtools_failed_logins_24h' );
 
         // ── Author enumeration ────────────────────────────────────────────────
         // With pretty permalinks on, /?author=1 redirects to /author/username/.
@@ -3543,21 +3543,21 @@ class CloudScale_DevTools {
      */
     public static function perf_track_failed_login( string $username ): void {
         // 1-hour rolling window.
-        $c1h = (int) get_transient( 'cs_devtools_failed_logins_1h' );
-        set_transient( 'cs_devtools_failed_logins_1h', $c1h + 1, HOUR_IN_SECONDS );
+        $c1h = (int) get_transient( 'csdt_devtools_failed_logins_1h' );
+        set_transient( 'csdt_devtools_failed_logins_1h', $c1h + 1, HOUR_IN_SECONDS );
         // 24-hour rolling window.
-        $c24h = (int) get_transient( 'cs_devtools_failed_logins_24h' );
-        set_transient( 'cs_devtools_failed_logins_24h', $c24h + 1, DAY_IN_SECONDS );
+        $c24h = (int) get_transient( 'csdt_devtools_failed_logins_24h' );
+        set_transient( 'csdt_devtools_failed_logins_24h', $c24h + 1, DAY_IN_SECONDS );
 
         // ── Brute-force per-account lockout ──────────────────────────────────
-        if ( get_option( 'cs_devtools_brute_force_enabled', '1' ) !== '1' || empty( $username ) ) {
+        if ( get_option( 'csdt_devtools_brute_force_enabled', '1' ) !== '1' || empty( $username ) ) {
             return;
         }
-        $max_attempts = max( 1, (int) get_option( 'cs_devtools_brute_force_attempts', '5' ) );
-        $lockout_secs = max( 60, (int) get_option( 'cs_devtools_brute_force_lockout', '5' ) * MINUTE_IN_SECONDS );
+        $max_attempts = max( 1, (int) get_option( 'csdt_devtools_brute_force_attempts', '5' ) );
+        $lockout_secs = max( 60, (int) get_option( 'csdt_devtools_brute_force_lockout', '5' ) * MINUTE_IN_SECONDS );
         $slug         = md5( strtolower( $username ) );
-        $count_key    = 'cs_devtools_bf_count_' . $slug;
-        $lock_key     = 'cs_devtools_bf_lock_' . $slug;
+        $count_key    = 'csdt_devtools_bf_count_' . $slug;
+        $lock_key     = 'csdt_devtools_bf_lock_' . $slug;
         $attempts     = (int) get_transient( $count_key ) + 1;
         if ( $attempts >= $max_attempts ) {
             // Threshold reached — lock the account and clear the counter.
@@ -3896,7 +3896,7 @@ class CloudScale_DevTools {
      * @return void  Sends JSON and exits.
      */
     public static function ajax_perf_explain() {
-        check_ajax_referer( 'cs_devtools_perf_explain', 'nonce' );
+        check_ajax_referer( 'csdt_devtools_perf_explain', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized.' );
@@ -3932,7 +3932,7 @@ class CloudScale_DevTools {
      * @return void  Sends JSON and exits.
      */
     public static function ajax_perf_debug_toggle() {
-        check_ajax_referer( 'cs_devtools_perf_debug', 'nonce' );
+        check_ajax_referer( 'csdt_devtools_perf_debug', 'nonce' );
 
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized.' );
@@ -3940,13 +3940,13 @@ class CloudScale_DevTools {
 
         $enable = isset( $_POST['enable'] ) ? ( '1' === $_POST['enable'] || 'true' === $_POST['enable'] ) : null;
         if ( null === $enable ) {
-            $enable = ! (bool) get_option( 'cs_devtools_perf_debug_logging', false );
+            $enable = ! (bool) get_option( 'csdt_devtools_perf_debug_logging', false );
         }
 
         if ( $enable ) {
-            update_option( 'cs_devtools_perf_debug_logging', 1, false );
+            update_option( 'csdt_devtools_perf_debug_logging', 1, false );
         } else {
-            delete_option( 'cs_devtools_perf_debug_logging' );
+            delete_option( 'csdt_devtools_perf_debug_logging' );
         }
 
         wp_send_json_success( [
@@ -4049,7 +4049,7 @@ class CloudScale_DevTools {
      * Returns the performance monitor panel HTML.
      *
      * All data rendering is handled client-side by cs-perf-monitor.js
-     * which reads window.csDevtoolsPerfData.
+     * which reads window.csdtDevtoolsPerfData.
      *
      * @return string HTML markup.
      */
@@ -4274,11 +4274,11 @@ class CloudScale_DevTools {
 
     // ── Constants ────────────────────────────────────────────────────────
 
-    const LOGIN_NONCE           = 'cs_devtools_login_nonce';
-    const SMTP_NONCE            = 'cs_devtools_smtp_nonce';
-    const LOGIN_2FA_TRANSIENT   = 'cs_devtools_2fa_pending_';    // + random token
-    const LOGIN_OTP_TRANSIENT   = 'cs_devtools_2fa_otp_';        // + user_id
-    const EMAIL_VERIFY_TRANSIENT = 'cs_devtools_email_verify_';  // + random token (10 min)
+    const LOGIN_NONCE           = 'csdt_devtools_login_nonce';
+    const SMTP_NONCE            = 'csdt_devtools_smtp_nonce';
+    const LOGIN_2FA_TRANSIENT   = 'csdt_devtools_2fa_pending_';    // + random token
+    const LOGIN_OTP_TRANSIENT   = 'csdt_devtools_2fa_otp_';        // + user_id
+    const EMAIL_VERIFY_TRANSIENT = 'csdt_devtools_email_verify_';  // + random token (10 min)
     const TOTP_CHARS            = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
     // ── A. Hide Login — custom URL slug ──────────────────────────────────
@@ -4291,10 +4291,10 @@ class CloudScale_DevTools {
      * @return void
      */
     public static function login_serve_custom_slug(): void {
-        if ( get_option( 'cs_devtools_login_hide_enabled', '0' ) !== '1' ) {
+        if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return;
         }
-        $slug = get_option( 'cs_devtools_login_slug', '' );
+        $slug = get_option( 'csdt_devtools_login_slug', '' );
         if ( empty( $slug ) ) {
             return;
         }
@@ -4361,7 +4361,7 @@ class CloudScale_DevTools {
      * @return int
      */
     public static function login_session_expiration( int $expiration, int $user_id, bool $remember ): int {
-        $duration = get_option( 'cs_devtools_session_duration', 'default' );
+        $duration = get_option( 'csdt_devtools_session_duration', 'default' );
         if ( 'default' === $duration ) {
             return $expiration;
         }
@@ -4384,7 +4384,7 @@ class CloudScale_DevTools {
      * @return void
      */
     public static function login_force_remember(): void {
-        if ( get_option( 'cs_devtools_session_duration', 'default' ) !== 'default' ) {
+        if ( get_option( 'csdt_devtools_session_duration', 'default' ) !== 'default' ) {
             $_POST['rememberme'] = 'forever'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
         }
     }
@@ -4399,7 +4399,7 @@ class CloudScale_DevTools {
      * @return bool
      */
     private static function login_should_remember( array $pending = [] ): bool {
-        if ( get_option( 'cs_devtools_session_duration', 'default' ) !== 'default' ) {
+        if ( get_option( 'csdt_devtools_session_duration', 'default' ) !== 'default' ) {
             return true;
         }
         return ! empty( $pending['remember'] );
@@ -4416,13 +4416,13 @@ class CloudScale_DevTools {
      * @return \WP_User|\WP_Error|null
      */
     public static function login_brute_force_check( $user, string $username, string $password ) {
-        if ( get_option( 'cs_devtools_brute_force_enabled', '1' ) !== '1' ) {
+        if ( get_option( 'csdt_devtools_brute_force_enabled', '1' ) !== '1' ) {
             return $user;
         }
         if ( empty( $username ) ) {
             return $user;
         }
-        $lock_key     = 'cs_devtools_bf_lock_' . md5( strtolower( $username ) );
+        $lock_key     = 'csdt_devtools_bf_lock_' . md5( strtolower( $username ) );
         $locked_until = get_transient( $lock_key );
         if ( $locked_until === false ) {
             return $user;
@@ -4437,7 +4437,7 @@ class CloudScale_DevTools {
             ? __( 'less than a minute', 'cloudscale-devtools' )
             : sprintf( _n( '%d minute', '%d minutes', $mins, 'cloudscale-devtools' ), $mins );
         return new \WP_Error(
-            'cs_devtools_account_locked',
+            'csdt_devtools_account_locked',
             sprintf(
                 /* translators: %s = remaining lockout time, e.g. "5 minutes" */
                 __( 'This account has been temporarily locked due to too many failed login attempts. Please try again in %s.', 'cloudscale-devtools' ),
@@ -4459,7 +4459,7 @@ class CloudScale_DevTools {
      */
     public static function login_redirect_authenticated(): void {
         $action = isset( $_REQUEST['action'] ) ? sanitize_key( $_REQUEST['action'] ) : 'login'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        $skip   = [ 'logout', 'lostpassword', 'rp', 'resetpass', 'postpass', 'register', 'cs_devtools_2fa' ];
+        $skip   = [ 'logout', 'lostpassword', 'rp', 'resetpass', 'postpass', 'register', 'csdt_devtools_2fa' ];
         if ( in_array( $action, $skip, true ) ) {
             return;
         }
@@ -4478,10 +4478,10 @@ class CloudScale_DevTools {
      * @return void
      */
     public static function login_block_direct_access(): void {
-        if ( get_option( 'cs_devtools_login_hide_enabled', '0' ) !== '1' ) {
+        if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return;
         }
-        $slug = get_option( 'cs_devtools_login_slug', '' );
+        $slug = get_option( 'csdt_devtools_login_slug', '' );
         if ( empty( $slug ) ) {
             return;
         }
@@ -4504,7 +4504,7 @@ class CloudScale_DevTools {
         }
         // Allow through: safe wp-login.php actions (password reset emails, logout, postpass).
         $action = isset( $_REQUEST['action'] ) ? sanitize_key( $_REQUEST['action'] ) : 'login'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        $safe   = [ 'logout', 'lostpassword', 'rp', 'resetpass', 'postpass', 'register', 'cs_devtools_2fa' ];
+        $safe   = [ 'logout', 'lostpassword', 'rp', 'resetpass', 'postpass', 'register', 'csdt_devtools_2fa' ];
         if ( in_array( $action, $safe, true ) ) {
             return;
         }
@@ -4523,10 +4523,10 @@ class CloudScale_DevTools {
      * @return string
      */
     public static function login_custom_url( string $url, string $redirect, bool $force_reauth ): string {
-        if ( get_option( 'cs_devtools_login_hide_enabled', '0' ) !== '1' ) {
+        if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return $url;
         }
-        $slug = get_option( 'cs_devtools_login_slug', '' );
+        $slug = get_option( 'csdt_devtools_login_slug', '' );
         if ( empty( $slug ) ) {
             return $url;
         }
@@ -4549,10 +4549,10 @@ class CloudScale_DevTools {
      * @return string
      */
     public static function login_custom_logout_url( string $url, string $redirect ): string {
-        if ( get_option( 'cs_devtools_login_hide_enabled', '0' ) !== '1' ) {
+        if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return $url;
         }
-        $slug = get_option( 'cs_devtools_login_slug', '' );
+        $slug = get_option( 'csdt_devtools_login_slug', '' );
         if ( empty( $slug ) ) {
             return $url;
         }
@@ -4573,10 +4573,10 @@ class CloudScale_DevTools {
      * @return string
      */
     public static function login_custom_lostpassword_url( string $url, string $redirect ): string {
-        if ( get_option( 'cs_devtools_login_hide_enabled', '0' ) !== '1' ) {
+        if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return $url;
         }
-        $slug = get_option( 'cs_devtools_login_slug', '' );
+        $slug = get_option( 'csdt_devtools_login_slug', '' );
         if ( empty( $slug ) ) {
             return $url;
         }
@@ -4623,10 +4623,10 @@ class CloudScale_DevTools {
      * @return string
      */
     private static function login_rewrite_login_url( string $url, string $path ): string {
-        if ( get_option( 'cs_devtools_login_hide_enabled', '0' ) !== '1' ) {
+        if ( get_option( 'csdt_devtools_login_hide_enabled', '0' ) !== '1' ) {
             return $url;
         }
-        $slug = get_option( 'cs_devtools_login_slug', '' );
+        $slug = get_option( 'csdt_devtools_login_slug', '' );
         if ( empty( $slug ) || strpos( $path, 'wp-login.php' ) === false ) {
             return $url;
         }
@@ -4658,18 +4658,18 @@ class CloudScale_DevTools {
 
         // Grace logins: allow up to N logins without 2FA being set up.
         // Useful for automated test accounts or newly invited users.
-        $grace_limit = (int) get_option( 'cs_devtools_2fa_grace_logins', '0' );
+        $grace_limit = (int) get_option( 'csdt_devtools_2fa_grace_logins', '0' );
         if ( $grace_limit > 0 ) {
-            $grace_count = (int) get_user_meta( $user->ID, 'cs_devtools_2fa_grace_count', true );
+            $grace_count = (int) get_user_meta( $user->ID, 'csdt_devtools_2fa_grace_count', true );
             if ( $grace_count < $grace_limit ) {
-                update_user_meta( $user->ID, 'cs_devtools_2fa_grace_count', $grace_count + 1 );
+                update_user_meta( $user->ID, 'csdt_devtools_2fa_grace_count', $grace_count + 1 );
                 return $user; // Skip 2FA — grace login consumed.
             }
         }
 
         // Avoid triggering 2FA during a 2FA verification POST itself.
         $action = isset( $_REQUEST['action'] ) ? sanitize_key( $_REQUEST['action'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        if ( $action === 'cs_devtools_2fa' ) {
+        if ( $action === 'csdt_devtools_2fa' ) {
             return $user;
         }
 
@@ -4700,8 +4700,8 @@ class CloudScale_DevTools {
 
         // Redirect to the 2FA form.
         $login_url = add_query_arg( [
-            'action'   => 'cs_devtools_2fa',
-            'cs_devtools_token' => rawurlencode( $token ),
+            'action'   => 'csdt_devtools_2fa',
+            'csdt_devtools_token' => rawurlencode( $token ),
         ], wp_login_url() );
 
         wp_safe_redirect( $login_url );
@@ -4716,11 +4716,11 @@ class CloudScale_DevTools {
      */
     public static function login_2fa_handle(): void {
         $action = isset( $_REQUEST['action'] ) ? sanitize_key( $_REQUEST['action'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-        if ( $action !== 'cs_devtools_2fa' ) {
+        if ( $action !== 'csdt_devtools_2fa' ) {
             return;
         }
 
-        $token   = isset( $_REQUEST['cs_devtools_token'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['cs_devtools_token'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $token   = isset( $_REQUEST['csdt_devtools_token'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['csdt_devtools_token'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $pending = $token ? get_transient( self::LOGIN_2FA_TRANSIENT . $token ) : false;
 
         // Invalid or expired token → back to login.
@@ -4734,9 +4734,9 @@ class CloudScale_DevTools {
         $error   = '';
 
         // ── Passkey → email fallback ─────────────────────────────────────────
-        if ( $method === 'passkey' && ! empty( $_POST['cs_devtools_pk_fallback'] ) ) {
+        if ( $method === 'passkey' && ! empty( $_POST['csdt_devtools_pk_fallback'] ) ) {
             // Only send a new OTP if one hasn't been sent in the last 30 seconds (prevents spam from double-clicks).
-            $rate_key    = 'cs_devtools_pk_fb_' . $user_id;
+            $rate_key    = 'csdt_devtools_pk_fb_' . $user_id;
             $already_sent = get_transient( $rate_key );
             if ( ! $already_sent ) {
                 $user = get_user_by( 'id', $user_id );
@@ -4757,8 +4757,8 @@ class CloudScale_DevTools {
         }
 
         // ── Passkey assertion (POST from cs-passkey login page) ──────────────
-        if ( $method === 'passkey' && isset( $_POST['cs_devtools_pk_cred_id'] ) ) {
-            $result = CS_DevTools_Passkey::verify_login_assertion( $token, $user_id );
+        if ( $method === 'passkey' && isset( $_POST['csdt_devtools_pk_cred_id'] ) ) {
+            $result = CSDT_DevTools_Passkey::verify_login_assertion( $token, $user_id );
             if ( $result === true ) {
                 delete_transient( self::LOGIN_2FA_TRANSIENT . $token );
                 wp_set_auth_cookie( $user_id, self::login_should_remember( $pending ) );
@@ -4771,17 +4771,17 @@ class CloudScale_DevTools {
         }
 
         // ── Passkey challenge page (GET or re-render after failure) ──────────
-        if ( $method === 'passkey' && empty( $_POST['cs_devtools_2fa_code'] ) ) {
-            CS_DevTools_Passkey::render_login_challenge( $token, $user_id, $error );
+        if ( $method === 'passkey' && empty( $_POST['csdt_devtools_2fa_code'] ) ) {
+            CSDT_DevTools_Passkey::render_login_challenge( $token, $user_id, $error );
             // render_login_challenge() exits.
         }
 
         // Handle code submission.
-        if ( isset( $_POST['cs_devtools_2fa_code'] ) ) {
-            if ( ! isset( $_POST['cs_devtools_2fa_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['cs_devtools_2fa_nonce'] ) ), 'cs_devtools_2fa_verify_' . $token ) ) {
+        if ( isset( $_POST['csdt_devtools_2fa_code'] ) ) {
+            if ( ! isset( $_POST['csdt_devtools_2fa_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['csdt_devtools_2fa_nonce'] ) ), 'csdt_devtools_2fa_verify_' . $token ) ) {
                 $error = __( 'Security check failed. Please try again.', 'cloudscale-devtools' );
             } else {
-                $code    = preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['cs_devtools_2fa_code'] ) ) );
+                $code    = preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['csdt_devtools_2fa_code'] ) ) );
                 $user    = get_user_by( 'id', $user_id );
                 $valid   = false;
 
@@ -4793,7 +4793,7 @@ class CloudScale_DevTools {
                             delete_transient( self::LOGIN_OTP_TRANSIENT . $user_id );
                         }
                     } elseif ( $method === 'totp' ) {
-                        $secret = get_user_meta( $user_id, 'cs_devtools_totp_secret', true );
+                        $secret = get_user_meta( $user_id, 'csdt_devtools_totp_secret', true );
                         if ( $secret ) {
                             $valid = self::totp_verify( (string) $secret, $code );
                         }
@@ -4831,14 +4831,14 @@ class CloudScale_DevTools {
         // Use WordPress's own login page scaffolding.
         login_header( __( 'Two-Factor Authentication', 'cloudscale-devtools' ), '', null );
 
-        $nonce      = wp_create_nonce( 'cs_devtools_2fa_verify_' . $token );
+        $nonce      = wp_create_nonce( 'csdt_devtools_2fa_verify_' . $token );
         $method_txt = $method === 'email'
             ? __( 'Enter the 6-digit code that was sent to your email address.', 'cloudscale-devtools' )
             : __( 'Enter the 6-digit code from your authenticator app.', 'cloudscale-devtools' );
 
         $icon = $method === 'email' ? '📧' : '📱';
         ?>
-        <form name="cs_devtools_2faform" id="cs_devtools_2faform" action="" method="post">
+        <form name="csdt_devtools_2faform" id="csdt_devtools_2faform" action="" method="post">
             <p style="text-align:center;font-size:48px;margin:0 0 8px"><?php echo $icon; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — emoji literal ?></p>
             <p style="text-align:center;margin:0 0 20px;color:#555;font-size:13px;line-height:1.5"><?php echo esc_html( $method_txt ); ?></p>
 
@@ -4847,8 +4847,8 @@ class CloudScale_DevTools {
             <?php endif; ?>
 
             <p>
-                <label for="cs_devtools_2fa_code"><?php esc_html_e( 'Authentication Code', 'cloudscale-devtools' ); ?></label>
-                <input type="text" name="cs_devtools_2fa_code" id="cs_devtools_2fa_code" class="input"
+                <label for="csdt_devtools_2fa_code"><?php esc_html_e( 'Authentication Code', 'cloudscale-devtools' ); ?></label>
+                <input type="text" name="csdt_devtools_2fa_code" id="csdt_devtools_2fa_code" class="input"
                        value="" size="20" maxlength="6"
                        inputmode="numeric" autocomplete="one-time-code"
                        placeholder="000000"
@@ -4863,9 +4863,9 @@ class CloudScale_DevTools {
             }
             ?>
 
-            <input type="hidden" name="action"     value="cs_devtools_2fa">
-            <input type="hidden" name="cs_devtools_token"   value="<?php echo esc_attr( $token ); ?>">
-            <input type="hidden" name="cs_devtools_2fa_nonce" value="<?php echo esc_attr( $nonce ); ?>">
+            <input type="hidden" name="action"     value="csdt_devtools_2fa">
+            <input type="hidden" name="csdt_devtools_token"   value="<?php echo esc_attr( $token ); ?>">
+            <input type="hidden" name="csdt_devtools_2fa_nonce" value="<?php echo esc_attr( $nonce ); ?>">
 
             <p class="submit">
                 <input type="submit" name="wp-submit" id="wp-submit"
@@ -4892,30 +4892,30 @@ class CloudScale_DevTools {
      * @return string
      */
     private static function login_2fa_method_for_user( \WP_User $user ): string {
-        $site_method = get_option( 'cs_devtools_2fa_method', 'off' );
-        $force       = get_option( 'cs_devtools_2fa_force_admins', '0' ) === '1';
+        $site_method = get_option( 'csdt_devtools_2fa_method', 'off' );
+        $force       = get_option( 'csdt_devtools_2fa_force_admins', '0' ) === '1';
 
         // Passkeys always take priority when the user has any registered.
-        if ( ! empty( CS_DevTools_Passkey::get_passkeys( $user->ID ) ) ) {
+        if ( ! empty( CSDT_DevTools_Passkey::get_passkeys( $user->ID ) ) ) {
             return 'passkey';
         }
 
         // If force is on and user is admin, enforce the site method.
         if ( $force && user_can( $user, 'manage_options' ) && $site_method !== 'off' ) {
             // If TOTP forced but user hasn't set it up, fall back to email.
-            if ( $site_method === 'totp' && get_user_meta( $user->ID, 'cs_devtools_totp_enabled', true ) !== '1' ) {
+            if ( $site_method === 'totp' && get_user_meta( $user->ID, 'csdt_devtools_totp_enabled', true ) !== '1' ) {
                 return 'email';
             }
             return $site_method;
         }
 
         // Per-user TOTP.
-        if ( get_user_meta( $user->ID, 'cs_devtools_totp_enabled', true ) === '1' ) {
+        if ( get_user_meta( $user->ID, 'csdt_devtools_totp_enabled', true ) === '1' ) {
             return 'totp';
         }
 
         // Per-user email 2FA.
-        if ( get_user_meta( $user->ID, 'cs_devtools_2fa_email_enabled', true ) === '1' ) {
+        if ( get_user_meta( $user->ID, 'csdt_devtools_2fa_email_enabled', true ) === '1' ) {
             return 'email';
         }
 
@@ -5057,8 +5057,8 @@ class CloudScale_DevTools {
         if ( in_array( $slug, $reserved, true ) ) {
             wp_send_json_error( __( 'That slug is reserved. Please choose a different one.', 'cloudscale-devtools' ) );
         }
-        update_option( 'cs_devtools_login_hide_enabled', $hide );
-        update_option( 'cs_devtools_login_slug', $slug );
+        update_option( 'csdt_devtools_login_hide_enabled', $hide );
+        update_option( 'csdt_devtools_login_slug', $slug );
 
         // 2FA
         $method = isset( $_POST['method'] ) ? sanitize_key( wp_unslash( $_POST['method'] ) ) : 'off';
@@ -5066,8 +5066,8 @@ class CloudScale_DevTools {
             $method = 'off';
         }
         $force = isset( $_POST['force_admins'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['force_admins'] ) ) ? '1' : '0';
-        update_option( 'cs_devtools_2fa_method', $method );
-        update_option( 'cs_devtools_2fa_force_admins', $force );
+        update_option( 'csdt_devtools_2fa_method', $method );
+        update_option( 'csdt_devtools_2fa_force_admins', $force );
 
         // Session duration
         $valid_durations = [ 'default', '1', '7', '14', '30', '90', '365' ];
@@ -5075,7 +5075,7 @@ class CloudScale_DevTools {
         if ( ! in_array( $duration, $valid_durations, true ) ) {
             $duration = 'default';
         }
-        update_option( 'cs_devtools_session_duration', $duration );
+        update_option( 'csdt_devtools_session_duration', $duration );
 
         // Brute-force protection
         $bf_enabled  = isset( $_POST['bf_enabled'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['bf_enabled'] ) ) ? '1' : '0';
@@ -5083,14 +5083,14 @@ class CloudScale_DevTools {
         $bf_lockout  = isset( $_POST['bf_lockout'] )  ? (int) sanitize_text_field( wp_unslash( $_POST['bf_lockout'] ) )  : 5;
         if ( $bf_attempts < 1 || $bf_attempts > 100 )   { $bf_attempts = 5; }
         if ( $bf_lockout  < 1 || $bf_lockout  > 1440 )  { $bf_lockout  = 5; }
-        update_option( 'cs_devtools_brute_force_enabled',  $bf_enabled );
-        update_option( 'cs_devtools_brute_force_attempts', (string) $bf_attempts );
-        update_option( 'cs_devtools_brute_force_lockout',  (string) $bf_lockout );
+        update_option( 'csdt_devtools_brute_force_enabled',  $bf_enabled );
+        update_option( 'csdt_devtools_brute_force_attempts', (string) $bf_attempts );
+        update_option( 'csdt_devtools_brute_force_lockout',  (string) $bf_lockout );
 
         // Grace logins
         $grace_logins = isset( $_POST['grace_logins'] ) ? (int) sanitize_text_field( wp_unslash( $_POST['grace_logins'] ) ) : 0;
         if ( $grace_logins < 0 || $grace_logins > 10 ) { $grace_logins = 0; }
-        update_option( 'cs_devtools_2fa_grace_logins', (string) $grace_logins );
+        update_option( 'csdt_devtools_2fa_grace_logins', (string) $grace_logins );
 
         $new_url = $hide === '1' && $slug ? home_url( '/' . $slug . '/' ) : wp_login_url();
         wp_send_json_success( [ 'login_url' => $new_url ] );
@@ -5113,7 +5113,7 @@ class CloudScale_DevTools {
         $secret  = self::totp_generate_secret();
 
         // Store as pending until the user verifies their first code.
-        update_user_meta( $user_id, 'cs_devtools_totp_secret_pending', $secret );
+        update_user_meta( $user_id, 'csdt_devtools_totp_secret_pending', $secret );
 
         $email = wp_get_current_user()->user_email;
         $uri   = self::totp_provisioning_uri( $secret, $email );
@@ -5138,7 +5138,7 @@ class CloudScale_DevTools {
 
         $code    = isset( $_POST['code'] ) ? preg_replace( '/\D/', '', sanitize_text_field( wp_unslash( $_POST['code'] ) ) ) : '';
         $user_id = get_current_user_id();
-        $secret  = get_user_meta( $user_id, 'cs_devtools_totp_secret_pending', true );
+        $secret  = get_user_meta( $user_id, 'csdt_devtools_totp_secret_pending', true );
 
         if ( ! $secret ) {
             wp_send_json_error( __( 'No pending setup found. Please start setup again.', 'cloudscale-devtools' ) );
@@ -5152,12 +5152,12 @@ class CloudScale_DevTools {
         }
 
         // Activate: promote pending secret to live.
-        update_user_meta( $user_id, 'cs_devtools_totp_secret', $secret );
-        update_user_meta( $user_id, 'cs_devtools_totp_enabled', '1' );
-        delete_user_meta( $user_id, 'cs_devtools_totp_secret_pending' );
+        update_user_meta( $user_id, 'csdt_devtools_totp_secret', $secret );
+        update_user_meta( $user_id, 'csdt_devtools_totp_enabled', '1' );
+        delete_user_meta( $user_id, 'csdt_devtools_totp_secret_pending' );
 
         // If user had email 2FA, disable it (TOTP is preferred).
-        delete_user_meta( $user_id, 'cs_devtools_2fa_email_enabled' );
+        delete_user_meta( $user_id, 'csdt_devtools_2fa_email_enabled' );
 
         // Security state changed — destroy all other open sessions.
         wp_destroy_other_sessions();
@@ -5181,12 +5181,12 @@ class CloudScale_DevTools {
         $user_id = get_current_user_id();
 
         if ( $method === 'totp' ) {
-            delete_user_meta( $user_id, 'cs_devtools_totp_secret' );
-            delete_user_meta( $user_id, 'cs_devtools_totp_secret_pending' );
-            update_user_meta( $user_id, 'cs_devtools_totp_enabled', '0' );
+            delete_user_meta( $user_id, 'csdt_devtools_totp_secret' );
+            delete_user_meta( $user_id, 'csdt_devtools_totp_secret_pending' );
+            update_user_meta( $user_id, 'csdt_devtools_totp_enabled', '0' );
         } elseif ( $method === 'email' ) {
-            update_user_meta( $user_id, 'cs_devtools_2fa_email_enabled', '0' );
-            delete_user_meta( $user_id, 'cs_devtools_email_verify_pending' );
+            update_user_meta( $user_id, 'csdt_devtools_2fa_email_enabled', '0' );
+            delete_user_meta( $user_id, 'csdt_devtools_email_verify_pending' );
         } else {
             wp_send_json_error( 'Unknown method.' );
         }
@@ -5247,10 +5247,10 @@ class CloudScale_DevTools {
         $token     = wp_generate_password( 32, false, false );
         $transient = self::EMAIL_VERIFY_TRANSIENT . $token;
         set_transient( $transient, [ 'user_id' => $user_id ], 3600 );
-        update_user_meta( $user_id, 'cs_devtools_email_verify_pending', '1' );
+        update_user_meta( $user_id, 'csdt_devtools_email_verify_pending', '1' );
 
         $callback = add_query_arg(
-            [ 'cs_devtools_email_verify' => rawurlencode( $token ) ],
+            [ 'csdt_devtools_email_verify' => rawurlencode( $token ) ],
             admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=login' )
         );
 
@@ -5267,7 +5267,7 @@ class CloudScale_DevTools {
 
         if ( ! $sent ) {
             delete_transient( $transient );
-            delete_user_meta( $user_id, 'cs_devtools_email_verify_pending' );
+            delete_user_meta( $user_id, 'csdt_devtools_email_verify_pending' );
             // Surface the real SMTP error if captured, otherwise the warning from diagnostics.
             $detail = $transport_error ?: $warning ?: __( 'Check your WordPress mail configuration.', 'cloudscale-devtools' );
             wp_send_json_error( [
@@ -5427,14 +5427,14 @@ class CloudScale_DevTools {
      * @return void
      */
     public static function email_2fa_confirm_check(): void {
-        if ( ! isset( $_GET['cs_devtools_email_verify'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        if ( ! isset( $_GET['csdt_devtools_email_verify'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
             return;
         }
         if ( ! is_user_logged_in() ) {
             return;
         }
 
-        $token     = sanitize_text_field( wp_unslash( $_GET['cs_devtools_email_verify'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $token     = sanitize_text_field( wp_unslash( $_GET['csdt_devtools_email_verify'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         $transient = self::EMAIL_VERIFY_TRANSIENT . $token;
         $data = get_transient( $transient );
 
@@ -5459,8 +5459,8 @@ class CloudScale_DevTools {
         }
 
         // Activate email 2FA.
-        update_user_meta( $user_id, 'cs_devtools_2fa_email_enabled', '1' );
-        delete_user_meta( $user_id, 'cs_devtools_email_verify_pending' );
+        update_user_meta( $user_id, 'csdt_devtools_2fa_email_enabled', '1' );
+        delete_user_meta( $user_id, 'csdt_devtools_email_verify_pending' );
 
         // Mark the transient as used (keep it alive for 10 min so re-clicks show success, not "expired").
         set_transient( $transient, [ 'user_id' => $user_id, 'activated' => true ], 600 );
@@ -5523,15 +5523,15 @@ class CloudScale_DevTools {
      * @return void
      */
     private static function render_smtp_panel(): void {
-        $enabled    = get_option( 'cs_devtools_smtp_enabled',    '0' ) === '1';
-        $host       = get_option( 'cs_devtools_smtp_host',       '' );
-        $port       = get_option( 'cs_devtools_smtp_port',       587 );
-        $encryption = get_option( 'cs_devtools_smtp_encryption', 'tls' );
-        $auth       = get_option( 'cs_devtools_smtp_auth',       '1' ) === '1';
-        $user       = get_option( 'cs_devtools_smtp_user',       '' );
-        $has_pass   = '' !== get_option( 'cs_devtools_smtp_pass', '' );
-        $from_email = get_option( 'cs_devtools_smtp_from_email', '' );
-        $from_name  = get_option( 'cs_devtools_smtp_from_name',  '' );
+        $enabled    = get_option( 'csdt_devtools_smtp_enabled',    '0' ) === '1';
+        $host       = get_option( 'csdt_devtools_smtp_host',       '' );
+        $port       = get_option( 'csdt_devtools_smtp_port',       587 );
+        $encryption = get_option( 'csdt_devtools_smtp_encryption', 'tls' );
+        $auth       = get_option( 'csdt_devtools_smtp_auth',       '1' ) === '1';
+        $user       = get_option( 'csdt_devtools_smtp_user',       '' );
+        $has_pass   = '' !== get_option( 'csdt_devtools_smtp_pass', '' );
+        $from_email = get_option( 'csdt_devtools_smtp_from_email', '' );
+        $from_name  = get_option( 'csdt_devtools_smtp_from_name',  '' );
         ?>
 
         <!-- ── SMTP Configuration ─────────────────────────────── -->
@@ -5831,7 +5831,7 @@ class CloudScale_DevTools {
             if ( $auth === '1' && $user === '' ) {
                 $errors[] = __( 'Username is required when SMTP Authentication is enabled.', 'cloudscale-devtools' );
             }
-            $existing_pass = get_option( 'cs_devtools_smtp_pass', '' );
+            $existing_pass = get_option( 'csdt_devtools_smtp_pass', '' );
             if ( $auth === '1' && $new_pass === '' && $existing_pass === '' ) {
                 $errors[] = __( 'Password is required when SMTP Authentication is enabled.', 'cloudscale-devtools' );
             }
@@ -5840,18 +5840,18 @@ class CloudScale_DevTools {
             }
         }
 
-        update_option( 'cs_devtools_smtp_enabled',    $enabled );
-        update_option( 'cs_devtools_smtp_host',       $host );
-        update_option( 'cs_devtools_smtp_port',       $port );
-        update_option( 'cs_devtools_smtp_encryption', $encryption );
-        update_option( 'cs_devtools_smtp_auth',       $auth );
-        update_option( 'cs_devtools_smtp_user',       $user );
-        update_option( 'cs_devtools_smtp_from_email', $from_email );
-        update_option( 'cs_devtools_smtp_from_name',  $from_name );
+        update_option( 'csdt_devtools_smtp_enabled',    $enabled );
+        update_option( 'csdt_devtools_smtp_host',       $host );
+        update_option( 'csdt_devtools_smtp_port',       $port );
+        update_option( 'csdt_devtools_smtp_encryption', $encryption );
+        update_option( 'csdt_devtools_smtp_auth',       $auth );
+        update_option( 'csdt_devtools_smtp_user',       $user );
+        update_option( 'csdt_devtools_smtp_from_email', $from_email );
+        update_option( 'csdt_devtools_smtp_from_name',  $from_name );
 
         // Only update password if the user explicitly provided one.
         if ( $new_pass !== '' ) {
-            update_option( 'cs_devtools_smtp_pass', $new_pass );
+            update_option( 'csdt_devtools_smtp_pass', $new_pass );
         }
 
         wp_send_json_success();
@@ -5869,13 +5869,13 @@ class CloudScale_DevTools {
             wp_send_json_error( [ 'type' => 'auth' ], 403 );
         }
 
-        $enabled    = get_option( 'cs_devtools_smtp_enabled', '0' );
-        $host       = trim( (string) get_option( 'cs_devtools_smtp_host', '' ) );
-        $port       = (int) get_option( 'cs_devtools_smtp_port', 587 );
-        $encryption = (string) get_option( 'cs_devtools_smtp_encryption', 'tls' );
-        $auth       = get_option( 'cs_devtools_smtp_auth', '1' ) === '1';
-        $user       = trim( (string) get_option( 'cs_devtools_smtp_user', '' ) );
-        $pass       = (string) get_option( 'cs_devtools_smtp_pass', '' );
+        $enabled    = get_option( 'csdt_devtools_smtp_enabled', '0' );
+        $host       = trim( (string) get_option( 'csdt_devtools_smtp_host', '' ) );
+        $port       = (int) get_option( 'csdt_devtools_smtp_port', 587 );
+        $encryption = (string) get_option( 'csdt_devtools_smtp_encryption', 'tls' );
+        $auth       = get_option( 'csdt_devtools_smtp_auth', '1' ) === '1';
+        $user       = trim( (string) get_option( 'csdt_devtools_smtp_user', '' ) );
+        $pass       = (string) get_option( 'csdt_devtools_smtp_pass', '' );
 
         // ── Pre-flight checks ─────────────────────────────────────────────
         $issues = [];
@@ -5924,8 +5924,8 @@ class CloudScale_DevTools {
                 }
             };
 
-            $from_email = get_option( 'cs_devtools_smtp_from_email', '' ) ?: get_bloginfo( 'admin_email' );
-            $from_name  = get_option( 'cs_devtools_smtp_from_name', '' ) ?: $site;
+            $from_email = get_option( 'csdt_devtools_smtp_from_email', '' ) ?: get_bloginfo( 'admin_email' );
+            $from_name  = get_option( 'csdt_devtools_smtp_from_name', '' ) ?: $site;
             $mail->setFrom( $from_email, $from_name );
             $mail->addAddress( $to );
             $mail->isHTML( true );
@@ -5966,17 +5966,17 @@ class CloudScale_DevTools {
      */
     public static function phpmailer_configure( $phpmailer ): void {
         $phpmailer->isSMTP();
-        $phpmailer->Host      = (string) get_option( 'cs_devtools_smtp_host', '' );
-        $port                 = (int) get_option( 'cs_devtools_smtp_port', 587 );
+        $phpmailer->Host      = (string) get_option( 'csdt_devtools_smtp_host', '' );
+        $port                 = (int) get_option( 'csdt_devtools_smtp_port', 587 );
         $phpmailer->Port      = $port > 0 ? $port : 587;
-        $encryption           = (string) get_option( 'cs_devtools_smtp_encryption', 'tls' );
+        $encryption           = (string) get_option( 'csdt_devtools_smtp_encryption', 'tls' );
         $encryption           = in_array( $encryption, [ 'tls', 'ssl', 'none' ], true ) ? $encryption : 'tls';
         $phpmailer->SMTPSecure = $encryption === 'none' ? '' : $encryption;
         // Default auth to ON — empty/missing option means "never explicitly turned off".
-        $auth_val             = get_option( 'cs_devtools_smtp_auth', '1' );
+        $auth_val             = get_option( 'csdt_devtools_smtp_auth', '1' );
         $phpmailer->SMTPAuth  = $auth_val !== '0';
-        $phpmailer->Username  = (string) get_option( 'cs_devtools_smtp_user', '' );
-        $phpmailer->Password  = (string) get_option( 'cs_devtools_smtp_pass', '' );
+        $phpmailer->Username  = (string) get_option( 'csdt_devtools_smtp_user', '' );
+        $phpmailer->Password  = (string) get_option( 'csdt_devtools_smtp_pass', '' );
         $phpmailer->SMTPDebug = 0;
     }
 
@@ -5988,7 +5988,7 @@ class CloudScale_DevTools {
      * @return string
      */
     public static function smtp_from_email( string $email ): string {
-        $configured = get_option( 'cs_devtools_smtp_from_email', '' );
+        $configured = get_option( 'csdt_devtools_smtp_from_email', '' );
         return $configured ?: $email;
     }
 
@@ -6000,7 +6000,7 @@ class CloudScale_DevTools {
      * @return string
      */
     public static function smtp_from_name( string $name ): string {
-        $configured = get_option( 'cs_devtools_smtp_from_name', '' );
+        $configured = get_option( 'csdt_devtools_smtp_from_name', '' );
         return $configured ?: $name;
     }
 
@@ -6008,7 +6008,7 @@ class CloudScale_DevTools {
        EMAIL LOG
        ================================================================== */
 
-    const EMAIL_LOG_OPTION  = 'cs_devtools_email_log';
+    const EMAIL_LOG_OPTION  = 'csdt_devtools_email_log';
     const EMAIL_LOG_MAX     = 100;
 
     /**
@@ -6029,8 +6029,8 @@ class CloudScale_DevTools {
             'subject' => (string) ( $args['subject'] ?? '' ),
             'status'  => 'pending',
             'error'   => '',
-            'via'     => ( get_option( 'cs_devtools_smtp_enabled', '0' ) === '1'
-                          && '' !== trim( (string) get_option( 'cs_devtools_smtp_host', '' ) ) )
+            'via'     => ( get_option( 'csdt_devtools_smtp_enabled', '0' ) === '1'
+                          && '' !== trim( (string) get_option( 'csdt_devtools_smtp_host', '' ) ) )
                          ? 'smtp' : 'phpmail',
         ];
         return $args;
@@ -6142,28 +6142,28 @@ class CloudScale_DevTools {
         wp_send_json_success( $log );
     }
 
-    // ── Prefix migration (cs_ → cs_devtools_) ───────────────────────────────
+    // ── Prefix migration (cs_ → csdt_devtools_) ───────────────────────────────
 
     /**
      * One-time migration: renames options and user meta from the old cs_ prefix
-     * to cs_devtools_.  Runs on every load but exits immediately after the first
+     * to csdt_devtools_.  Runs on every load but exits immediately after the first
      * successful run (guarded by a flag option).
      */
     private static function maybe_migrate_prefix(): void {
-        if ( get_option( 'cs_devtools_prefix_migrated' ) ) {
+        if ( get_option( 'csdt_devtools_prefix_migrated' ) ) {
             return;
         }
 
         // ── Options ──────────────────────────────────────────────────────────
         $option_map = [
-            'cs_hide_login'           => 'cs_devtools_hide_login',
-            'cs_login_slug'           => 'cs_devtools_login_slug',
-            'cs_2fa_method'           => 'cs_devtools_2fa_method',
-            'cs_2fa_force_admins'     => 'cs_devtools_2fa_force_admins',
-            'cs_code_default_theme'   => 'cs_devtools_code_default_theme',
-            'cs_code_theme_pair'      => 'cs_devtools_code_theme_pair',
-            'cs_perf_monitor_enabled' => 'cs_devtools_perf_monitor_enabled',
-            'cs_perf_debug_logging'   => 'cs_devtools_perf_debug_logging',
+            'cs_hide_login'           => 'csdt_devtools_hide_login',
+            'cs_login_slug'           => 'csdt_devtools_login_slug',
+            'cs_2fa_method'           => 'csdt_devtools_2fa_method',
+            'cs_2fa_force_admins'     => 'csdt_devtools_2fa_force_admins',
+            'cs_code_default_theme'   => 'csdt_devtools_code_default_theme',
+            'cs_code_theme_pair'      => 'csdt_devtools_code_theme_pair',
+            'cs_perf_monitor_enabled' => 'csdt_devtools_perf_monitor_enabled',
+            'cs_perf_debug_logging'   => 'csdt_devtools_perf_debug_logging',
         ];
         foreach ( $option_map as $old => $new ) {
             $val = get_option( $old );
@@ -6176,19 +6176,19 @@ class CloudScale_DevTools {
         // ── User meta (all users) ─────────────────────────────────────────────
         global $wpdb;
         $meta_map = [
-            'cs_passkeys'            => 'cs_devtools_passkeys',
-            'cs_totp_enabled'        => 'cs_devtools_totp_enabled',
-            'cs_totp_secret'         => 'cs_devtools_totp_secret',
-            'cs_totp_secret_pending' => 'cs_devtools_totp_secret_pending',
-            'cs_2fa_email_enabled'   => 'cs_devtools_2fa_email_enabled',
-            'cs_email_verify_pending' => 'cs_devtools_email_verify_pending',
+            'cs_passkeys'            => 'csdt_devtools_passkeys',
+            'cs_totp_enabled'        => 'csdt_devtools_totp_enabled',
+            'cs_totp_secret'         => 'csdt_devtools_totp_secret',
+            'cs_totp_secret_pending' => 'csdt_devtools_totp_secret_pending',
+            'cs_2fa_email_enabled'   => 'csdt_devtools_2fa_email_enabled',
+            'cs_email_verify_pending' => 'csdt_devtools_email_verify_pending',
         ];
         foreach ( $meta_map as $old => $new ) {
             // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
             $wpdb->update( $wpdb->usermeta, [ 'meta_key' => $new ], [ 'meta_key' => $old ] );
         }
 
-        update_option( 'cs_devtools_prefix_migrated', '1' );
+        update_option( 'csdt_devtools_prefix_migrated', '1' );
     }
 
     /* ==================================================================
@@ -6254,7 +6254,7 @@ class CloudScale_DevTools {
      */
     public static function maybe_custom_404(): void {
         if ( ! is_404() ) { return; }
-        $is_preview = isset( $_GET['cs_devtools_preview_scheme'] ) && current_user_can( 'manage_options' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $is_preview = isset( $_GET['csdt_devtools_preview_scheme'] ) && current_user_can( 'manage_options' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
         if ( ! $is_preview && ! get_option( self::CUSTOM_404_OPTION, 0 ) ) { return; }
 
         status_header( 404 );
@@ -6276,7 +6276,7 @@ class CloudScale_DevTools {
         $css_url  = plugins_url( 'assets/cs-custom-404.css', __FILE__ ) . '?ver=' . self::VERSION . '.' . filemtime( $css_path );
         $js_url   = plugins_url( 'assets/cs-custom-404.js',  __FILE__ ) . '?ver=' . self::VERSION . '.' . filemtime( $js_path );
 
-        $preview_key   = isset( $_GET['cs_devtools_preview_scheme'] ) ? sanitize_key( wp_unslash( $_GET['cs_devtools_preview_scheme'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only palette preview
+        $preview_key   = isset( $_GET['csdt_devtools_preview_scheme'] ) ? sanitize_key( wp_unslash( $_GET['csdt_devtools_preview_scheme'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only palette preview
         $all_schemes   = self::get_404_schemes();
         $active_scheme = ( $preview_key && isset( $all_schemes[ $preview_key ] ) ) ? $preview_key : get_option( self::SCHEME_404_OPTION, 'ocean' );
         $scheme_css    = self::get_404_scheme_css( $active_scheme );
@@ -6409,7 +6409,7 @@ class CloudScale_DevTools {
     /** Returns the top-10 leaderboard for one game. */
     public static function rest_get_hiscore( WP_REST_Request $request ): WP_REST_Response {
         $game = sanitize_key( $request->get_param( 'game' ) );
-        $raw  = get_option( 'cs_devtools_leaderboard_' . $game, '' );
+        $raw  = get_option( 'csdt_devtools_leaderboard_' . $game, '' );
         $lb   = $raw ? json_decode( $raw, true ) : [];
         if ( ! is_array( $lb ) ) { $lb = []; }
         return rest_ensure_response( [ 'leaderboard' => $lb ] );
@@ -6432,14 +6432,14 @@ class CloudScale_DevTools {
 
         // Rate limit: max 5 submissions per IP per game per 10 minutes.
         $ip     = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-        $ip_key = 'cs_devtools_rl_' . md5( $ip . $game );
+        $ip_key = 'csdt_devtools_rl_' . md5( $ip . $game );
         $count  = (int) get_transient( $ip_key );
         if ( $count >= 5 ) {
             return new WP_Error( 'rate_limited', __( 'Too many score submissions. Try again later.', 'cloudscale-devtools' ), [ 'status' => 429 ] );
         }
         set_transient( $ip_key, $count + 1, 600 );
 
-        $raw = get_option( 'cs_devtools_leaderboard_' . $game, '' );
+        $raw = get_option( 'csdt_devtools_leaderboard_' . $game, '' );
         $lb  = $raw ? json_decode( $raw, true ) : [];
         if ( ! is_array( $lb ) ) { $lb = []; }
 
@@ -6455,13 +6455,13 @@ class CloudScale_DevTools {
         $lb[] = [ 'score' => $score, 'name' => $name ];
         usort( $lb, fn( $a, $b ) => (int) $b['score'] - (int) $a['score'] );
         $lb = array_slice( $lb, 0, 10 );
-        update_option( 'cs_devtools_leaderboard_' . $game, wp_json_encode( $lb ), false );
+        update_option( 'csdt_devtools_leaderboard_' . $game, wp_json_encode( $lb ), false );
         return rest_ensure_response( [ 'ok' => true, 'leaderboard' => $lb ] );
     }
 
     /** AJAX handler: saves the 404 enable toggle and colour scheme. */
     public static function ajax_save_404_settings(): void {
-        check_ajax_referer( 'cs_devtools_404_settings', 'nonce' );
+        check_ajax_referer( 'csdt_devtools_404_settings', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( esc_html__( 'Forbidden.', 'cloudscale-devtools' ) );
         }
@@ -6537,7 +6537,7 @@ class CloudScale_DevTools {
        ================================================================== */
 
     // ─── Nonce / constants ──────────────────────────────────────────────
-    private const THUMB_NONCE = 'cs_devtools_thumbnails';
+    private const THUMB_NONCE = 'csdt_devtools_thumbnails';
 
     private const SOCIAL_PLATFORMS = [
         // target_kb = optimum file size to aim for during generation.
@@ -6560,8 +6560,8 @@ class CloudScale_DevTools {
     // ─── Panel render ────────────────────────────────────────────────────
 
     private static function render_thumbnails_panel(): void {
-        $cf_zone  = get_option( 'cs_devtools_cf_zone_id', '' );
-        $cf_token = get_option( 'cs_devtools_cf_api_token', '' );
+        $cf_zone  = get_option( 'csdt_devtools_cf_zone_id', '' );
+        $cf_token = get_option( 'csdt_devtools_cf_api_token', '' );
         $cf_token_masked = $cf_token ? str_repeat( '•', 12 ) . substr( $cf_token, -4 ) : '';
         ?>
         <div class="cs-panel" id="cs-panel-thumbs-checker">
@@ -6713,7 +6713,7 @@ class CloudScale_DevTools {
         </div>
 
         <?php
-        $enabled_platforms = get_option( 'cs_devtools_social_platforms', array_keys( self::SOCIAL_PLATFORMS ) );
+        $enabled_platforms = get_option( 'csdt_devtools_social_platforms', array_keys( self::SOCIAL_PLATFORMS ) );
         ?>
         <div class="cs-panel" id="cs-panel-thumbs-platforms">
             <div class="cs-section-header" style="background:linear-gradient(135deg,#00695c,#004d40);">
@@ -7097,7 +7097,7 @@ class CloudScale_DevTools {
         $raw      = isset( $_POST['platforms'] ) ? (array) $_POST['platforms'] : [];
         $allowed  = array_keys( self::SOCIAL_PLATFORMS );
         $filtered = array_values( array_intersect( $raw, $allowed ) );
-        update_option( 'cs_devtools_social_platforms', $filtered );
+        update_option( 'csdt_devtools_social_platforms', $filtered );
         wp_send_json_success( [ 'saved' => $filtered ] );
     }
 
@@ -7110,7 +7110,7 @@ class CloudScale_DevTools {
         $source_file = get_attached_file( (int) $thumb_id );
         if ( ! $source_file || ! file_exists( $source_file ) ) return null;
 
-        $enabled = get_option( 'cs_devtools_social_platforms', array_keys( self::SOCIAL_PLATFORMS ) );
+        $enabled = get_option( 'csdt_devtools_social_platforms', array_keys( self::SOCIAL_PLATFORMS ) );
         if ( empty( $enabled ) ) return null;
 
         $upload   = wp_upload_dir();
@@ -7170,7 +7170,7 @@ class CloudScale_DevTools {
             ];
         }
 
-        update_post_meta( $post_id, '_cs_social_formats', $results );
+        update_post_meta( $post_id, '_csdt_social_formats', $results );
         return $results;
     }
 
@@ -7185,13 +7185,13 @@ class CloudScale_DevTools {
         if ( ! $thumb_id ) return;
 
         // Skip if the thumbnail hasn't changed since last generation.
-        $last_thumb = (int) get_post_meta( $post_id, '_cs_social_formats_thumb_id', true );
+        $last_thumb = (int) get_post_meta( $post_id, '_csdt_social_formats_thumb_id', true );
         if ( $last_thumb === $thumb_id ) return;
 
         $results = self::generate_social_formats_for_post( $post_id );
         if ( $results === null ) return;
 
-        update_post_meta( $post_id, '_cs_social_formats_thumb_id', $thumb_id );
+        update_post_meta( $post_id, '_csdt_social_formats_thumb_id', $thumb_id );
 
         // Store for admin notice on next page load.
         $user_id = get_current_user_id();
@@ -7253,7 +7253,7 @@ class CloudScale_DevTools {
             wp_send_json_error( [ 'message' => 'Could not generate formats — check the featured image file and platform settings.' ] );
         }
         // Mark as up-to-date so the save hook won't re-run for this thumbnail.
-        update_post_meta( $post_id, '_cs_social_formats_thumb_id', (int) get_post_thumbnail_id( $post_id ) );
+        update_post_meta( $post_id, '_csdt_social_formats_thumb_id', (int) get_post_thumbnail_id( $post_id ) );
         wp_send_json_success( $results );
     }
 
@@ -7295,7 +7295,7 @@ class CloudScale_DevTools {
             }
             $results = self::generate_social_formats_for_post( $post_id );
             if ( $results ) {
-                update_post_meta( $post_id, '_cs_social_formats_thumb_id', (int) $thumb_id );
+                update_post_meta( $post_id, '_csdt_social_formats_thumb_id', (int) $thumb_id );
             }
             $batch_results[] = [ 'post_id' => $post_id, 'skipped' => false, 'ok' => $results !== null ];
         }
@@ -7330,7 +7330,7 @@ class CloudScale_DevTools {
         $post_id = get_the_ID();
         if ( ! $post_id ) return;
 
-        $formats = get_post_meta( $post_id, '_cs_social_formats', true );
+        $formats = get_post_meta( $post_id, '_csdt_social_formats', true );
         if ( empty( $formats[ $platform ]['url'] ) ) return;
 
         $img_url = esc_url( $formats[ $platform ]['url'] );
@@ -7365,8 +7365,8 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
-        $zone_id = get_option( 'cs_devtools_cf_zone_id', '' );
-        $token   = get_option( 'cs_devtools_cf_api_token', '' );
+        $zone_id = get_option( 'csdt_devtools_cf_zone_id', '' );
+        $token   = get_option( 'csdt_devtools_cf_api_token', '' );
         if ( ! $zone_id || ! $token ) {
             wp_send_json_error( [ 'message' => __( 'Cloudflare Zone ID and API Token are required. Please save them above.', 'cloudscale-devtools' ) ] );
         }
@@ -7412,9 +7412,9 @@ class CloudScale_DevTools {
         }
         $zone_id = isset( $_POST['zone_id'] ) ? sanitize_text_field( wp_unslash( $_POST['zone_id'] ) ) : '';
         $token   = isset( $_POST['api_token'] ) ? sanitize_text_field( wp_unslash( $_POST['api_token'] ) ) : '';
-        update_option( 'cs_devtools_cf_zone_id', $zone_id );
+        update_option( 'csdt_devtools_cf_zone_id', $zone_id );
         if ( $token !== '' ) {
-            update_option( 'cs_devtools_cf_api_token', $token );
+            update_option( 'csdt_devtools_cf_api_token', $token );
         }
         wp_send_json_success( [ 'message' => __( 'Cloudflare settings saved.', 'cloudscale-devtools' ) ] );
     }
