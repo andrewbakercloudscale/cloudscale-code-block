@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.8.120] - 2026-04-11
+
+### Fixed
+- Code Block editor: raw paste transform now detects markdown fenced blocks pasted as `<p>` elements (plain-text clipboard format from terminals and text editors) and converts them to a CloudScale code block with the correct language set — previously the fence markers became stray paragraphs
+
 ## [1.8.119] - 2026-04-11
 
 ### Added

@@ -50,6 +50,40 @@
         { label: 'Light', value: 'light' }
     ];
 
+    // ── Language helpers (module scope — used by transforms AND edit fn) ────────
+
+    var LANG_ALIASES = {
+        'sh': 'bash', 'shell': 'bash', 'zsh': 'bash',
+        'py': 'python', 'py3': 'python',
+        'js': 'javascript', 'mjs': 'javascript',
+        'ts': 'typescript',
+        'rb': 'ruby',
+        'rs': 'rust',
+        'yml': 'yaml',
+        'md': 'markdown',
+        'tf': 'hcl'
+    };
+
+    // Detect a markdown/GitHub fenced block and return { lang, code } or null.
+    function detectFence( text ) {
+        var m = text.match( /^[ \t]*(?:`{3,}|~{3,})([a-zA-Z0-9_+#.-]*)[^\n]*\r?\n([\s\S]*?)(?:\r?\n[ \t]*(?:`{3,}|~{3,})[ \t]*)?$/ );
+        if ( ! m ) return null;
+        var lang = ( m[1] || '' ).trim().toLowerCase();
+        lang = LANG_ALIASES[ lang ] || lang;
+        var code = m[2].replace( /\r\n/g, '\n' ).replace( /\n$/, '' );
+        return { lang: lang, code: code };
+    }
+
+    // Extract text from a DOM node, converting <br> to newlines and stripping tags.
+    function nodeToText( node ) {
+        var html = node.innerHTML || '';
+        html = html.replace( /<br\s*\/?>/gi, '\n' );
+        html = html.replace( /<[^>]+>/g, '' );
+        var tmp = document.createElement( 'div' );
+        tmp.innerHTML = html;
+        return tmp.textContent || '';
+    }
+
     function cleanHtml( text ) {
         if ( ! text ) return '';
         text = text.replace( /<br\s*\/?>/gi, '\n' );
@@ -84,6 +118,7 @@
                     }
                 },
                 {
+                    // HTML <pre>/<code> from web-page clipboard (e.g. copying from GitHub, docs sites)
                     type: 'raw',
                     priority: 1,
                     isMatch: function( node ) {
@@ -107,6 +142,29 @@
                         return createBlock( 'cloudscale/code-block', {
                             content: code.replace( /\n+$/, '' ),
                             language: lang
+                        } );
+                    }
+                },
+                {
+                    // Plain-text markdown fence pasted as a <p> with <br> line separators.
+                    // Browsers use this format when copying plain text (e.g. from a terminal
+                    // or text editor).  Gutenberg never generates PRE for plain-text pastes,
+                    // so without this transform the fence markers become stray paragraphs.
+                    type: 'raw',
+                    priority: 0,
+                    isMatch: function( node ) {
+                        if ( ! node || node.nodeType !== 1 ) return false;
+                        if ( node.nodeName.toUpperCase() !== 'P' ) return false;
+                        var text = nodeToText( node ).trim();
+                        // Must look like a complete fence: opening ``` line + content
+                        return /^[ \t]*(?:`{3,}|~{3,})[^\n]*\n[\s\S]/.test( text );
+                    },
+                    transform: function( node ) {
+                        var text = nodeToText( node ).trim();
+                        var fence = detectFence( text );
+                        return createBlock( 'cloudscale/code-block', {
+                            content: fence ? fence.code : text,
+                            language: fence ? ( fence.lang || '' ) : ''
                         } );
                     }
                 }
@@ -208,32 +266,8 @@
                 return text;
             }
 
-            // Aliases so common fence tags (sh, py, js…) map to known language values.
-            var langAliases = {
-                'sh': 'bash', 'shell': 'bash', 'zsh': 'bash',
-                'py': 'python', 'py3': 'python',
-                'js': 'javascript', 'mjs': 'javascript',
-                'ts': 'typescript',
-                'rb': 'ruby',
-                'rs': 'rust',
-                'yml': 'yaml',
-                'md': 'markdown',
-                'tf': 'hcl'
-            };
-
-            // Detect a markdown/GitLab/GitHub fenced code block and return
-            // { lang, code } if found, otherwise null.
-            function detectMarkdownFence( text ) {
-                var m = text.match( /^[ \t]*(?:`{3,}|~{3,})([a-zA-Z0-9_+#.-]*)[^\n]*\r?\n([\s\S]*?)(?:\r?\n[ \t]*(?:`{3,}|~{3,})[ \t]*)?$/ );
-                if ( ! m ) return null;
-                var lang = ( m[1] || '' ).trim().toLowerCase();
-                lang = langAliases[ lang ] || lang;
-                var code = m[2].replace( /\r\n/g, '\n' ).replace( /\n$/, '' );
-                return { lang: lang, code: code };
-            }
-
             function applyPastedCode( text ) {
-                var fence = detectMarkdownFence( text );
+                var fence = detectFence( text ); // module-scope
                 if ( fence ) {
                     var updates = { content: fence.code };
                     // Auto-set language only when none is explicitly chosen yet
