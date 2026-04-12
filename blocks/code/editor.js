@@ -50,6 +50,14 @@
         { label: 'Light', value: 'light' }
     ];
 
+    // Decode HTML entities in stored content (e.g. &gt; → >, from core/code migrations).
+    function decodeHtmlEntities( text ) {
+        if ( ! text || ! /&[a-z#0-9]+;/i.test( text ) ) return text;
+        var t = document.createElement( 'textarea' );
+        t.innerHTML = text;
+        return t.value;
+    }
+
     // ── Language helpers (module scope — used by transforms AND edit fn) ────────
 
     var LANG_ALIASES = {
@@ -210,7 +218,7 @@
             var setCopyLabel = copyLabelState[1];
 
             function onCopyCode() {
-                var code = attributes.content || '';
+                var code = decodeHtmlEntities( attributes.content || '' );
                 if ( ! code ) return;
                 if ( navigator.clipboard && navigator.clipboard.writeText ) {
                     navigator.clipboard.writeText( code ).then( function() {
@@ -359,12 +367,12 @@
                     ),
                     el( 'textarea', {
                         className: 'cs-code-editor-textarea',
-                        value: attributes.content,
+                        value: decodeHtmlEntities( attributes.content ),
                         onChange: onChangeCode,
                         onKeyDown: onKeyDown,
                         onPaste: onPasteCode,
                         placeholder: __( 'Paste or type your code here...', 'cloudscale-devtools' ),
-                        rows: Math.max( 8, ( ( attributes.content || '' ).split( '\n' ).length || 1 ) + 2 ),
+                        rows: Math.max( 8, ( decodeHtmlEntities( attributes.content || '' ).split( '\n' ).length || 1 ) + 2 ),
                         spellCheck: false,
                         autoComplete: 'off',
                         autoCorrect: 'off',

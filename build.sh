@@ -143,14 +143,15 @@ fi
 # Create temp directory with plugin name as wrapper
 mkdir -p "$TEMP_DIR/$PLUGIN_NAME"
 rsync -a \
-  --exclude='.git' --exclude='.gitignore' --exclude='*.zip' \
-  --exclude='.DS_Store' --exclude='._*' \
-  --exclude='.claude-flow' --exclude='.claude' \
-  --exclude='*.sh' \
-  --exclude='repo' --exclude='*.backup' --exclude='docs' \
-  --exclude='tests' --exclude='playwright*' --exclude='node_modules' \
-  --exclude='package.json' --exclude='package-lock.json' \
-  --exclude='phpcs.xml' --exclude='*.config.js' \
+  --exclude='.*' \
+  --exclude='*.zip' --exclude='*.sh' --exclude='*.xml' \
+  --include='blocks/code/block.json' \
+  --exclude='*.json' \
+  --exclude='*.jpg' --exclude='*.png' --exclude='*.svg' \
+  --exclude='repo/' --exclude='docs/' --exclude='tests/' \
+  --exclude='node_modules/' --exclude='svn-assets/' \
+  --exclude='playwright-report/' --exclude='playwright.config.js' \
+  --exclude='*.backup' --exclude='*.config.js' \
   "$REPO_DIR/" "$TEMP_DIR/$PLUGIN_NAME/"
 
 # Build zip with correct structure
