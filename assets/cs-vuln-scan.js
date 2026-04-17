@@ -295,9 +295,7 @@
 
                     if (d.status === 'complete') {
                         bar.complete();
-                        var lbl = d.data && d.data.report ? d.data.report.score_label : '';
-                        var msg = '✅ ' + (type === 'deep' ? 'Deep dive' : 'Audit') + ' complete' + (lbl ? ' — ' + lbl : '');
-                        if (statusEl) { statusEl.textContent = msg; statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-ok'; }
+                        if (statusEl) { statusEl.textContent = ''; statusEl.className = 'cs-vuln-inline-msg'; }
                         if (resultsEl && d.data) {
                             renderReport(d.data, resultsEl, type);
                             resultsEl.style.display = 'block';
@@ -327,8 +325,7 @@
                 .then(function (res) {
                     if (!res.success || res.data.no_cache) return;
                     if (resultsEl) { renderReport(res.data, resultsEl, 'standard'); resultsEl.style.display = 'block'; }
-                    var lbl = res.data.report ? res.data.report.score_label : '';
-                    if (statusEl) { statusEl.textContent = '✅ Audit complete — ' + (lbl || 'cached'); statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-ok'; }
+                    if (statusEl) { statusEl.textContent = ''; statusEl.className = 'cs-vuln-inline-msg'; }
                 })
                 .catch(function () {});
             return;
@@ -367,8 +364,7 @@
                 .then(function (res) {
                     if (!res.success || res.data.no_cache) return;
                     if (resultsEl) { renderReport(res.data, resultsEl, 'deep'); resultsEl.style.display = 'block'; }
-                    var lbl = res.data.report ? res.data.report.score_label : '';
-                    if (statusEl) { statusEl.textContent = '✅ Deep dive complete — ' + (lbl || 'cached'); statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-ok'; }
+                    if (statusEl) { statusEl.textContent = ''; statusEl.className = 'cs-vuln-inline-msg'; }
                 })
                 .catch(function () {});
             return;

@@ -1359,7 +1359,7 @@
 .cs-audit-score-lbl  { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-top: 1px; }
 .cs-audit-score-excellent { color: #15803d; }
 .cs-audit-score-good      { color: #16a34a; }
-.cs-audit-score-fair      { color: #b45309; }
+.cs-audit-score-fair      { color: #d97706; }
 .cs-audit-score-poor      { color: #ea580c; }
 .cs-audit-score-critical  { color: #dc2626; }
 
