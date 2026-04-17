@@ -235,6 +235,8 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == External services ==
 
+= cdnjs CDN (Cloudflare) =
+
 This plugin loads syntax highlighting scripts and stylesheets from the cdnjs CDN operated by Cloudflare, Inc.
 
 * Service: cdnjs (https://cdnjs.cloudflare.com/)
@@ -243,6 +245,32 @@ This plugin loads syntax highlighting scripts and stylesheets from the cdnjs CDN
 * Why: To serve the highlight.js library and theme stylesheets without bundling them locally.
 * Cloudflare Privacy Policy: https://www.cloudflare.com/privacypolicy/
 * Cloudflare Terms of Service: https://www.cloudflare.com/terms/
+
+= Anthropic Claude API (optional — AI Security Audit only) =
+
+**Service:** Anthropic PBC
+**Website:** https://anthropic.com
+**Endpoint:** https://api.anthropic.com/v1/messages
+**Data sent:** WordPress configuration data (plugin list, PHP version, WordPress version, file permission flags, exposed debug settings, user role counts, key wp-config.php flags) and, for the Cyber Deep Dive, HTTP security header responses from your own site's public URLs. No post content or visitor data is transmitted.
+**When data is sent:** Only when you click "Run AI Security Scan" or "Run Cyber Deep Dive" on the Security tab in Tools > CloudScale DevTools and Anthropic is selected as your AI provider.
+**API key:** You must supply your own Anthropic API key. The key is stored in your WordPress database (wp_options) and is never transmitted anywhere except directly to api.anthropic.com.
+
+Anthropic Privacy Policy: https://www.anthropic.com/privacy
+Anthropic Terms of Service: https://www.anthropic.com/terms
+Anthropic API documentation: https://docs.anthropic.com
+
+= Google Gemini API (optional — AI Security Audit only) =
+
+**Service:** Google LLC
+**Website:** https://ai.google.dev
+**Endpoint:** https://generativelanguage.googleapis.com/v1beta/models/
+**Data sent:** WordPress configuration data (plugin list, PHP version, WordPress version, file permission flags, exposed debug settings, user role counts, key wp-config.php flags) and, for the Cyber Deep Dive, HTTP security header responses from your own site's public URLs. No post content or visitor data is transmitted.
+**When data is sent:** Only when you click "Run AI Security Scan" or "Run Cyber Deep Dive" on the Security tab in Tools > CloudScale DevTools and Google Gemini is selected as your AI provider.
+**API key:** You must supply your own Google AI API key. The key is stored in your WordPress database (wp_options) and is never transmitted anywhere except directly to Google.
+
+Google Privacy Policy: https://policies.google.com/privacy
+Google Terms of Service: https://policies.google.com/terms
+Gemini API documentation: https://ai.google.dev/docs
 
 == Upgrade Notice ==
 
