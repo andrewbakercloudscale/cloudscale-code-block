@@ -43,9 +43,107 @@
         return 'cs-audit-score-critical';
     }
 
+    // ── PDF export ────────────────────────────────────────────────────
+
+    function exportSecurityPDF(data, scanType) {
+        var r    = data.report;
+        var now  = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
+        var site = window.location.hostname;
+        var title = scanType === 'deep' ? 'Cyber Deep Dive Report' : 'AI Security Audit Report';
+
+        function esc(s) {
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        var secColors = { critical: '#c53030', high: '#c05621', medium: '#b7791f', low: '#2b6cb0', good: '#276749' };
+        var secBg     = { critical: '#fff5f5', high: '#fffaf0', medium: '#fffbeb', low: '#ebf8ff', good: '#f0fff4' };
+
+        var css = [
+            'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:12px;color:#1a202c;margin:0;padding:28px 32px;line-height:1.5}',
+            'h1{font-size:20px;font-weight:700;margin:0 0 2px}',
+            '.meta{font-size:11px;color:#718096;margin-bottom:24px}',
+            '.score-row{display:flex;align-items:center;gap:20px;margin-bottom:20px;padding:14px 18px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0}',
+            '.score-circle{width:64px;height:64px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}',
+            '.score-num{font-size:22px;font-weight:800;line-height:1}',
+            '.score-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}',
+            '.summary{font-size:12px;color:#2d3748;line-height:1.6}',
+            '.model-line{font-size:10px;color:#718096;margin-top:6px}',
+            'h2{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#4a5568;border-bottom:1px solid #e2e8f0;padding-bottom:5px;margin:20px 0 10px}',
+            '.issue{padding:8px 12px;margin-bottom:7px;border-radius:4px;border-left:3px solid;page-break-inside:avoid}',
+            '.issue-title{font-weight:700;font-size:12px}',
+            '.issue-detail{font-size:11px;color:#4a5568;margin-top:3px}',
+            '.issue-fix{font-size:11px;color:#2d3748;margin-top:5px;padding:6px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:3px}',
+            '.good-item{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid #f0f0f0;font-size:11px}',
+            '.good-check{color:#276749;font-weight:700;flex-shrink:0}',
+            'code{font-family:"SFMono-Regular",Consolas,monospace;font-size:10px;background:#edf2f7;padding:1px 4px;border-radius:2px}',
+            '@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.issue{page-break-inside:avoid}}',
+        ].join('\n');
+
+        var scoreCls = scoreClass(r.score);
+        var scoreStyleMap = {
+            'cs-audit-score-excellent': { bg: '#c6f6d5', color: '#22543d' },
+            'cs-audit-score-good':      { bg: '#bee3f8', color: '#2a4365' },
+            'cs-audit-score-fair':      { bg: '#fefcbf', color: '#744210' },
+            'cs-audit-score-poor':      { bg: '#fed7d7', color: '#742a2a' },
+            'cs-audit-score-critical':  { bg: '#feb2b2', color: '#63171b' },
+        };
+        var ss = scoreStyleMap[scoreCls] || scoreStyleMap['cs-audit-score-fair'];
+
+        var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(title) + ' — ' + esc(site) + '</title><style>' + css + '</style></head><body>';
+        html += '<h1>' + esc(title) + '</h1>';
+        html += '<div class="meta">' + esc(site) + ' &nbsp;·&nbsp; ' + esc(now) + ' &nbsp;·&nbsp; Model: ' + esc(data.model_used || '?') + '</div>';
+
+        html += '<div class="score-row">';
+        html += '<div class="score-circle" style="background:' + ss.bg + ';color:' + ss.color + '">';
+        html += '<span class="score-num">' + esc(r.score) + '</span>';
+        html += '<span class="score-lbl">' + esc(r.score_label || '') + '</span>';
+        html += '</div>';
+        html += '<div><div class="summary">' + esc(r.summary || '') + '</div></div>';
+        html += '</div>';
+
+        var secs = [
+            { key: 'critical', label: 'Critical' },
+            { key: 'high',     label: 'High' },
+            { key: 'medium',   label: 'Medium' },
+            { key: 'low',      label: 'Low' },
+            { key: 'good',     label: 'Good Practices' },
+        ];
+
+        secs.forEach(function (sec) {
+            var items = r[sec.key];
+            if (!items || !items.length) return;
+            html += '<h2>' + esc(sec.label) + ' (' + items.length + ')</h2>';
+            if (sec.key === 'good') {
+                items.forEach(function (g) {
+                    html += '<div class="good-item"><span class="good-check">✓</span><span><strong>' + esc(g.title) + '</strong>';
+                    if (g.detail) html += ' — ' + esc(g.detail);
+                    html += '</span></div>';
+                });
+            } else {
+                items.forEach(function (issue) {
+                    html += '<div class="issue" style="border-left-color:' + (secColors[sec.key] || '#718096') + ';background:' + (secBg[sec.key] || '#f7fafc') + '">';
+                    html += '<div class="issue-title">' + esc(issue.title) + '</div>';
+                    if (issue.detail) html += '<div class="issue-detail">' + esc(issue.detail) + '</div>';
+                    if (issue.fix)    html += '<div class="issue-fix">' + esc(issue.fix) + '</div>';
+                    html += '</div>';
+                });
+            }
+        });
+
+        html += '</body></html>';
+
+        var w = window.open('', '_blank', 'width=900,height=700');
+        if (!w) { alert('Pop-up blocked — allow pop-ups for this page and try again.'); return; }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+        w.onload = function () { w.focus(); w.print(); };
+        setTimeout(function () { try { w.focus(); w.print(); } catch(e) {} }, 600);
+    }
+
     // ── Render audit report ───────────────────────────────────────────
 
-    function renderReport(data, container) {
+    function renderReport(data, container, scanType) {
         if (!container) return;
         var r   = data.report;
         var cls = scoreClass(r.score);
@@ -62,6 +160,7 @@
         html += '<span class="cs-audit-meta-line">Model: ' + escHtml(data.model_used || '') + age + '</span>';
         html += '</div>';
         html += '</div>';
+        html += '<div style="margin:10px 0 16px"><button class="cs-audit-pdf-btn button button-secondary" data-scan-type="' + escHtml(scanType || 'standard') + '">&#8595; Download PDF Report</button></div>';
 
         var secs = [
             { key: 'critical', label: 'Critical',       cls: 'cs-audit-sec-critical' },
@@ -97,6 +196,11 @@
         });
 
         container.innerHTML = html;
+
+        var pdfBtn = container.querySelector('.cs-audit-pdf-btn');
+        if (pdfBtn) {
+            pdfBtn.addEventListener('click', function () { exportSecurityPDF(data, scanType); });
+        }
     }
 
     // ── Progress bar ──────────────────────────────────────────────────
@@ -152,7 +256,7 @@
                         var msg = '✅ ' + (type === 'deep' ? 'Deep dive' : 'Audit') + ' complete' + (lbl ? ' — ' + lbl : '');
                         if (statusEl) { statusEl.textContent = msg; statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-ok'; }
                         if (resultsEl && d.data) {
-                            renderReport(d.data, resultsEl);
+                            renderReport(d.data, resultsEl, type);
                             resultsEl.style.display = 'block';
                         }
                     } else if (d.status === 'error') {
@@ -179,7 +283,7 @@
             post('csdt_devtools_vuln_scan', { cache_only: '1' })
                 .then(function (res) {
                     if (!res.success || res.data.no_cache) return;
-                    if (resultsEl) { renderReport(res.data, resultsEl); resultsEl.style.display = 'block'; }
+                    if (resultsEl) { renderReport(res.data, resultsEl, 'standard'); resultsEl.style.display = 'block'; }
                     var lbl = res.data.report ? res.data.report.score_label : '';
                     if (statusEl) { statusEl.textContent = '✅ Audit complete — ' + (lbl || 'cached'); statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-ok'; }
                 })
@@ -219,7 +323,7 @@
             post('csdt_devtools_deep_scan', { cache_only: '1' })
                 .then(function (res) {
                     if (!res.success || res.data.no_cache) return;
-                    if (resultsEl) { renderReport(res.data, resultsEl); resultsEl.style.display = 'block'; }
+                    if (resultsEl) { renderReport(res.data, resultsEl, 'deep'); resultsEl.style.display = 'block'; }
                     var lbl = res.data.report ? res.data.report.score_label : '';
                     if (statusEl) { statusEl.textContent = '✅ Deep dive complete — ' + (lbl || 'cached'); statusEl.className = 'cs-vuln-inline-msg cs-vuln-msg-ok'; }
                 })
