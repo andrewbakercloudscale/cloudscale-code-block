@@ -101,6 +101,9 @@
     text-overflow: ellipsis;
     max-width: 50%;
     color: var(--cs-text-title);
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 1px solid var(--cs-toolbar-border);
 }
 
 /* 4. ACTIONS */
@@ -267,6 +270,11 @@
     border-radius: 0 !important;
     width: 100% !important;
     background: var(--cs-bg) !important;
+    color: #abb2bf !important;
+}
+
+.cs-code-wrapper[data-active-theme="light"] .cs-code-body pre code {
+    color: #383a42 !important;
 }
 
 /* Scrollbar */
