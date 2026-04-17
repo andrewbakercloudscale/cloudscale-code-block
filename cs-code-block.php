@@ -1178,6 +1178,10 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === 'login' ? 'active' : ''; ?>">
                     🔐 <?php esc_html_e( 'Login Security', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'security' ? 'active' : ''; ?>">
+                    🛡️ <?php esc_html_e( 'Security Scan', 'cloudscale-devtools' ); ?>
+                </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=mail' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'mail' ? 'active' : ''; ?>">
                     📧 <?php esc_html_e( 'Mail / SMTP', 'cloudscale-devtools' ); ?>
@@ -1193,10 +1197,6 @@ class CloudScale_DevTools {
                 <a href="<?php echo esc_url( $base_url . '&tab=404' ); ?>"
                    class="cs-tab <?php echo $active_tab === '404' ? 'active' : ''; ?>">
                     🎮 <?php esc_html_e( '404 Games', 'cloudscale-devtools' ); ?>
-                </a>
-                <a href="<?php echo esc_url( $base_url . '&tab=security' ); ?>"
-                   class="cs-tab <?php echo $active_tab === 'security' ? 'active' : ''; ?>">
-                    🛡️ <?php esc_html_e( 'Security Scan', 'cloudscale-devtools' ); ?>
                 </a>
             </div>
 
