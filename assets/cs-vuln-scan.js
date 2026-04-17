@@ -52,7 +52,7 @@
             var r     = data.report;
             var now   = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
             var site  = window.location.hostname;
-            var title = scanType === 'deep' ? 'Cyber Deep Dive Report' : 'AI Security Audit Report';
+            var title = scanType === 'deep' ? 'AI Deep Dive Cyber Audit Report' : 'AI Cyber Audit Report';
             var doc   = new window.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
             var pageW = doc.internal.pageSize.getWidth();
             var pageH = doc.internal.pageSize.getHeight();
@@ -348,7 +348,7 @@
         }
 
         if (scanBtn)   scanBtn.disabled = true;
-        if (statusEl)  { statusEl.textContent = '⏳ Running AI security audit…'; statusEl.className = 'cs-vuln-inline-msg'; }
+        if (statusEl)  { statusEl.textContent = '⏳ Running AI cyber audit…'; statusEl.className = 'cs-vuln-inline-msg'; }
         if (resultsEl) resultsEl.style.display = 'none';
 
         post('csdt_devtools_vuln_scan', {})
@@ -387,7 +387,7 @@
         }
 
         if (scanBtn)   scanBtn.disabled = true;
-        if (statusEl)  { statusEl.textContent = '⏳ Running Cyber Deep Dive… this may take 60–90s.'; statusEl.className = 'cs-vuln-inline-msg'; }
+        if (statusEl)  { statusEl.textContent = '⏳ Running AI Deep Dive Cyber Audit… this may take 60–90s.'; statusEl.className = 'cs-vuln-inline-msg'; }
         if (resultsEl) resultsEl.style.display = 'none';
 
         post('csdt_devtools_deep_scan', {})

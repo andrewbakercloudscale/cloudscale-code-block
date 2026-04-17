@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.28
+ * Version: 1.9.29
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.28';
+    const VERSION      = '1.9.29';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -8224,7 +8224,7 @@ class CloudScale_DevTools {
         ?>
         <div class="cs-panel" id="cs-panel-security">
             <div class="cs-section-header cs-section-header-red">
-                <span>🛡️ <?php esc_html_e( 'AI Security Audit', 'cloudscale-devtools' ); ?></span>
+                <span>🛡️ <?php esc_html_e( 'AI Cyber Audit', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Claude AI analyses your WordPress configuration and gives prioritised remediation advice', 'cloudscale-devtools' ); ?></span>
             </div>
             <div class="cs-panel-body">
@@ -8321,7 +8321,7 @@ class CloudScale_DevTools {
                         </div>
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                             <button id="cs-vuln-scan-btn" class="cs-btn-primary" disabled>
-                                🔍 <?php esc_html_e( 'Run AI Security Audit', 'cloudscale-devtools' ); ?>
+                                🔍 <?php esc_html_e( 'Run AI Cyber Audit', 'cloudscale-devtools' ); ?>
                             </button>
                             <button id="cs-vuln-cancel-btn" class="cs-btn-secondary" style="display:none">
                                 ✕ <?php esc_html_e( 'Cancel', 'cloudscale-devtools' ); ?>
@@ -8336,12 +8336,12 @@ class CloudScale_DevTools {
 
                     <div class="cs-scan-col cs-scan-col-deep">
                         <div class="cs-scan-col-header">
-                            <span class="cs-scan-col-title"><?php esc_html_e( 'Cyber Deep Dive', 'cloudscale-devtools' ); ?></span>
+                            <span class="cs-scan-col-title"><?php esc_html_e( 'AI Deep Dive Cyber Audit', 'cloudscale-devtools' ); ?></span>
                             <span class="cs-scan-col-hint"><?php esc_html_e( 'Internal config + plugin code scan + external exposure: SSL cert, login/xmlrpc, REST user enum, author enum, directory listing — 30–60s', 'cloudscale-devtools' ); ?></span>
                         </div>
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                             <button id="cs-deep-scan-btn" class="cs-btn-primary cs-btn-deep" disabled>
-                                🕵️ <?php esc_html_e( 'Run Cyber Deep Dive', 'cloudscale-devtools' ); ?>
+                                🕵️ <?php esc_html_e( 'Run AI Deep Dive Cyber Audit', 'cloudscale-devtools' ); ?>
                             </button>
                             <button id="cs-deep-cancel-btn" class="cs-btn-secondary" style="display:none">
                                 ✕ <?php esc_html_e( 'Cancel', 'cloudscale-devtools' ); ?>
