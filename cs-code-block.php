@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.80
+ * Version: 1.9.81
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.80';
+    const VERSION      = '1.9.81';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9891,13 +9891,38 @@ PROMPT;
             }
         }
 
+        // SPF strictness — ~all (soft fail) still lets spoofed mail through
+        $spf_strictness = 'missing';
+        if ( $spf_found && $spf_record ) {
+            if ( strpos( $spf_record, '+all' ) !== false )     { $spf_strictness = 'pass_all'; }
+            elseif ( strpos( $spf_record, '-all' ) !== false ) { $spf_strictness = 'hard_fail'; }
+            elseif ( strpos( $spf_record, '~all' ) !== false ) { $spf_strictness = 'soft_fail'; }
+            elseif ( strpos( $spf_record, '?all' ) !== false ) { $spf_strictness = 'neutral'; }
+            else                                               { $spf_strictness = 'unknown'; }
+        }
+
+        // DMARC policy — p=none does nothing (monitoring only)
+        $dmarc_policy = 'missing';
+        $dmarc_pct    = 100;
+        if ( $dmarc_found && $dmarc_record ) {
+            if ( preg_match( '/\bp=([^;\s]+)/i', $dmarc_record, $pm ) ) {
+                $dmarc_policy = strtolower( trim( $pm[1] ) );
+            }
+            if ( preg_match( '/\bpct=(\d+)/i', $dmarc_record, $pm ) ) {
+                $dmarc_pct = (int) $pm[1];
+            }
+        }
+
         return [
-            'spf_present'   => $spf_found,
-            'spf_record'    => $spf_record,
-            'dmarc_present' => $dmarc_found,
-            'dmarc_record'  => $dmarc_record,
-            'dkim_present'  => $dkim_found,
-            'dkim_selector' => $dkim_selector,
+            'spf_present'    => $spf_found,
+            'spf_record'     => $spf_record,
+            'spf_strictness' => $spf_strictness,
+            'dmarc_present'  => $dmarc_found,
+            'dmarc_record'   => $dmarc_record,
+            'dmarc_policy'   => $dmarc_policy,
+            'dmarc_pct'      => $dmarc_pct,
+            'dkim_present'   => $dkim_found,
+            'dkim_selector'  => $dkim_selector,
         ];
     }
 
@@ -10148,6 +10173,44 @@ PROMPT;
                 $ext['security_headers_external'][ $hname ] = $h[ $hname ] ?? null;
             }
         }
+
+        // CSP quality — presence alone is not enough; weak directives leave XSS open
+        $csp_val     = $ext['security_headers_external']['content-security-policy'] ?? null;
+        $csp_quality = [ 'present' => (bool) $csp_val, 'issues' => [] ];
+        if ( $csp_val ) {
+            if ( stripos( $csp_val, "'unsafe-inline'" ) !== false ) { $csp_quality['issues'][] = 'unsafe-inline'; }
+            if ( stripos( $csp_val, "'unsafe-eval'" ) !== false )   { $csp_quality['issues'][] = 'unsafe-eval'; }
+            if ( preg_match( '/(?:^|[\s;])(\*)[\s;]/', $csp_val ) ) { $csp_quality['issues'][] = 'wildcard-source'; }
+            if ( stripos( $csp_val, 'default-src' ) === false )     { $csp_quality['issues'][] = 'no-default-src'; }
+            $csp_quality['grade'] = empty( $csp_quality['issues'] ) ? 'good' : 'weak';
+        } else {
+            $csp_quality['grade'] = 'missing';
+        }
+        $ext['csp_quality'] = $csp_quality;
+
+        // HSTS quality — max-age must be ≥1 year to be effective
+        $hsts_val    = $ext['security_headers_external']['strict-transport-security'] ?? null;
+        $hsts_quality = [ 'present' => (bool) $hsts_val, 'issues' => [] ];
+        if ( $hsts_val ) {
+            $max_age = 0;
+            if ( preg_match( '/max-age=(\d+)/i', $hsts_val, $m ) ) { $max_age = (int) $m[1]; }
+            $hsts_quality['max_age']             = $max_age;
+            $hsts_quality['includes_subdomains'] = stripos( $hsts_val, 'includeSubDomains' ) !== false;
+            $hsts_quality['preload']             = stripos( $hsts_val, 'preload' ) !== false;
+            if ( $max_age < 31536000 )              { $hsts_quality['issues'][] = 'max-age-too-short'; }
+            if ( ! $hsts_quality['includes_subdomains'] ) { $hsts_quality['issues'][] = 'no-includeSubDomains'; }
+            $hsts_quality['grade'] = empty( $hsts_quality['issues'] ) ? 'good' : 'weak';
+        } else {
+            $hsts_quality['grade'] = 'missing';
+        }
+        $ext['hsts_quality'] = $hsts_quality;
+
+        // Server header version leak — e.g. "nginx/1.18.0" reveals exact version for CVE targeting
+        $server_hdr = $ext['security_headers_external']['server'] ?? null;
+        $ext['server_version_leak'] = [
+            'header'        => $server_hdr,
+            'leaks_version' => $server_hdr !== null && (bool) preg_match( '/\/[\d.]+/', $server_hdr ),
+        ];
 
         return $ext;
     }
@@ -10769,6 +10832,33 @@ PROMPT;
             'known'      => $php_eol_date !== null,
         ];
 
+        // WordPress auto-update configuration
+        $auto_updates = [
+            'updater_globally_disabled' => defined( 'AUTOMATIC_UPDATER_DISABLED' ) && AUTOMATIC_UPDATER_DISABLED,
+            'core_auto_update_constant' => defined( 'WP_AUTO_UPDATE_CORE' ) ? WP_AUTO_UPDATE_CORE : null,
+        ];
+        $auto_updates['core_disabled'] = $auto_updates['updater_globally_disabled'] || $auto_updates['core_auto_update_constant'] === false;
+
+        // PHP display_errors — exposes stack traces and file paths to all visitors
+        $di_raw         = (string) ini_get( 'display_errors' );
+        $display_errors = [
+            'display_errors_on' => ! in_array( $di_raw, [ '', '0', 'Off', 'off', 'FALSE', 'false' ], true ),
+            'wp_debug_display'  => defined( 'WP_DEBUG_DISPLAY' ) ? WP_DEBUG_DISPLAY : null,
+            'ini_value'         => $di_raw,
+        ];
+
+        // Inactive (deactivated) plugins — installed on disk, still exploitable via directory traversal
+        $inactive_plugins = [];
+        foreach ( $all_plugins as $plugin_file => $plugin_data ) {
+            if ( ! in_array( $plugin_file, $active_files, true ) ) {
+                $inactive_plugins[] = [
+                    'name'    => $plugin_data['Name'],
+                    'version' => $plugin_data['Version'],
+                    'file'    => $plugin_file,
+                ];
+            }
+        }
+
         return array_merge( $base, [
             'theme'              => $theme,
             'auth_salts'         => $salts,
@@ -10781,6 +10871,9 @@ PROMPT;
             'external_checks'    => $external,
             'plugin_code_scan'   => $code_scan,
             'php_eol'            => $php_eol_info,
+            'auto_updates'       => $auto_updates,
+            'display_errors'     => $display_errors,
+            'inactive_plugins'   => $inactive_plugins,
         ] );
     }
 
@@ -10790,19 +10883,19 @@ You are a professional penetration tester and WordPress security expert performi
 
 You will receive a JSON object with these categories:
 
-1. Internal config — WP/PHP versions (also php_eol key: version, minor, eol_date, is_eol, days_since — EOL PHP receives no security patches, treat as critical if is_eol=true), debug flags, DISALLOW_FILE_EDIT/MODS, FORCE_SSL_ADMIN, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey counts), login URL obfuscation, wp-config.php permissions. Also includes app_passwords: enabled flag, how many admins have application passwords created (app passwords bypass 2FA).
+1. Internal config — WP/PHP versions (also php_eol key: version, minor, eol_date, is_eol, days_since — EOL PHP receives no security patches, treat as critical if is_eol=true), debug flags, DISALLOW_FILE_EDIT/MODS, FORCE_SSL_ADMIN, database prefix, admin username, user counts, brute force, 2FA (email/TOTP/passkey counts), login URL obfuscation, wp-config.php permissions. Also includes app_passwords: enabled flag, how many admins have application passwords created (app passwords bypass 2FA). display_errors key: display_errors_on=true means PHP stack traces and file paths are exposed to all visitors — high risk on any production site. auto_updates key: updater_globally_disabled and core_disabled flags — if core_disabled=true the site will not auto-patch security releases.
 2. Site config — open user registration, pingbacks enabled (DDoS amplification), WP version in meta generator tag, comment defaults.
 3. Theme — active theme name/version, pending update for active or parent theme.
 4. Auth salts — all 8 WP secret keys/salts set and non-default (weak salts = session forgery).
 5. User audit (user_audit) — admin_count, weak_admin_usernames (e.g. "admin", "administrator"), admins_without_2fa (list of admin logins with no TOTP/passkey/email 2FA), non_admin_role_counts.
 6. Cron audit (cron_audit) — disable_wp_cron flag, suspicious_hooks (scheduled hook names that don't match any active plugin or WP core hook — potential malware persistence).
-7. Plugin WP.org data (plugin_wporg) — for each active plugin: last_updated, abandoned (>2 years since update), years_since_update, active_installs, tested_up_to. Abandoned plugins with low install counts are high risk.
+7. Plugin WP.org data (plugin_wporg) — for each active plugin: last_updated, abandoned (>2 years since update), years_since_update, active_installs, tested_up_to. Abandoned plugins with low install counts are high risk. Also includes inactive_plugins key: list of installed-but-deactivated plugins (name, version, file) — they sit on disk unpatched and can be exploited via directory traversal or have known CVEs even though not running.
 8. Known CVEs (plugin_cves) — each entry has: plugin slug, version installed, CVE ID, title, severity (critical/high/medium/low), CVSS score, fixed_in version. ANY unfixed CVE at critical/high severity is a critical finding.
 9. Core file integrity (core_integrity) — MD5 comparison of key WP core files against WordPress.org checksums. modified_files = likely backdoor. This is CRITICAL if any files are listed.
-9. Malware indicators (malware_indicators) — php_files_in_uploads (PHP files found in uploads dir — should be zero, any found = likely webshell), recently_modified_php (core PHP files modified in last 7 days outside plugin/theme dirs — warrants investigation).
-10. External checks — SSL validity/expiry, HTTP→HTTPS redirect, TLS weak protocols (tls_weak_protocols: checked, tls10_accepted, tls11_accepted — TLS 1.0/1.1 deprecated since 2021, susceptible to POODLE/BEAST attacks), wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum (rest_users: exposed, count, slugs), author enum, directory listings (uploads_listing, plugins_listing, themes_listing — plugins/themes listing reveals exact software versions to attackers), exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (email_dns: spf_present, dmarc_present, dkim_present, dkim_selector — all three required for full email spoofing protection), security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, access-control-allow-origin — wildcard "*" allows credential theft from any origin).
-11. Plugin code scan — raw static analysis findings (may include false positives): RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
-12. Code triage (code_triage) — AI-verified verdicts on the static scan findings. Each entry: plugin, file, line, verdict (confirmed|false_positive|needs_context), severity, type, explanation, fix. ONLY report confirmed findings as real vulnerabilities — ignore false_positives. Use triage severity for confirmed items. For needs_context, mention at low severity with explanation.
+10. Malware indicators (malware_indicators) — php_files_in_uploads (PHP files found in uploads dir — should be zero, any found = likely webshell), recently_modified_php (core PHP files modified in last 7 days outside plugin/theme dirs — warrants investigation).
+11. External checks — SSL validity/expiry, HTTP→HTTPS redirect, TLS weak protocols (tls_weak_protocols: checked, tls10_accepted, tls11_accepted — TLS 1.0/1.1 deprecated since 2021, susceptible to POODLE/BEAST attacks), wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum (rest_users: exposed, count, slugs), author enum, directory listings (uploads_listing, plugins_listing, themes_listing — plugins/themes listing reveals exact software versions to attackers), exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (email_dns: spf_present, spf_strictness: hard_fail=good/soft_fail=weak/pass_all=dangerous; dmarc_present, dmarc_policy: none=monitoring-only-does-nothing/quarantine=acceptable/reject=best, dmarc_pct; dkim_present, dkim_selector — all three required with strong policies for full spoofing protection), security headers (csp_quality: grade good/weak/missing, issues: unsafe-inline/unsafe-eval/wildcard-source/no-default-src — any issue weakens XSS mitigation; hsts_quality: grade, max_age, includes_subdomains, issues — max-age < 31536000 means HTTPS not enforced for a full year; X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, access-control-allow-origin — wildcard "*" allows credential theft from any origin), server_version_leak: leaks_version=true means Server header discloses exact software version (e.g. nginx/1.18.0) aiding targeted CVE exploitation.
+12. Plugin code scan — raw static analysis findings (may include false positives): RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
+13. Code triage (code_triage) — AI-verified verdicts on the static scan findings. Each entry: plugin, file, line, verdict (confirmed|false_positive|needs_context), severity, type, explanation, fix. ONLY report confirmed findings as real vulnerabilities — ignore false_positives. Use triage severity for confirmed items. For needs_context, mention at low severity with explanation.
 
 Cross-correlate ALL categories for compound risks:
 - Known CVE (critical/high) = immediately critical regardless of other factors
@@ -10812,6 +10905,9 @@ Cross-correlate ALL categories for compound risks:
 - Abandoned plugin (>2 years) + known CVE = critical
 - No WAF/CDN detected + multiple exposed endpoints = significantly elevated risk
 - Missing SPF + DMARC = email spoofing trivially possible
+- spf_strictness=soft_fail (~all) = SPF won't block spoofed emails — flag medium; -all required
+- dmarc_policy=none = DMARC record exists but does nothing (monitoring only) — flag medium; quarantine/reject required to block
+- spf_strictness=soft_fail + dmarc_policy=none = email spoofing fully unblocked despite records existing — escalate to high
 - wp-cron.php public = unauthenticated resource exhaustion
 - Default auth salts = any active session can be forged
 - debug.log exposed = credentials and stack traces publicly readable
@@ -10827,6 +10923,12 @@ Cross-correlate ALL categories for compound risks:
 - access-control-allow-origin: "*" = wildcard CORS allows any site to make credentialed requests — critical if combined with sensitive REST endpoints
 - REST API user enum exposed (rest_users.exposed=true) = real usernames exposed for credential stuffing — escalates brute force risk significantly
 - Abandoned plugin (plugin_wporg: abandoned=true) with no active CVEs = still high risk — unpatched future vulnerabilities likely
+- display_errors.display_errors_on=true = PHP stack traces with file paths and variable values visible to all visitors — mark high on production
+- auto_updates.core_disabled=true = WP core will not auto-patch security releases; combined with outdated WP version = high risk
+- inactive_plugins count > 0 = deactivated plugins on disk are unpatched attack surface; flag names and versions for awareness
+- csp_quality.grade=missing or weak + any XSS code finding = actively exploitable XSS without browser-side mitigation
+- hsts_quality.grade=missing or max_age < 31536000 = HTTPS not enforced long-term, HTTP downgrade / MITM possible
+- server_version_leak.leaks_version=true + unpatched software = version fingerprinting directly aids targeted exploitation — escalate severity
 
 Return ONLY a JSON object (no markdown, no code fences, no explanation):
 {
