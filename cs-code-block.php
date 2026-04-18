@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.81
+ * Version: 1.9.82
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.81';
+    const VERSION      = '1.9.82';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9846,6 +9846,26 @@ PROMPT;
     }
 
     private static function check_email_dns( string $host ): array {
+        // Check MX records first — if none exist, email is not configured for this domain
+        // and missing SPF/DMARC/DKIM is not a finding (there's nothing to protect).
+        $mx_records = @dns_get_record( $host, DNS_MX ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+        $has_mx     = is_array( $mx_records ) && ! empty( $mx_records );
+
+        if ( ! $has_mx ) {
+            return [
+                'mx_present'     => false,
+                'spf_present'    => false,
+                'spf_record'     => null,
+                'spf_strictness' => 'not_applicable',
+                'dmarc_present'  => false,
+                'dmarc_record'   => null,
+                'dmarc_policy'   => 'not_applicable',
+                'dmarc_pct'      => null,
+                'dkim_present'   => false,
+                'dkim_selector'  => null,
+            ];
+        }
+
         $spf_found   = false;
         $dmarc_found = false;
         $spf_record  = null;
@@ -9914,6 +9934,7 @@ PROMPT;
         }
 
         return [
+            'mx_present'     => true,
             'spf_present'    => $spf_found,
             'spf_record'     => $spf_record,
             'spf_strictness' => $spf_strictness,
@@ -10893,7 +10914,7 @@ You will receive a JSON object with these categories:
 8. Known CVEs (plugin_cves) — each entry has: plugin slug, version installed, CVE ID, title, severity (critical/high/medium/low), CVSS score, fixed_in version. ANY unfixed CVE at critical/high severity is a critical finding.
 9. Core file integrity (core_integrity) — MD5 comparison of key WP core files against WordPress.org checksums. modified_files = likely backdoor. This is CRITICAL if any files are listed.
 10. Malware indicators (malware_indicators) — php_files_in_uploads (PHP files found in uploads dir — should be zero, any found = likely webshell), recently_modified_php (core PHP files modified in last 7 days outside plugin/theme dirs — warrants investigation).
-11. External checks — SSL validity/expiry, HTTP→HTTPS redirect, TLS weak protocols (tls_weak_protocols: checked, tls10_accepted, tls11_accepted — TLS 1.0/1.1 deprecated since 2021, susceptible to POODLE/BEAST attacks), wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum (rest_users: exposed, count, slugs), author enum, directory listings (uploads_listing, plugins_listing, themes_listing — plugins/themes listing reveals exact software versions to attackers), exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (email_dns: spf_present, spf_strictness: hard_fail=good/soft_fail=weak/pass_all=dangerous; dmarc_present, dmarc_policy: none=monitoring-only-does-nothing/quarantine=acceptable/reject=best, dmarc_pct; dkim_present, dkim_selector — all three required with strong policies for full spoofing protection), security headers (csp_quality: grade good/weak/missing, issues: unsafe-inline/unsafe-eval/wildcard-source/no-default-src — any issue weakens XSS mitigation; hsts_quality: grade, max_age, includes_subdomains, issues — max-age < 31536000 means HTTPS not enforced for a full year; X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, access-control-allow-origin — wildcard "*" allows credential theft from any origin), server_version_leak: leaks_version=true means Server header discloses exact software version (e.g. nginx/1.18.0) aiding targeted CVE exploitation.
+11. External checks — SSL validity/expiry, HTTP→HTTPS redirect, TLS weak protocols (tls_weak_protocols: checked, tls10_accepted, tls11_accepted — TLS 1.0/1.1 deprecated since 2021, susceptible to POODLE/BEAST attacks), wp-login.php/xmlrpc.php/wp-cron.php access, REST API user enum (rest_users: exposed, count, slugs), author enum, directory listings (uploads_listing, plugins_listing, themes_listing — plugins/themes listing reveals exact software versions to attackers), exposed files (debug.log, .env, backup archives, phpinfo.php, .git/config etc), adminer/phpMyAdmin, server-status/server-info, WAF/CDN detected (waf_cdn.detected, waf_cdn.providers), cookie_security (WP session cookies Secure/HttpOnly/SameSite flags), email DNS (email_dns: mx_present=false means no email is configured for this domain — skip all SPF/DMARC/DKIM findings entirely; mx_present=true means email is active and all three records matter: spf_present, spf_strictness: hard_fail=good/soft_fail=weak/pass_all=dangerous; dmarc_present, dmarc_policy: none=monitoring-only-does-nothing/quarantine=acceptable/reject=best, dmarc_pct; dkim_present, dkim_selector — all three required with strong policies for full spoofing protection), security headers (csp_quality: grade good/weak/missing, issues: unsafe-inline/unsafe-eval/wildcard-source/no-default-src — any issue weakens XSS mitigation; hsts_quality: grade, max_age, includes_subdomains, issues — max-age < 31536000 means HTTPS not enforced for a full year; X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, access-control-allow-origin — wildcard "*" allows credential theft from any origin), server_version_leak: leaks_version=true means Server header discloses exact software version (e.g. nginx/1.18.0) aiding targeted CVE exploitation.
 12. Plugin code scan — raw static analysis findings (may include false positives): RCE functions (eval, exec, shell_exec, base64_decode), SQLi (wpdb with raw $_GET/$_POST), XSS (unescaped echo of user input), unserialize with user input, RFI (include/require with user input). Includes plugin, file, line number.
 13. Code triage (code_triage) — AI-verified verdicts on the static scan findings. Each entry: plugin, file, line, verdict (confirmed|false_positive|needs_context), severity, type, explanation, fix. ONLY report confirmed findings as real vulnerabilities — ignore false_positives. Use triage severity for confirmed items. For needs_context, mention at low severity with explanation.
 
@@ -10904,10 +10925,11 @@ Cross-correlate ALL categories for compound risks:
 - wp-login.php accessible + brute force disabled = critical combined risk
 - Abandoned plugin (>2 years) + known CVE = critical
 - No WAF/CDN detected + multiple exposed endpoints = significantly elevated risk
-- Missing SPF + DMARC = email spoofing trivially possible
-- spf_strictness=soft_fail (~all) = SPF won't block spoofed emails — flag medium; -all required
-- dmarc_policy=none = DMARC record exists but does nothing (monitoring only) — flag medium; quarantine/reject required to block
-- spf_strictness=soft_fail + dmarc_policy=none = email spoofing fully unblocked despite records existing — escalate to high
+- email_dns.mx_present=false = domain has no email — do NOT flag missing SPF/DMARC/DKIM, they are irrelevant
+- email_dns.mx_present=true + missing SPF + DMARC = email spoofing trivially possible
+- email_dns.mx_present=true + spf_strictness=soft_fail (~all) = SPF won't block spoofed emails — flag medium; -all required
+- email_dns.mx_present=true + dmarc_policy=none = DMARC record exists but does nothing (monitoring only) — flag medium; quarantine/reject required to block
+- email_dns.mx_present=true + spf_strictness=soft_fail + dmarc_policy=none = email spoofing fully unblocked despite records existing — escalate to high
 - wp-cron.php public = unauthenticated resource exhaustion
 - Default auth salts = any active session can be forged
 - debug.log exposed = credentials and stack traces publicly readable
