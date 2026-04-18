@@ -54,12 +54,16 @@ Dedicated panel for building and managing a Content Security Policy without brea
 - **Backup/rollback** — every save snapshots the previous config; a one-click Rollback button (with time-ago label) instantly restores it
 
 ### Login Security
-- **Brute-Force Protection** — per-username account lockout after N failed attempts (configurable)
-- **Hide Login URL** — moves `/wp-login.php` to a secret slug; bots get a 404
-- **Two-Factor Authentication** — Email OTP, TOTP (Google Authenticator / Authy / 1Password), or Passkey
-- **Passkeys (WebAuthn / FIDO2)** — Face ID, Touch ID, Windows Hello, YubiKey; phishing-resistant by design
-- **Force 2FA** for all administrators site-wide
-- **Test Account Manager** — temporary subscriber accounts with app passwords for Playwright / CI pipelines; auto-delete on expiry or first use
+
+| Feature | Details |
+|---|---|
+| **Hide Login URL** | Moves `/wp-login.php` to a secret slug; direct requests to the default URL return 404 — bots never find the login form |
+| **Brute-Force Protection** | Per-username lockout after N failed attempts (default: 5 attempts, 5-minute lock — both configurable) |
+| **Session Duration** | Override the WordPress default session length with a custom value; persistent cookies set automatically |
+| **Two-Factor Authentication** | Email OTP (6-digit code, 10-min expiry), TOTP via Google Authenticator / Authy / 1Password (RFC 6238), or Passkey |
+| **Passkeys (WebAuthn / FIDO2)** | Face ID, Touch ID, Windows Hello, YubiKey — private key never leaves the device, phishing-resistant by design; test button verifies each key without logging out |
+| **Force 2FA for admins** | Blocks dashboard access until 2FA is configured; grace-login allowance configurable |
+| **Test Account Manager** | Temporary subscriber accounts with app passwords for Playwright / CI pipelines; configurable TTL and optional single-use mode; auto-delete on expiry or first login |
 
 ### Server Logs
 Read-only browser viewer for PHP error log, WordPress debug log, and web server access/error logs:
@@ -97,7 +101,19 @@ Replaces PHP `mail()` with authenticated SMTP. Test button, email log, configura
 Overlay panel (toggleable) tracking query count, HTTP requests, PHP errors, hooks, assets, and transients per page load.
 
 ### Custom 404 Page
-Branded 404 with **seven browser mini-games** and a site-wide leaderboard.
+Branded 404 page with **seven playable canvas mini-games** and a per-game site-wide leaderboard (Top 10, rate-limited score submissions via REST API). Fully theme-independent — works even if the active theme is broken.
+
+| Game | Controls |
+|---|---|
+| 🏃 Runner | Space / tap — jump over obstacles |
+| 🚀 Jetpack | Space / tap — thrust upward, dodge walls |
+| 🚗 Racer | Arrow keys / on-screen buttons — dodge traffic |
+| ⛏ Miner | Arrow keys / on-screen buttons — collect gems |
+| 🌌 Asteroids | Arrow keys + Space / on-screen buttons — shoot rocks |
+| 🐍 Snake | Arrow keys / on-screen buttons — eat, don't crash |
+| 👾 Space Invaders | Arrow keys + Space / on-screen ◀ Fire ▶ buttons — classic shoot-em-up |
+
+Customisable accent colour, background, and text colour from the admin panel.
 
 ---
 
