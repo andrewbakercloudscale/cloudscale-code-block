@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.67
+ * Version: 1.9.70
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.67';
+    const VERSION      = '1.9.70';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -519,14 +519,14 @@ class CloudScale_DevTools {
             'csdt-code-block-frontend',
             plugins_url( 'assets/cs-code-block.css', __FILE__ ),
             [ 'hljs-theme-dark', 'hljs-theme-light' ],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block.css' )
+            self::VERSION
         );
 
         wp_register_script(
             'csdt-code-block-frontend',
             plugins_url( 'assets/cs-code-block.js', __FILE__ ),
             [ 'hljs-core' ],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block.js' ),
+            self::VERSION,
             true
         );
 
@@ -534,14 +534,14 @@ class CloudScale_DevTools {
             'csdt-code-block-editor',
             plugins_url( 'assets/cs-code-block-editor.css', __FILE__ ),
             [],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-block-editor.css' )
+            self::VERSION
         );
 
         wp_register_script(
             'cloudscale-code-block-editor-script',
             plugins_url( 'blocks/code/editor.js', __FILE__ ),
             [ 'wp-blocks', 'wp-element', 'wp-block-editor', 'wp-components', 'wp-i18n', 'wp-data', 'wp-hooks' ],
-            filemtime( plugin_dir_path( __FILE__ ) . 'blocks/code/editor.js' ),
+            self::VERSION,
             true
         );
 
@@ -569,7 +569,7 @@ class CloudScale_DevTools {
             'csdt-code-block-convert',
             plugins_url( 'assets/cs-convert.js', __FILE__ ),
             [ 'wp-blocks', 'wp-data' ],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-convert.js' ),
+            self::VERSION,
             true
         );
         wp_add_inline_style( 'csdt-code-block-editor', self::get_convert_toast_css() );
@@ -993,7 +993,7 @@ class CloudScale_DevTools {
             'csdt-admin-tabs',
             plugins_url( 'assets/cs-admin-tabs.css', __FILE__ ),
             [],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-admin-tabs.css' )
+            self::VERSION
         );
         // Explain modal description styling — scoped to .cs-explain-desc.
         wp_add_inline_style( 'csdt-admin-tabs', self::get_explain_modal_css() );
@@ -1003,13 +1003,13 @@ class CloudScale_DevTools {
             'csdt-code-migrate',
             plugins_url( 'assets/cs-code-migrate.css', __FILE__ ),
             [],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-migrate.css' )
+            self::VERSION
         );
         wp_enqueue_script(
             'csdt-code-migrate',
             plugins_url( 'assets/cs-code-migrate.js', __FILE__ ),
             [],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-code-migrate.js' ),
+            self::VERSION,
             true
         );
         wp_localize_script( 'csdt-code-migrate', 'csdtDevtoolsMigrate', [
@@ -1022,7 +1022,7 @@ class CloudScale_DevTools {
             'csdt-admin-settings',
             plugins_url( 'assets/cs-admin-settings.js', __FILE__ ),
             [],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-admin-settings.js' ),
+            self::VERSION,
             true
         );
         wp_localize_script( 'csdt-admin-settings', 'csdtDevtoolsAdminSettings', [
@@ -1034,7 +1034,7 @@ class CloudScale_DevTools {
             'csdt-sql-editor',
             plugins_url( 'assets/cs-sql-editor.js', __FILE__ ),
             [],
-            filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-sql-editor.js' ),
+            self::VERSION,
             true
         );
         wp_localize_script( 'csdt-sql-editor', 'csdtDevtoolsSqlEditor', [
@@ -1048,14 +1048,14 @@ class CloudScale_DevTools {
                 'csdt-qrcode',
                 plugins_url( 'assets/qrcode.min.js', __FILE__ ),
                 [],
-                filemtime( plugin_dir_path( __FILE__ ) . 'assets/qrcode.min.js' ),
+                self::VERSION,
                 true
             );
             wp_enqueue_script(
                 'csdt-login',
                 plugins_url( 'assets/cs-login.js', __FILE__ ),
                 [ 'csdt-qrcode' ],
-                filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-login.js' ),
+                self::VERSION,
                 true
             );
             wp_localize_script( 'csdt-login', 'csdtDevtoolsLogin', [
@@ -1068,15 +1068,14 @@ class CloudScale_DevTools {
                 'csdt-passkey',
                 plugins_url( 'assets/cs-passkey.js', __FILE__ ),
                 [ 'csdt-login' ],
-                filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-passkey.js' ),
+                self::VERSION,
                 true
             );
-            $ta_js = plugin_dir_path( __FILE__ ) . 'assets/cs-test-accounts.js';
             wp_enqueue_script(
                 'csdt-test-accounts',
                 plugins_url( 'assets/cs-test-accounts.js', __FILE__ ),
                 [ 'csdt-login' ],
-                file_exists( $ta_js ) ? filemtime( $ta_js ) : self::VERSION,
+                self::VERSION,
                 true
             );
             wp_localize_script( 'csdt-test-accounts', 'csdtTestAccounts', [
@@ -1091,7 +1090,7 @@ class CloudScale_DevTools {
                 'csdt-smtp',
                 plugins_url( 'assets/cs-smtp.js', __FILE__ ),
                 [],
-                filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-smtp.js' ),
+                self::VERSION,
                 true
             );
             wp_localize_script( 'csdt-smtp', 'csdtDevtoolsSmtp', [
@@ -1106,7 +1105,7 @@ class CloudScale_DevTools {
                 'csdt-404-admin',
                 plugins_url( 'assets/cs-404-admin.js', __FILE__ ),
                 [],
-                filemtime( plugin_dir_path( __FILE__ ) . 'assets/cs-404-admin.js' ),
+                self::VERSION,
                 true
             );
             wp_localize_script( 'csdt-404-admin', 'csdtDevtools404', [
@@ -1119,12 +1118,11 @@ class CloudScale_DevTools {
         }
 
         if ( $active_tab === 'security' ) {
-            $vuln_js = plugin_dir_path( __FILE__ ) . 'assets/cs-vuln-scan.js';
             wp_enqueue_script(
                 'csdt-vuln-scan',
                 plugins_url( 'assets/cs-vuln-scan.js', __FILE__ ),
                 [],
-                file_exists( $vuln_js ) ? filemtime( $vuln_js ) : self::VERSION,
+                self::VERSION,
                 true
             );
             $saved_model      = get_option( 'csdt_devtools_security_model', '_auto' );
@@ -1157,7 +1155,7 @@ class CloudScale_DevTools {
                 'csdt-thumbnails',
                 plugins_url( 'assets/cs-thumbnails.js', __FILE__ ),
                 [],
-                file_exists( $thumb_js ) ? filemtime( $thumb_js ) : self::VERSION,
+                self::VERSION,
                 true
             );
             wp_localize_script( 'csdt-thumbnails', 'csdtDevtoolsThumbs', [
@@ -1176,7 +1174,7 @@ class CloudScale_DevTools {
                 'csdt-server-logs',
                 plugins_url( 'assets/cs-server-logs.js', __FILE__ ),
                 [],
-                file_exists( $logs_js ) ? filemtime( $logs_js ) : self::VERSION,
+                self::VERSION,
                 true
             );
             wp_localize_script( 'csdt-server-logs', 'csdtServerLogs', [
@@ -3077,13 +3075,13 @@ class CloudScale_DevTools {
             'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
             [],
-            filemtime( $base . 'cs-perf-monitor.css' )
+            self::VERSION
         );
         wp_enqueue_script(
             'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
             [],
-            filemtime( $base . 'cs-perf-monitor.js' ),
+            self::VERSION,
             true
         );
     }
@@ -3357,13 +3355,13 @@ class CloudScale_DevTools {
             'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.css', __FILE__ ),
             [],
-            filemtime( $base . 'cs-perf-monitor.css' )
+            self::VERSION
         );
         wp_enqueue_script(
             'csdt-perf-monitor',
             plugins_url( 'assets/cs-perf-monitor.js', __FILE__ ),
             [],
-            filemtime( $base . 'cs-perf-monitor.js' ),
+            self::VERSION,
             true
         );
     }
