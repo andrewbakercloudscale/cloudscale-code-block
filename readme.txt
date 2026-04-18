@@ -4,7 +4,7 @@ Tags: code block, syntax highlighting, gutenberg block, dark mode, highlight.js
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.73
+Stable tag: 1.9.79
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,7 +79,7 @@ Yes. Press Enter to run the query. Use Shift+Enter to insert a newline. Ctrl+Ent
 
 == Changelog ==
 
-= 1.9.73 =
+= 1.9.79 =
 * feat: Test Account Manager — temporary single-use accounts with app passwords for Playwright/CI pipelines; subscriber-level accounts auto-delete on expiry or first use; app passwords blocked for all non-test accounts
 
 = 1.9.10 =
