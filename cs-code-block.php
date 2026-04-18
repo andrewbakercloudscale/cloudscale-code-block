@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.52
+ * Version: 1.9.60
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.52';
+    const VERSION      = '1.9.60';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -238,6 +238,9 @@ class CloudScale_DevTools {
         if ( get_option( 'csdt_devtools_hide_wp_version', '0' ) === '1' ) {
             remove_action( 'wp_head', 'wp_generator' );
             add_filter( 'the_generator', '__return_empty_string' );
+            // Strip ?ver= query strings from enqueued scripts/styles to prevent version fingerprinting
+            add_filter( 'style_loader_src',  [ __CLASS__, 'strip_asset_ver' ], 9999 );
+            add_filter( 'script_loader_src', [ __CLASS__, 'strip_asset_ver' ], 9999 );
         }
 
         add_action( 'init', [ __CLASS__, 'load_textdomain' ] );
@@ -8475,8 +8478,9 @@ class CloudScale_DevTools {
                     $admins = get_users( [ 'role' => 'administrator', 'fields' => 'ID' ] );
                     $count  = 0;
                     foreach ( $admins as $id ) {
-                        $keys = get_user_meta( (int) $id, 'csdt_devtools_passkeys', true );
-                        if ( ! empty( $keys ) && is_array( $keys ) ) {
+                        // Passkeys stored as JSON string — use the class method which decodes it
+                        $keys = CSDT_DevTools_Passkey::get_passkeys( (int) $id );
+                        if ( ! empty( $keys ) ) {
                             $count++;
                         }
                     }
@@ -8510,6 +8514,13 @@ class CloudScale_DevTools {
         ];
     }
 
+    public static function strip_asset_ver( string $src ): string {
+        if ( strpos( $src, 'ver=' ) !== false ) {
+            $src = remove_query_arg( 'ver', $src );
+        }
+        return $src;
+    }
+
     private static function get_quick_fixes(): array {
         $app_pw_available = function_exists( 'wp_is_application_passwords_available' )
                            && wp_is_application_passwords_available();
@@ -8538,7 +8549,7 @@ class CloudScale_DevTools {
             [
                 'id'        => 'hide_wp_version',
                 'title'     => 'WordPress version exposed in HTML',
-                'detail'    => 'The <generator> meta tag reveals your WP version, helping attackers target known vulnerabilities.',
+                'detail'    => 'The <generator> meta tag and asset ?ver= query strings reveal your WP version, helping attackers target known vulnerabilities.',
                 'fixed'     => get_option( 'csdt_devtools_hide_wp_version', '0' ) === '1'
                               || has_filter( 'the_generator', '__return_empty_string' ),
                 'fix_label' => 'Hide WP Version',
@@ -8549,6 +8560,30 @@ class CloudScale_DevTools {
                 'detail'    => 'Open comments invite spam, XSS payloads, and link injection attacks.',
                 'fixed'     => get_option( 'default_comment_status' ) !== 'open',
                 'fix_label' => 'Close Comments',
+            ],
+            [
+                'id'        => 'wpconfig_perms',
+                'title'     => 'wp-config.php permissions too open (0644)',
+                'detail'    => '0644 is world-readable. Tighten to 0600 so only the server process owner can read DB credentials and salts.',
+                'fixed'     => ( function () {
+                    $f = ABSPATH . 'wp-config.php';
+                    if ( ! file_exists( $f ) ) { return true; }
+                    $perms = substr( sprintf( '%o', fileperms( $f ) ), -4 );
+                    return in_array( $perms, [ '0600', '0640' ], true );
+                } )(),
+                'fix_label' => 'Set to 0600',
+            ],
+            [
+                'id'        => 'block_debug_log',
+                'title'     => 'debug.log exposed publicly',
+                'detail'    => 'debug.log can leak database errors, file paths, stack traces, and credentials. Block HTTP access and delete any existing file.',
+                'fixed'     => ( function () {
+                    $log = WP_CONTENT_DIR . '/debug.log';
+                    if ( file_exists( $log ) ) { return false; }
+                    $htaccess = ABSPATH . '.htaccess';
+                    return file_exists( $htaccess ) && strpos( (string) file_get_contents( $htaccess ), 'debug.log' ) !== false;
+                } )(),
+                'fix_label' => 'Block & Delete',
             ],
         ];
     }
@@ -9001,6 +9036,32 @@ class CloudScale_DevTools {
                 break;
             case 'close_comments':
                 update_option( 'default_comment_status', 'closed' );
+                break;
+            case 'wpconfig_perms':
+                $cfg_file = ABSPATH . 'wp-config.php';
+                if ( ! file_exists( $cfg_file ) || ! is_writable( dirname( $cfg_file ) ) ) {
+                    wp_send_json_error( 'wp-config.php not found or directory not writable.' );
+                    return;
+                }
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_chmod
+                if ( ! chmod( $cfg_file, 0600 ) ) {
+                    wp_send_json_error( 'chmod failed — server may restrict permission changes.' );
+                    return;
+                }
+                break;
+            case 'block_debug_log':
+                // Delete existing debug.log
+                $log_file = WP_CONTENT_DIR . '/debug.log';
+                if ( file_exists( $log_file ) ) {
+                    wp_delete_file( $log_file );
+                }
+                // Block HTTP access via .htaccess
+                $htaccess   = ABSPATH . '.htaccess';
+                $deny_block = "\n# Block debug.log access\n<Files debug.log>\n    Order allow,deny\n    Deny from all\n</Files>\n";
+                if ( file_exists( $htaccess ) && strpos( (string) file_get_contents( $htaccess ), 'debug.log' ) === false ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+                    // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+                    file_put_contents( $htaccess, $deny_block, FILE_APPEND );
+                }
                 break;
             default:
                 wp_send_json_error( 'Unknown fix ID' );
@@ -10390,7 +10451,7 @@ PROMPT;
         }
 
         $status = get_transient( $status_key );
-        $result = get_transient( $result_key );
+        $result = get_option( $result_key );
 
         if ( ! $status ) {
             if ( $result ) {
