@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.110
+ * Version: 1.9.111
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.110';
+    const VERSION      = '1.9.111';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -325,6 +325,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_devtools_quick_fix',          [ __CLASS__, 'ajax_apply_quick_fix' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_save',           [ __CLASS__, 'ajax_csp_save' ] );
         add_action( 'wp_ajax_csdt_devtools_csp_rollback',       [ __CLASS__, 'ajax_csp_rollback' ] );
+        add_action( 'wp_ajax_csdt_devtools_csp_violations_get',  [ __CLASS__, 'ajax_csp_violations_get' ] );
+        add_action( 'wp_ajax_csdt_devtools_csp_violations_clear', [ __CLASS__, 'ajax_csp_violations_clear' ] );
         add_action( 'send_headers',                             [ __CLASS__, 'output_security_headers' ] );
         add_action( 'wp_ajax_csdt_test_account_create',          [ __CLASS__, 'ajax_create_test_account' ] );
         add_action( 'wp_ajax_csdt_test_account_revoke',          [ __CLASS__, 'ajax_revoke_test_account' ] );
@@ -383,6 +385,7 @@ class CloudScale_DevTools {
         // Custom 404 page + hiscore leaderboard.
         add_action( 'template_redirect',                        [ __CLASS__, 'maybe_custom_404' ], 1 );
         add_action( 'rest_api_init',                            [ __CLASS__, 'register_hiscore_routes' ] );
+        add_action( 'rest_api_init',                            [ __CLASS__, 'register_csp_report_route' ] );
         add_action( 'wp_ajax_csdt_devtools_save_404_settings',    [ __CLASS__, 'ajax_save_404_settings' ] );
 
         // Performance monitor — EXPLAIN endpoint.
@@ -8912,7 +8915,8 @@ class CloudScale_DevTools {
             if ( $csp ) {
                 $mode = get_option( 'csdt_devtools_csp_mode', 'enforce' );
                 $hdr  = $mode === 'report_only' ? 'Content-Security-Policy-Report-Only' : 'Content-Security-Policy';
-                header( $hdr . ': ' . $csp );
+                $report_uri = $mode === 'report_only' ? '; report-uri ' . rest_url( 'csdt/v1/csp-report' ) : '';
+                header( $hdr . ': ' . $csp . $report_uri );
             }
         }
     }
@@ -9078,6 +9082,20 @@ class CloudScale_DevTools {
                 <span id="cs-csp-saved"    style="display:none;color:#16a34a;font-size:13px;font-weight:600;">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
                 <span id="cs-csp-rolledback" style="display:none;color:#d97706;font-size:13px;font-weight:600;">↩ <?php esc_html_e( 'Rolled back', 'cloudscale-devtools' ); ?></span>
             </div>
+
+            <!-- Violation log — only visible in report-only mode -->
+            <div id="cs-csp-violation-wrap" style="<?php echo $csp_on && $csp_mode === 'report_only' ? '' : 'display:none;'; ?>margin-top:20px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;"><?php esc_html_e( 'Violation Log', 'cloudscale-devtools' ); ?></span>
+                    <span id="cs-csp-viol-count" style="background:#6366f1;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;display:none;">0</span>
+                    <button type="button" id="cs-csp-viol-refresh" class="cs-btn-secondary cs-btn-sm" style="margin-left:auto;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                    <button type="button" id="cs-csp-viol-clear" class="cs-btn-secondary cs-btn-sm" style="border-color:#f87171;color:#dc2626;"><?php esc_html_e( 'Clear Log', 'cloudscale-devtools' ); ?></button>
+                </div>
+                <div id="cs-csp-viol-table" style="font-size:12px;"></div>
+                <p style="font-size:11px;color:#94a3b8;margin:6px 0 0;">
+                    <?php esc_html_e( 'The browser reports what would be blocked if CSP were in Enforce mode. Browse your site normally to populate this log, then review before switching to Enforce.', 'cloudscale-devtools' ); ?>
+                </p>
+            </div>
         </div>
 
         <script>
@@ -9195,6 +9213,97 @@ class CloudScale_DevTools {
                 });
             }
             wireRollback(document.getElementById('cs-csp-rollback-btn'));
+
+            // ── Violation log ────────────────────────────────────────────
+            var violWrap    = document.getElementById('cs-csp-violation-wrap');
+            var violTable   = document.getElementById('cs-csp-viol-table');
+            var violCount   = document.getElementById('cs-csp-viol-count');
+            var violRefresh = document.getElementById('cs-csp-viol-refresh');
+            var violClear   = document.getElementById('cs-csp-viol-clear');
+
+            function renderViolations(rows) {
+                if (!violTable) return;
+                if (!rows || !rows.length) {
+                    violTable.innerHTML = '<p style="color:#94a3b8;font-size:12px;margin:0;">No violations recorded yet. Browse your site with Report-Only enabled to capture them.</p>';
+                    if (violCount) violCount.style.display = 'none';
+                    return;
+                }
+                if (violCount) { violCount.textContent = rows.length; violCount.style.display = 'inline'; }
+                var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+                    '<thead><tr style="background:#f1f5f9;">' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Time</th>' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Blocked URI</th>' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Directive</th>' +
+                    '<th style="padding:6px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;">Page</th>' +
+                    '</tr></thead><tbody>';
+                rows.forEach(function(r, i) {
+                    var d = new Date(r.time * 1000);
+                    var t = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + ' ' + d.toLocaleDateString([], {month:'short',day:'numeric'});
+                    var bg = i % 2 === 0 ? '#fff' : '#f8fafc';
+                    var blocked = r.blocked || '—';
+                    // Truncate long URIs for display
+                    var blockedDisplay = blocked.length > 60 ? blocked.slice(0, 57) + '…' : blocked;
+                    var pageDisplay = (r.page || '—').replace(/^https?:\/\/[^/]+/, '');
+                    if (pageDisplay.length > 40) pageDisplay = pageDisplay.slice(0, 37) + '…';
+                    html += '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;">' +
+                        '<td style="padding:5px 8px;white-space:nowrap;color:#64748b;">' + t + '</td>' +
+                        '<td style="padding:5px 8px;font-family:monospace;color:#0f172a;" title="' + blocked.replace(/"/g,'&quot;') + '">' + blockedDisplay + '</td>' +
+                        '<td style="padding:5px 8px;font-family:monospace;color:#6366f1;">' + (r.directive || '—') + '</td>' +
+                        '<td style="padding:5px 8px;color:#64748b;" title="' + (r.page||'').replace(/"/g,'&quot;') + '">' + pageDisplay + '</td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>';
+                violTable.innerHTML = html;
+            }
+
+            function fetchViolations() {
+                var fd = new FormData();
+                fd.append('action', 'csdt_devtools_csp_violations_get');
+                fd.append('nonce',  csdtVulnScan.nonce);
+                fetch(csdtVulnScan.ajaxUrl, { method:'POST', body:fd })
+                    .then(function(r){ return r.json(); })
+                    .then(function(resp){ if (resp && resp.success) renderViolations(resp.data); })
+                    .catch(function(){});
+            }
+
+            // Show/hide violation wrap when mode changes
+            document.querySelectorAll('input[name="cs-csp-mode"]').forEach(function(radio) {
+                radio.addEventListener('change', function() {
+                    if (!violWrap) return;
+                    var enabled = document.getElementById('cs-csp-enabled');
+                    violWrap.style.display = (this.value === 'report_only' && enabled && enabled.checked) ? '' : 'none';
+                    if (this.value === 'report_only') fetchViolations();
+                });
+            });
+            var cspEnabledCb = document.getElementById('cs-csp-enabled');
+            if (cspEnabledCb) {
+                cspEnabledCb.addEventListener('change', function() {
+                    if (!violWrap) return;
+                    var modeEl = document.querySelector('input[name="cs-csp-mode"]:checked');
+                    violWrap.style.display = (this.checked && modeEl && modeEl.value === 'report_only') ? '' : 'none';
+                });
+            }
+
+            if (violRefresh) violRefresh.addEventListener('click', fetchViolations);
+
+            if (violClear) {
+                violClear.addEventListener('click', function() {
+                    var fd = new FormData();
+                    fd.append('action', 'csdt_devtools_csp_violations_clear');
+                    fd.append('nonce',  csdtVulnScan.nonce);
+                    fetch(csdtVulnScan.ajaxUrl, { method:'POST', body:fd })
+                        .then(function(){ renderViolations([]); })
+                        .catch(function(){});
+                });
+            }
+
+            // Auto-load if already in report-only mode
+            if (violWrap && violWrap.style.display !== 'none') fetchViolations();
+
+            // Auto-refresh every 30 s when panel is visible
+            setInterval(function() {
+                if (violWrap && violWrap.style.display !== 'none') fetchViolations();
+            }, 30000);
         })();
         </script>
         <?php
@@ -9252,6 +9361,56 @@ class CloudScale_DevTools {
             'services' => json_decode( $backup['services'] ?? '[]', true ),
             'custom'   => $backup['custom']    ?? '',
         ] );
+    }
+
+    public static function register_csp_report_route(): void {
+        register_rest_route( 'csdt/v1', '/csp-report', [
+            'methods'             => 'POST',
+            'callback'            => [ __CLASS__, 'rest_csp_report' ],
+            'permission_callback' => '__return_true',
+        ] );
+    }
+
+    public static function rest_csp_report( \WP_REST_Request $request ): \WP_REST_Response {
+        $body = json_decode( $request->get_body(), true );
+        $report = $body['csp-report'] ?? null;
+        if ( ! is_array( $report ) ) {
+            return new \WP_REST_Response( null, 204 );
+        }
+
+        $entry = [
+            'time'      => time(),
+            'blocked'   => isset( $report['blocked-uri'] )          ? (string) $report['blocked-uri']          : '',
+            'directive' => isset( $report['violated-directive'] )    ? (string) $report['violated-directive']    : '',
+            'page'      => isset( $report['document-uri'] )         ? (string) $report['document-uri']         : '',
+            'source'    => isset( $report['source-file'] )          ? (string) $report['source-file']          : '',
+        ];
+
+        // Skip noise: inline/eval violations that are expected with unsafe-inline in the policy
+        if ( in_array( $entry['blocked'], [ 'inline', 'eval', 'data' ], true ) ) {
+            return new \WP_REST_Response( null, 204 );
+        }
+
+        $stored = json_decode( get_option( 'csdt_csp_violations', '[]' ), true );
+        if ( ! is_array( $stored ) ) { $stored = []; }
+        array_unshift( $stored, $entry );
+        update_option( 'csdt_csp_violations', wp_json_encode( array_slice( $stored, 0, 100 ) ), false );
+
+        return new \WP_REST_Response( null, 204 );
+    }
+
+    public static function ajax_csp_violations_get(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+        $stored = json_decode( get_option( 'csdt_csp_violations', '[]' ), true );
+        wp_send_json_success( is_array( $stored ) ? $stored : [] );
+    }
+
+    public static function ajax_csp_violations_clear(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+        delete_option( 'csdt_csp_violations' );
+        wp_send_json_success();
     }
 
     public static function register_dashboard_widget(): void {
