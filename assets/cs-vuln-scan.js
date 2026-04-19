@@ -677,7 +677,7 @@
 
         var dpr = window.devicePixelRatio || 1;
         var W   = canvas.offsetWidth || canvas.parentElement.offsetWidth || 600;
-        var H   = 180;
+        var H   = 190;
         canvas.width        = W * dpr;
         canvas.height       = H * dpr;
         canvas.style.height = H + 'px';
@@ -685,94 +685,54 @@
         var ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
 
-        // Padding: left for score axis + title, right for issues axis + title,
-        // top for legend, bottom for date labels + axis title
-        var PAD_L = 52, PAD_R = 52, PAD_T = 36, PAD_B = 42;
+        // Single left y-axis (score 0-100). Right side is just a small margin.
+        var PAD_L = 44, PAD_R = 16, PAD_T = 38, PAD_B = 38;
         var cW = W - PAD_L - PAD_R;
         var cH = H - PAD_T - PAD_B;
 
-        var LABEL_COLOR  = '#64748b';
-        var GRID_COLOR   = 'rgba(0,0,0,0.07)';
-        var AXIS_COLOR   = 'rgba(0,0,0,0.15)';
-        var FONT         = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-        var FONT_TITLE   = '10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+        var LABEL_COLOR = '#64748b';
+        var GRID_COLOR  = 'rgba(0,0,0,0.07)';
+        var AXIS_COLOR  = 'rgba(0,0,0,0.15)';
+        var FONT        = '11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
 
         ctx.clearRect(0, 0, W, H);
 
-        // ── Max issues for right-axis scale ──────────────────────────
-        var maxIssues = 1;
-        data.forEach(function (e) {
-            var tot = (e.critical_count || 0) + (e.high_count || 0);
-            if (tot > maxIssues) { maxIssues = tot; }
-        });
-        maxIssues = Math.ceil(maxIssues / 2) * 2 || 2;
-
-        // ── Grid + left Y-axis (score 0-100) ─────────────────────────
-        var scoreGridLines = [0, 25, 50, 75, 100];
-        scoreGridLines.forEach(function (v) {
+        // ── Grid + Y-axis (score 0-100) ───────────────────────────────
+        [0, 25, 50, 75, 100].forEach(function (v) {
             var y = PAD_T + cH - (v / 100) * cH;
-            // Grid line
             ctx.strokeStyle = GRID_COLOR;
             ctx.lineWidth   = 1;
             ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L + cW, y); ctx.stroke();
-            // Left label
             ctx.fillStyle  = LABEL_COLOR;
             ctx.font       = FONT;
             ctx.textAlign  = 'right';
-            ctx.fillText(v, PAD_L - 8, y + 4);
+            ctx.fillText(v, PAD_L - 6, y + 4);
         });
 
-        // Left axis line
+        // Y-axis line
         ctx.strokeStyle = AXIS_COLOR;
         ctx.lineWidth   = 1;
         ctx.beginPath(); ctx.moveTo(PAD_L, PAD_T); ctx.lineTo(PAD_L, PAD_T + cH); ctx.stroke();
 
-        // Left Y-axis title (rotated)
+        // Y-axis title (rotated)
         ctx.save();
-        ctx.translate(13, PAD_T + cH / 2);
+        ctx.translate(10, PAD_T + cH / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle  = '#1e6fd9';
-        ctx.font       = 'bold ' + FONT_TITLE;
-        ctx.textAlign  = 'center';
-        ctx.fillText('Security Score', 0, 0);
+        ctx.fillStyle = '#1e6fd9';
+        ctx.font      = 'bold 10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Security Score (0–100)', 0, 0);
         ctx.restore();
 
-        // ── Right Y-axis (issues count) ───────────────────────────────
-        [0, Math.round(maxIssues / 2), maxIssues].forEach(function (v) {
-            var y = PAD_T + cH - (v / maxIssues) * cH;
-            ctx.fillStyle  = '#dc2626';
-            ctx.font       = FONT;
-            ctx.textAlign  = 'left';
-            ctx.fillText(v, PAD_L + cW + 8, y + 4);
-        });
-
-        // Right axis line
-        ctx.strokeStyle = AXIS_COLOR;
-        ctx.lineWidth   = 1;
-        ctx.beginPath(); ctx.moveTo(PAD_L + cW, PAD_T); ctx.lineTo(PAD_L + cW, PAD_T + cH); ctx.stroke();
-
-        // Right Y-axis title (rotated)
-        ctx.save();
-        ctx.translate(W - 12, PAD_T + cH / 2);
-        ctx.rotate(Math.PI / 2);
-        ctx.fillStyle  = '#dc2626';
-        ctx.font       = 'bold ' + FONT_TITLE;
-        ctx.textAlign  = 'center';
-        ctx.fillText('Issues (Critical + High)', 0, 0);
-        ctx.restore();
-
-        // ── X-axis: date labels + axis title ─────────────────────────
+        // ── X-axis: date labels ───────────────────────────────────────
         var step = cW / Math.max(data.length - 1, 1);
-        ctx.fillStyle  = LABEL_COLOR;
-        ctx.font       = FONT;
-        ctx.textAlign  = 'center';
+        ctx.fillStyle = LABEL_COLOR;
+        ctx.font      = FONT;
+        ctx.textAlign = 'center';
         data.forEach(function (entry, i) {
             var x = PAD_L + i * step;
             var d = new Date((entry.scanned_at || 0) * 1000);
-            var mo  = d.getMonth() + 1;
-            var day = d.getDate();
-            ctx.fillText(mo + '/' + day, x, PAD_T + cH + 16);
-            // Subtle vertical guide
+            ctx.fillText((d.getMonth() + 1) + '/' + d.getDate(), x, PAD_T + cH + 14);
             ctx.strokeStyle = GRID_COLOR;
             ctx.lineWidth   = 1;
             ctx.beginPath(); ctx.moveTo(x, PAD_T); ctx.lineTo(x, PAD_T + cH); ctx.stroke();
@@ -783,19 +743,45 @@
         ctx.lineWidth   = 1;
         ctx.beginPath(); ctx.moveTo(PAD_L, PAD_T + cH); ctx.lineTo(PAD_L + cW, PAD_T + cH); ctx.stroke();
 
-        // X-axis title
-        ctx.fillStyle  = LABEL_COLOR;
-        ctx.font       = 'bold ' + FONT_TITLE;
-        ctx.textAlign  = 'center';
-        ctx.fillText('Scan Date', PAD_L + cW / 2, H - 4);
-
-        // ── Helper coords ─────────────────────────────────────────────
         function scoreX(i) { return PAD_L + i * step; }
         function scoreY(v) { return PAD_T + cH - ((v || 0) / 100) * cH; }
 
+        // ── Issue bars (max 25% of chart height; count labeled on top) ─
+        var BAR_MAX_H = cH * 0.25;
+        var maxIssues = 1;
+        data.forEach(function (e) {
+            var tot = (e.critical_count || 0) + (e.high_count || 0);
+            if (tot > maxIssues) maxIssues = tot;
+        });
+        var barW = Math.max(6, Math.min(20, step * 0.4));
+        data.forEach(function (e, i) {
+            var hc    = e.high_count     || 0;
+            var cc    = e.critical_count || 0;
+            var tot   = hc + cc;
+            if (!tot) return;
+            var x     = scoreX(i) - barW / 2;
+            var yBase = PAD_T + cH;
+            var totalBarH = (tot / maxIssues) * BAR_MAX_H;
+            var hBarH = (hc / tot) * totalBarH;
+            var cBarH = totalBarH - hBarH;
+            if (hc > 0) {
+                ctx.fillStyle = 'rgba(251,146,60,0.80)';
+                ctx.fillRect(x, yBase - hBarH, barW, hBarH);
+            }
+            if (cc > 0) {
+                ctx.fillStyle = 'rgba(220,38,38,0.85)';
+                ctx.fillRect(x, yBase - hBarH - cBarH, barW, cBarH);
+            }
+            // Count label above bar
+            ctx.fillStyle = cc > 0 ? '#dc2626' : '#ea580c';
+            ctx.font      = 'bold ' + FONT;
+            ctx.textAlign = 'center';
+            ctx.fillText(tot, scoreX(i), yBase - totalBarH - 3);
+        });
+
         // ── Score area fill ───────────────────────────────────────────
         var grad = ctx.createLinearGradient(0, PAD_T, 0, PAD_T + cH);
-        grad.addColorStop(0, 'rgba(30,111,217,0.18)');
+        grad.addColorStop(0, 'rgba(30,111,217,0.15)');
         grad.addColorStop(1, 'rgba(30,111,217,0.02)');
         ctx.fillStyle = grad;
         ctx.beginPath();
@@ -811,32 +797,11 @@
         ctx.lineJoin    = 'round';
         ctx.beginPath();
         data.forEach(function (e, i) {
-            if (i === 0) { ctx.moveTo(scoreX(i), scoreY(e.score)); }
-            else         { ctx.lineTo(scoreX(i), scoreY(e.score)); }
+            i === 0 ? ctx.moveTo(scoreX(i), scoreY(e.score)) : ctx.lineTo(scoreX(i), scoreY(e.score));
         });
         ctx.stroke();
 
-        // ── Issue bars ────────────────────────────────────────────────
-        var barW = Math.max(4, Math.min(18, step * 0.35));
-        data.forEach(function (e, i) {
-            var x     = scoreX(i) - barW / 2;
-            var hc    = e.high_count     || 0;
-            var cc    = e.critical_count || 0;
-            var yBase = PAD_T + cH;
-            if (hc > 0) {
-                var hH = (hc / maxIssues) * cH;
-                ctx.fillStyle = 'rgba(251,146,60,0.75)';
-                ctx.fillRect(x, yBase - hH, barW, hH);
-            }
-            if (cc > 0) {
-                var cHt = (cc / maxIssues) * cH;
-                var hHt = (hc / maxIssues) * cH;
-                ctx.fillStyle = 'rgba(220,38,38,0.85)';
-                ctx.fillRect(x, yBase - hHt - cHt, barW, cHt);
-            }
-        });
-
-        // ── Score dots ────────────────────────────────────────────────
+        // ── Score dots + value labels ─────────────────────────────────
         data.forEach(function (e, i) {
             var x = scoreX(i), y = scoreY(e.score);
             ctx.beginPath();
@@ -846,28 +811,30 @@
             ctx.lineWidth   = 2;
             ctx.fill();
             ctx.stroke();
+            // Score value above dot
+            ctx.fillStyle = '#1e40af';
+            ctx.font      = 'bold 10px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(e.score, x, y - 8);
         });
 
-        // ── Legend (top-left inside chart area) ───────────────────────
+        // ── Legend ────────────────────────────────────────────────────
         var legItems = [
-            { color: '#1e6fd9', type: 'line',  label: 'Security Score' },
-            { color: 'rgba(220,38,38,0.85)', type: 'bar', label: 'Critical Issues' },
-            { color: 'rgba(251,146,60,0.75)', type: 'bar', label: 'High Issues'     },
+            { color: '#1e6fd9',              type: 'line', label: 'Score' },
+            { color: 'rgba(220,38,38,0.85)', type: 'bar',  label: 'Critical' },
+            { color: 'rgba(251,146,60,0.80)', type: 'bar', label: 'High' },
         ];
-        var legX = PAD_L + 8, legY = 14;
+        var legX = PAD_L + 4, legY = 14;
         ctx.font      = FONT;
         ctx.textAlign = 'left';
         var offset = 0;
         legItems.forEach(function (item) {
             ctx.fillStyle = item.color;
-            if (item.type === 'line') {
-                ctx.fillRect(legX + offset, legY - 5, 14, 3);
-            } else {
-                ctx.fillRect(legX + offset, legY - 7, 10, 9);
-            }
+            if (item.type === 'line') { ctx.fillRect(legX + offset, legY - 4, 12, 3); }
+            else                      { ctx.fillRect(legX + offset, legY - 6, 9, 8); }
             ctx.fillStyle = '#374151';
-            ctx.fillText(item.label, legX + offset + 17, legY);
-            offset += ctx.measureText(item.label).width + 36;
+            ctx.fillText(item.label, legX + offset + 15, legY);
+            offset += ctx.measureText(item.label).width + 28;
         });
     }
 })();
