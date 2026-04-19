@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.116
+Stable tag: 1.9.117
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,7 +85,7 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
-= 1.9.116 =
+= 1.9.117 =
 * feat: SSH Brute-Force Monitor — WP-Cron reads /var/log/auth.log every 60 seconds, alerts via email + ntfy.sh push when ≥10 failures detected in 60 seconds; throttled to one alert per 5 minutes; configurable threshold; enabled by default
 * feat: SSH auth log added as a source in the Server Logs tab (auto-detected at /var/log/auth.log and /var/log/secure)
 * feat: Quick Fixes — SSH brute-force protection row shows fail2ban install/running state and live failure count; "Copy fail2ban config" modal with ready-to-paste jail.local
