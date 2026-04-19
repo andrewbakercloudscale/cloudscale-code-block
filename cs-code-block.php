@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.117
+ * Version: 1.9.118
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.117';
+    const VERSION      = '1.9.118';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -338,6 +338,9 @@ class CloudScale_DevTools {
         add_action( 'csdt_scheduled_scan',                      [ __CLASS__, 'run_scheduled_scan' ] );
         add_action( 'csdt_ssh_monitor',                         [ __CLASS__, 'monitor_ssh_failures' ] );
         add_filter( 'cron_schedules',                           [ __CLASS__, 'add_cron_schedules' ] );
+        add_action( 'wp_ajax_csdt_plugin_stack_scan',           [ __CLASS__, 'ajax_plugin_stack_scan' ] );
+        add_action( 'wp_ajax_csdt_ai_debug_log',                [ __CLASS__, 'ajax_ai_debug_log' ] );
+        add_action( 'wp_ajax_csdt_site_audit',                  [ __CLASS__, 'ajax_site_audit' ] );
 
         // Schedule SSH monitor (default on) — ensure cron is running if enabled
         if ( get_option( 'csdt_ssh_monitor_enabled', '1' ) === '1' ) {
@@ -1190,6 +1193,35 @@ class CloudScale_DevTools {
             wp_add_inline_style( 'csdt-admin-tabs', self::get_thumbnails_admin_css() );
         }
 
+        if ( $active_tab === 'optimizer' ) {
+            wp_enqueue_script(
+                'csdt-optimizer',
+                plugins_url( 'assets/cs-plugin-stack.js', __FILE__ ),
+                [],
+                self::VERSION,
+                true
+            );
+            wp_localize_script( 'csdt-optimizer', 'csdtOptimizer', [
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'csdt_optimizer_nonce' ),
+                'baseUrl' => admin_url( 'tools.php?page=' . self::TOOLS_SLUG ),
+            ] );
+        }
+
+        if ( $active_tab === 'site-audit' ) {
+            wp_enqueue_script(
+                'csdt-site-audit',
+                plugins_url( 'assets/cs-site-audit.js', __FILE__ ),
+                [],
+                self::VERSION,
+                true
+            );
+            wp_localize_script( 'csdt-site-audit', 'csdtSiteAudit', [
+                'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+                'nonce'   => wp_create_nonce( 'csdt_site_audit_nonce' ),
+            ] );
+        }
+
         if ( $active_tab === 'logs' ) {
             $logs_js = plugin_dir_path( __FILE__ ) . 'assets/cs-server-logs.js';
             wp_enqueue_script(
@@ -1287,6 +1319,14 @@ class CloudScale_DevTools {
                    class="cs-tab <?php echo $active_tab === '404' ? 'active' : ''; ?>">
                     🎮 <?php esc_html_e( '404 Games', 'cloudscale-devtools' ); ?>
                 </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=optimizer' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'optimizer' ? 'active' : ''; ?>">
+                    🔧 <?php esc_html_e( 'Optimizer', 'cloudscale-devtools' ); ?>
+                </a>
+                <a href="<?php echo esc_url( $base_url . '&tab=site-audit' ); ?>"
+                   class="cs-tab <?php echo $active_tab === 'site-audit' ? 'active' : ''; ?>">
+                    🔍 <?php esc_html_e( 'Site Audit', 'cloudscale-devtools' ); ?>
+                </a>
                 <a href="<?php echo esc_url( $base_url . '&tab=logs' ); ?>"
                    class="cs-tab <?php echo $active_tab === 'logs' ? 'active' : ''; ?>">
                     📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?>
@@ -1332,6 +1372,14 @@ class CloudScale_DevTools {
             <?php elseif ( $active_tab === 'security' ) : ?>
                 <div class="cs-tab-content active">
                     <?php self::render_security_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'optimizer' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php self::render_optimizer_panel(); ?>
+                </div>
+            <?php elseif ( $active_tab === 'site-audit' ) : ?>
+                <div class="cs-tab-content active">
+                    <?php self::render_site_audit_panel(); ?>
                 </div>
             <?php elseif ( $active_tab === 'logs' ) : ?>
                 <div class="cs-tab-content active">
@@ -9882,6 +9930,129 @@ class CloudScale_DevTools {
         <?php
     }
 
+    /* ==================================================================
+       Optimizer tab — Plugin Stack Scanner + AI Debugging Assistant
+       ================================================================== */
+
+    private static function render_site_audit_panel(): void {
+        $has_key    = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
+                      ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $security_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        ?>
+        <div class="cs-panel" id="cs-panel-site-audit">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#0f172a 0%,#1e2d40 100%);border-left:3px solid #10b981;">
+                <span>🔍 <?php esc_html_e( 'AI Site Auditor', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'One-click scan — SEO, performance, content, and database health, all in under 60 seconds', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div class="cs-panel-body">
+
+                <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
+                    <?php esc_html_e( 'Scans your published content and database, then uses AI to produce a prioritised issue list scored by impact. Covers SEO gaps, thin content, missing images, duplicate titles, database bloat, and plugin health — no external crawlers, no data leaving your server.', 'cloudscale-devtools' ); ?>
+                </p>
+                <p style="color:#9ca3af;margin:0 0 20px;font-size:.88em;">
+                    <?php esc_html_e( 'Without an AI key the audit still runs and returns rule-based findings. With an AI key you also get narrative summaries and prioritised recommendations.', 'cloudscale-devtools' ); ?>
+                </p>
+
+                <?php if ( ! $has_key ) : ?>
+                <div style="background:#fff7ed;border-left:3px solid #f59e0b;padding:11px 16px;border-radius:0 6px 6px 0;margin-bottom:16px;font-size:13px;color:#92400e;">
+                    <?php printf(
+                        /* translators: %s: link to security tab */
+                        esc_html__( 'Add an AI key for narrative summaries and deeper analysis. %s', 'cloudscale-devtools' ),
+                        '<a href="' . esc_url( $security_url ) . '" style="color:#b45309;font-weight:600;">' . esc_html__( 'Add your key on the Security tab →', 'cloudscale-devtools' ) . '</a>'
+                    ); ?>
+                </div>
+                <?php endif; ?>
+
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:24px;">
+                    <button id="csdt-site-audit-btn" class="cs-btn-primary" style="background:linear-gradient(135deg,#10b981,#059669);border-color:#059669;">
+                        🚀 <?php esc_html_e( 'Run Site Audit', 'cloudscale-devtools' ); ?>
+                    </button>
+                    <span id="csdt-site-audit-progress" style="display:none;color:#6b7280;font-size:13px;">
+                        ⏳ <span id="csdt-site-audit-progress-text"><?php esc_html_e( 'Gathering site data...', 'cloudscale-devtools' ); ?></span>
+                    </span>
+                </div>
+
+                <div id="csdt-site-audit-results" style="display:none;"></div>
+
+            </div>
+        </div>
+        <?php
+    }
+
+    private static function render_optimizer_panel(): void {
+        $has_key = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
+                   ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+        $security_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        ?>
+        <div class="cs-panel" id="cs-panel-optimizer">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f35 0%,#1e2d40 100%);border-left:3px solid #6366f1;">
+                <span>🔧 <?php esc_html_e( 'Plugin Optimizer', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'Find plugins CloudScale replaces, reduce bloat, and diagnose errors with AI', 'cloudscale-devtools' ); ?></span>
+            </div>
+            <div class="cs-panel-body">
+
+                <!-- ── Plugin Stack Scanner ──────────────────────────────── -->
+                <div style="margin-bottom:36px;">
+                    <h2 class="cs-panel-heading">🔍 <?php esc_html_e( 'Plugin Stack Scanner', 'cloudscale-devtools' ); ?></h2>
+                    <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
+                        <?php esc_html_e( 'CloudScale replaces entire categories of WordPress plugins — security scanners, 2FA plugins, SMTP mailers, code block plugins, SQL tools, and log viewers. Scan to find out which of your installed plugins you can safely remove.', 'cloudscale-devtools' ); ?>
+                    </p>
+                    <p style="color:#9ca3af;margin:0 0 18px;font-size:.88em;">
+                        <?php esc_html_e( 'Fewer plugins = smaller attack surface, faster page loads, fewer update conflicts.', 'cloudscale-devtools' ); ?>
+                    </p>
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <button id="csdt-optimizer-scan-btn" class="cs-btn-primary">
+                            🔍 <?php esc_html_e( 'Scan My Plugin Stack', 'cloudscale-devtools' ); ?>
+                        </button>
+                        <span id="csdt-optimizer-scanning" style="display:none;color:#6b7280;font-size:13px;">
+                            ⏳ <?php esc_html_e( 'Scanning installed plugins...', 'cloudscale-devtools' ); ?>
+                        </span>
+                    </div>
+                    <div id="csdt-optimizer-results" style="display:none;margin-top:20px;"></div>
+                </div>
+
+                <!-- ── AI Debugging Assistant ────────────────────────────── -->
+                <div style="border-top:1px solid #e5e7eb;padding-top:28px;">
+                    <h2 class="cs-panel-heading">🤖 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></h2>
+                    <p style="color:#4b5563;margin:0 0 6px;line-height:1.65;font-size:.95em;">
+                        <?php esc_html_e( 'Paste an error message, PHP warning, or stack trace. The AI identifies the root cause and gives you specific steps to fix it — no more hunting through Stack Overflow.', 'cloudscale-devtools' ); ?>
+                    </p>
+                    <p style="color:#9ca3af;margin:0 0 16px;font-size:.88em;">
+                        <?php esc_html_e( 'Works with PHP fatal errors, WordPress notices, plugin conflicts, database errors, and 500s.', 'cloudscale-devtools' ); ?>
+                    </p>
+
+                    <?php if ( ! $has_key ) : ?>
+                    <div style="background:#fff7ed;border-left:3px solid #f59e0b;padding:11px 16px;border-radius:0 6px 6px 0;margin-bottom:16px;font-size:13px;color:#92400e;">
+                        <?php printf(
+                            /* translators: %s: link to security tab */
+                            esc_html__( 'AI analysis requires an API key. %s', 'cloudscale-devtools' ),
+                            '<a href="' . esc_url( $security_url ) . '" style="color:#b45309;font-weight:600;">' . esc_html__( 'Add your key on the Security tab →', 'cloudscale-devtools' ) . '</a>'
+                        ); ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <textarea id="csdt-debug-input"
+                              rows="6"
+                              placeholder="<?php esc_attr_e( 'Paste your error message, stack trace, or describe the problem...', 'cloudscale-devtools' ); ?>"
+                              style="width:100%;font-family:'SF Mono','Fira Code',Consolas,monospace;font-size:12px;background:#0d1117;color:#c9d1d9;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:12px;box-sizing:border-box;resize:vertical;line-height:1.6;"></textarea>
+
+                    <div style="display:flex;align-items:center;gap:12px;margin-top:10px;flex-wrap:wrap;">
+                        <button id="csdt-debug-analyze-btn" class="cs-btn-primary" <?php echo $has_key ? '' : 'disabled style="opacity:.5;cursor:not-allowed;"'; ?>>
+                            🤖 <?php esc_html_e( 'Diagnose with AI', 'cloudscale-devtools' ); ?>
+                        </button>
+                        <span id="csdt-debug-analyzing" style="display:none;color:#6b7280;font-size:13px;">
+                            ⏳ <?php esc_html_e( 'Analyzing...', 'cloudscale-devtools' ); ?>
+                        </span>
+                    </div>
+
+                    <div id="csdt-debug-result" style="display:none;margin-top:20px;"></div>
+                </div>
+
+            </div>
+        </div>
+        <?php
+    }
+
     private static function render_security_panel(): void {
         ?>
         <div class="cs-panel" id="cs-panel-security">
@@ -10959,6 +11130,451 @@ PROMPT;
             delete_transient( 'csdt_vuln_scan_status' );
         }
         wp_send_json_success( [ 'cancelled' => true ] );
+    }
+
+    // ── Optimizer: Plugin Stack Scanner ──────────────────────────────
+
+    public static function ajax_plugin_stack_scan(): void {
+        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        if ( ! function_exists( 'get_plugins' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $replacements = self::get_plugin_replacements();
+        $active       = (array) get_option( 'active_plugins', [] );
+        $all_plugins  = get_plugins();
+        $matched      = [];
+        $total_saving = 0;
+
+        foreach ( $active as $plugin_file ) {
+            if ( isset( $replacements[ $plugin_file ] ) ) {
+                $r         = $replacements[ $plugin_file ];
+                $info      = $all_plugins[ $plugin_file ] ?? [];
+                $matched[] = [
+                    'file'    => $plugin_file,
+                    'name'    => ! empty( $info['Name'] ) ? $info['Name'] : $r['name'],
+                    'version' => $info['Version'] ?? '',
+                    'feature' => $r['feature'],
+                    'tab'     => $r['tab'],
+                    'cost'    => $r['cost'],
+                ];
+                $total_saving += $r['cost'];
+            }
+        }
+
+        wp_send_json_success( [
+            'matched'      => $matched,
+            'total_saving' => $total_saving,
+            'active_count' => count( $active ),
+        ] );
+    }
+
+    private static function get_plugin_replacements(): array {
+        return [
+            // Security scanners / firewalls
+            'wordfence/wordfence.php'                                          => [ 'name' => 'Wordfence Security',            'feature' => 'AI Cyber Audit + Quick Fixes + Brute Force Protection',  'tab' => 'security',   'cost' => 119 ],
+            'better-wp-security/better-wp-security.php'                       => [ 'name' => 'iThemes Security',              'feature' => 'Hide Login URL + Brute Force + Security Audit',          'tab' => 'login',      'cost' => 99  ],
+            'all-in-one-wp-security-and-firewall/wp-security.php'             => [ 'name' => 'All-In-One Security & Firewall', 'feature' => 'Hide Login URL + Brute Force + Hardening Quick Fixes',  'tab' => 'login',      'cost' => 0   ],
+            'sucuri-scanner/sucuri.php'                                        => [ 'name' => 'Sucuri Security',                'feature' => 'AI Cyber Audit + Server Logs',                           'tab' => 'security',   'cost' => 199 ],
+            'wp-cerber/wp-cerber.php'                                          => [ 'name' => 'WP Cerber Security',             'feature' => 'Brute Force Protection + Hide Login URL',                'tab' => 'login',      'cost' => 99  ],
+            'shield-security/icwp-wpsf.php'                                   => [ 'name' => 'Shield Security',                'feature' => 'AI Cyber Audit + Brute Force + Login Security',          'tab' => 'security',   'cost' => 69  ],
+            // Two-factor authentication
+            'wp-2fa/wp-2fa.php'                                                => [ 'name' => 'WP 2FA',                         'feature' => 'Two-Factor Auth (email OTP, TOTP, Passkeys)',             'tab' => 'login',      'cost' => 79  ],
+            'miniorange-2-factor-authentication/miniorange_2_factor_authentication.php' => [ 'name' => 'miniOrange 2FA',       'feature' => 'Two-Factor Auth (email OTP, TOTP)',                       'tab' => 'login',      'cost' => 99  ],
+            'google-authenticator/google-authenticator.php'                    => [ 'name' => 'Google Authenticator',           'feature' => 'Two-Factor Auth (TOTP authenticator app)',                'tab' => 'login',      'cost' => 0   ],
+            'duo-wordpress/duo.php'                                            => [ 'name' => 'Duo Two-Factor Auth',             'feature' => 'Two-Factor Authentication',                               'tab' => 'login',      'cost' => 0   ],
+            'two-factor/two-factor.php'                                        => [ 'name' => 'Two Factor',                     'feature' => 'Two-Factor Auth (email OTP, TOTP, Passkeys)',             'tab' => 'login',      'cost' => 0   ],
+            // Login protection / hide login
+            'limit-login-attempts-reloaded/limit-login-attempts-reloaded.php' => [ 'name' => 'Limit Login Attempts Reloaded',  'feature' => 'Brute Force Protection (per-account lockout)',            'tab' => 'login',      'cost' => 0   ],
+            'loginpress/loginpress.php'                                        => [ 'name' => 'LoginPress',                     'feature' => 'Hide Login URL',                                          'tab' => 'login',      'cost' => 49  ],
+            'wps-hide-login/wps-hide-login.php'                                => [ 'name' => 'WPS Hide Login',                 'feature' => 'Hide Login URL',                                          'tab' => 'login',      'cost' => 0   ],
+            'rename-wp-login/rename-wp-login.php'                              => [ 'name' => 'Rename wp-login.php',            'feature' => 'Hide Login URL',                                          'tab' => 'login',      'cost' => 0   ],
+            'sf-move-login/sf-move-login.php'                                  => [ 'name' => 'Move Login',                     'feature' => 'Hide Login URL',                                          'tab' => 'login',      'cost' => 0   ],
+            // SMTP
+            'wp-mail-smtp/wp_mail_smtp.php'                                    => [ 'name' => 'WP Mail SMTP',                   'feature' => 'SMTP Mail (authenticated delivery + email log)',          'tab' => 'mail',       'cost' => 49  ],
+            'post-smtp/postman-smtp.php'                                       => [ 'name' => 'Post SMTP',                      'feature' => 'SMTP Mail (authenticated delivery)',                       'tab' => 'mail',       'cost' => 0   ],
+            'easy-wp-smtp/easy-wp-smtp.php'                                    => [ 'name' => 'Easy WP SMTP',                   'feature' => 'SMTP Mail',                                               'tab' => 'mail',       'cost' => 0   ],
+            'fluent-smtp/fluent-smtp.php'                                      => [ 'name' => 'FluentSMTP',                     'feature' => 'SMTP Mail',                                               'tab' => 'mail',       'cost' => 0   ],
+            'sendgrid-email-delivery-simplified/wpsendgrid.php'                => [ 'name' => 'SendGrid',                       'feature' => 'SMTP Mail (use any SMTP provider)',                       'tab' => 'mail',       'cost' => 0   ],
+            // Code syntax highlighting
+            'enlighter/enlighter.php'                                          => [ 'name' => 'Enlighter Syntax Highlighter',   'feature' => 'Code Block (190+ languages, 14 themes, zero CDN)',       'tab' => 'migrate',    'cost' => 29  ],
+            'syntaxhighlighter/syntaxhighlighter.php'                          => [ 'name' => 'SyntaxHighlighter Evolved',      'feature' => 'Code Block (190+ languages)',                             'tab' => 'migrate',    'cost' => 0   ],
+            'prismatic/prismatic.php'                                          => [ 'name' => 'Prismatic',                      'feature' => 'Code Block (190+ languages, 14 themes)',                  'tab' => 'migrate',    'cost' => 29  ],
+            'code-syntax-block/index.php'                                      => [ 'name' => 'Code Syntax Block',              'feature' => 'Code Block (Gutenberg block)',                            'tab' => 'migrate',    'cost' => 0   ],
+            'urvanov-syntax-highlighter/urvanov-syntax-highlighter.php'        => [ 'name' => 'Urvanov Syntax Highlighter',     'feature' => 'Code Block',                                              'tab' => 'migrate',    'cost' => 0   ],
+            // SQL / database tools
+            'wp-phpmyadmin-extension/wp-phpmyadmin-extension.php'              => [ 'name' => 'WP phpMyAdmin',                  'feature' => 'SQL Query Tool (read-only, safe, wp-admin only)',         'tab' => 'sql',        'cost' => 0   ],
+            'adminer-for-wordpress/adminer-for-wordpress.php'                  => [ 'name' => 'Adminer for WordPress',          'feature' => 'SQL Query Tool',                                          'tab' => 'sql',        'cost' => 0   ],
+            // Log viewers / debug tools
+            'wp-log-viewer/wp-log-viewer.php'                                  => [ 'name' => 'WP Log Viewer',                  'feature' => 'Server Logs (live search, tail mode, multiple sources)',  'tab' => 'logs',       'cost' => 0   ],
+            'query-monitor/query-monitor.php'                                  => [ 'name' => 'Query Monitor',                  'feature' => 'Performance Monitor + Server Logs',                       'tab' => 'logs',       'cost' => 0   ],
+            'debug-bar/debug-bar.php'                                          => [ 'name' => 'Debug Bar',                      'feature' => 'Performance Monitor',                                     'tab' => 'logs',       'cost' => 0   ],
+            // Social / OG images
+            'wordpress-seo/wp-seo.php'                                         => [ 'name' => 'Yoast SEO',                      'feature' => 'Thumbnails (og:image generation + social preview scan)',  'tab' => 'thumbnails', 'cost' => 99  ],
+            'seo-by-rank-math/rank-math.php'                                   => [ 'name' => 'Rank Math SEO',                  'feature' => 'Thumbnails (og:image generation)',                        'tab' => 'thumbnails', 'cost' => 0   ],
+        ];
+    }
+
+    // ── Optimizer: AI Debugging Assistant ────────────────────────────
+
+    public static function ajax_ai_debug_log(): void {
+        check_ajax_referer( 'csdt_optimizer_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $raw_input = isset( $_POST['input'] ) ? wp_unslash( $_POST['input'] ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+        $input     = sanitize_textarea_field( $raw_input );
+        if ( empty( trim( $input ) ) ) {
+            wp_send_json_error( [ 'message' => 'No input provided.' ] );
+        }
+
+        $site_ctx = sprintf( 'WordPress %s, PHP %s', get_bloginfo( 'version' ), PHP_VERSION );
+        $system   = 'You are a WordPress debugging expert. The user provides an error message, log excerpt, or problem description. Identify the root cause and give specific actionable steps to fix it. Be direct and practical. Structure your response with exactly three sections: **Root Cause** (1-2 sentences), **Why It Happens** (2-3 sentences explaining the underlying mechanism), **How to Fix It** (numbered steps). Use backtick formatting for file paths, function names, and code snippets. Do not pad with generic advice.';
+        $user_msg = "Site context: {$site_ctx}\n\nError / Problem:\n{$input}";
+
+        $result = self::dispatch_ai_call( $system, $user_msg, '_auto', 1024 );
+
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( [ 'message' => $result->get_error_message() ] );
+        }
+
+        wp_send_json_success( [ 'analysis' => $result ] );
+    }
+
+    // ── AI Site Auditor ───────────────────────────────────────────────
+
+    public static function ajax_site_audit(): void {
+        check_ajax_referer( 'csdt_site_audit_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $data     = self::gather_site_audit_data();
+        $has_key  = ! empty( get_option( 'csdt_devtools_anthropic_key', '' ) ) ||
+                    ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
+
+        if ( $has_key ) {
+            $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first).';
+
+            $user_msg = "Audit this WordPress site and return findings as a JSON array:\n\n" . wp_json_encode( $data, JSON_PRETTY_PRINT );
+
+            try {
+                $raw      = self::dispatch_ai_call( $system, $user_msg, '_auto', 2048 );
+                // Strip markdown code fences if present
+                $raw      = preg_replace( '/^```(?:json)?\s*/i', '', trim( $raw ) );
+                $raw      = preg_replace( '/\s*```$/', '', $raw );
+                $findings = json_decode( $raw, true );
+                if ( ! is_array( $findings ) ) {
+                    $findings = self::generate_rule_based_findings( $data );
+                }
+            } catch ( \Throwable $e ) {
+                $findings = self::generate_rule_based_findings( $data );
+            }
+        } else {
+            $findings = self::generate_rule_based_findings( $data );
+        }
+
+        // Attach summary counts
+        $counts = [ 'critical' => 0, 'high' => 0, 'medium' => 0, 'low' => 0, 'info' => 0 ];
+        foreach ( $findings as $f ) {
+            $sev = strtolower( $f['severity'] ?? 'info' );
+            if ( isset( $counts[ $sev ] ) ) { $counts[ $sev ]++; }
+        }
+
+        wp_send_json_success( [
+            'findings' => $findings,
+            'counts'   => $counts,
+            'ai_used'  => $has_key,
+            'post_count' => $data['post_count'] ?? 0,
+        ] );
+    }
+
+    private static function gather_site_audit_data(): array {
+        global $wpdb;
+
+        // ── Content sample (up to 100 published posts + pages) ──
+        $posts = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT ID, post_title, post_type, post_status, post_content,
+                    post_modified, comment_count
+             FROM {$wpdb->posts}
+             WHERE post_status = 'publish'
+               AND post_type   IN ('post','page')
+             ORDER BY post_modified DESC
+             LIMIT 100",
+            ARRAY_A
+        ) ?: [];
+
+        $post_ids     = array_column( $posts, 'ID' );
+        $post_count   = count( $posts );
+
+        // ── SEO meta (Yoast / RankMath / AIO-SEO) ──
+        $meta_map = [];
+        if ( $post_ids ) {
+            $in_clause  = implode( ',', array_map( 'intval', $post_ids ) );
+            $meta_rows  = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+                "SELECT post_id, meta_key, meta_value
+                 FROM {$wpdb->postmeta}
+                 WHERE post_id IN ({$in_clause})
+                   AND meta_key IN ('_yoast_wpseo_metadesc','_yoast_wpseo_title',
+                                    'rank_math_description','rank_math_title',
+                                    '_aioseop_description','_aioseop_title',
+                                    '_thumbnail_id')",
+                ARRAY_A
+            ) ?: [];
+            foreach ( $meta_rows as $row ) {
+                $meta_map[ $row['post_id'] ][ $row['meta_key'] ] = $row['meta_value'];
+            }
+        }
+
+        // ── Analyse posts ──
+        $issues          = [ 'no_meta_desc' => [], 'no_title_tag' => [], 'thin_content' => [], 'no_featured_image' => [], 'duplicate_titles' => [] ];
+        $title_counts    = [];
+        $word_count_data = [];
+
+        $meta_desc_keys = [ '_yoast_wpseo_metadesc', 'rank_math_description', '_aioseop_description' ];
+        $title_keys     = [ '_yoast_wpseo_title', 'rank_math_title', '_aioseop_title' ];
+
+        foreach ( $posts as $p ) {
+            $id    = (int) $p['ID'];
+            $title = $p['post_title'];
+            $meta  = $meta_map[ $id ] ?? [];
+
+            // Duplicate titles
+            $title_counts[ $title ] = ( $title_counts[ $title ] ?? 0 ) + 1;
+
+            // Meta description
+            $has_meta_desc = false;
+            foreach ( $meta_desc_keys as $k ) {
+                if ( ! empty( $meta[ $k ] ) ) { $has_meta_desc = true; break; }
+            }
+            if ( ! $has_meta_desc ) { $issues['no_meta_desc'][] = $title; }
+
+            // SEO title
+            $has_title = false;
+            foreach ( $title_keys as $k ) {
+                if ( ! empty( $meta[ $k ] ) ) { $has_title = true; break; }
+            }
+            if ( ! $has_title ) { $issues['no_title_tag'][] = $title; }
+
+            // Word count
+            $words = str_word_count( wp_strip_all_tags( $p['post_content'] ) );
+            if ( $words < 300 ) { $issues['thin_content'][] = [ 'title' => $title, 'words' => $words ]; }
+            $word_count_data[] = $words;
+
+            // Featured image
+            if ( empty( $meta['_thumbnail_id'] ) ) { $issues['no_featured_image'][] = $title; }
+        }
+
+        // Duplicate titles (more than once)
+        foreach ( $title_counts as $t => $c ) {
+            if ( $c > 1 ) { $issues['duplicate_titles'][] = $t; }
+        }
+
+        $avg_words = $word_count_data ? (int) ( array_sum( $word_count_data ) / count( $word_count_data ) ) : 0;
+
+        // ── Database health ──
+        $autoload_kb = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT ROUND( SUM( LENGTH(option_value) ) / 1024 ) FROM {$wpdb->options} WHERE autoload = 'yes'"
+        );
+
+        $expired_transients = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT COUNT(*) FROM {$wpdb->options}
+             WHERE option_name LIKE '_transient_timeout_%'
+               AND CAST( option_value AS UNSIGNED ) < UNIX_TIMESTAMP()"
+        );
+
+        $revision_count = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'revision'"
+        );
+
+        $orphan_postmeta = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+            "SELECT COUNT(*) FROM {$wpdb->postmeta} pm
+             LEFT JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+             WHERE p.ID IS NULL"
+        );
+
+        // ── Plugin health ──
+        if ( ! function_exists( 'get_plugins' ) ) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $all_plugins    = get_plugins();
+        $active_slugs   = (array) get_option( 'active_plugins', [] );
+        $active_count   = count( $active_slugs );
+        $inactive_count = count( $all_plugins ) - $active_count;
+
+        // ── Config flags ──
+        $debug_on      = defined( 'WP_DEBUG' ) && WP_DEBUG;
+        $debug_log_on  = defined( 'WP_DEBUG_LOG' ) && WP_DEBUG_LOG;
+        $revisions_max = defined( 'WP_POST_REVISIONS' ) ? WP_POST_REVISIONS : -1;
+
+        return [
+            'post_count'          => $post_count,
+            'avg_word_count'      => $avg_words,
+            'no_meta_desc_count'  => count( $issues['no_meta_desc'] ),
+            'no_meta_desc_sample' => array_slice( $issues['no_meta_desc'], 0, 5 ),
+            'no_title_tag_count'  => count( $issues['no_title_tag'] ),
+            'thin_content_count'  => count( $issues['thin_content'] ),
+            'thin_content_sample' => array_slice( $issues['thin_content'], 0, 5 ),
+            'no_featured_img_count' => count( $issues['no_featured_image'] ),
+            'duplicate_titles'    => $issues['duplicate_titles'],
+            'autoload_kb'         => $autoload_kb,
+            'expired_transients'  => $expired_transients,
+            'revision_count'      => $revision_count,
+            'orphan_postmeta'     => $orphan_postmeta,
+            'active_plugins'      => $active_count,
+            'inactive_plugins'    => $inactive_count,
+            'wp_debug'            => $debug_on,
+            'wp_debug_log'        => $debug_log_on,
+            'revisions_max'       => $revisions_max,
+            'wp_version'          => get_bloginfo( 'version' ),
+            'php_version'         => PHP_VERSION,
+        ];
+    }
+
+    private static function generate_rule_based_findings( array $d ): array {
+        $findings = [];
+
+        if ( $d['no_meta_desc_count'] > 0 ) {
+            $sev  = $d['no_meta_desc_count'] > 10 ? 'high' : 'medium';
+            $findings[] = [
+                'category' => 'SEO',
+                'severity' => $sev,
+                'title'    => "Missing meta descriptions on {$d['no_meta_desc_count']} posts/pages",
+                'detail'   => 'Meta descriptions control how your pages appear in Google search results. Missing descriptions mean Google auto-generates them, often producing poor click-through rates.',
+                'fix'      => 'Install Yoast SEO or Rank Math and add meta descriptions. Focus on your highest-traffic pages first.',
+                'affected' => "{$d['no_meta_desc_count']} posts/pages",
+            ];
+        }
+
+        if ( $d['thin_content_count'] > 0 ) {
+            $sev = $d['thin_content_count'] > 15 ? 'high' : 'medium';
+            $findings[] = [
+                'category' => 'Content',
+                'severity' => $sev,
+                'title'    => "{$d['thin_content_count']} pages with fewer than 300 words",
+                'detail'   => 'Thin content is a known Google ranking penalty trigger. Pages under 300 words rarely rank for competitive terms and may dilute the authority of the whole site.',
+                'fix'      => 'Expand these pages with useful content, merge them into a comprehensive page, or set them to noindex if they serve a utility purpose only.',
+                'affected' => "{$d['thin_content_count']} pages",
+            ];
+        }
+
+        if ( ! empty( $d['duplicate_titles'] ) ) {
+            $count      = count( $d['duplicate_titles'] );
+            $findings[] = [
+                'category' => 'SEO',
+                'severity' => 'high',
+                'title'    => "Duplicate page titles: {$count} title(s) used on multiple pages",
+                'detail'   => 'Google treats duplicate titles as a quality signal. Pages sharing titles compete against each other and confuse crawlers about which to rank.',
+                'fix'      => 'Give every page a unique, descriptive title that includes the target keyword for that page.',
+                'affected' => "{$count} duplicate title groups",
+            ];
+        }
+
+        if ( $d['no_featured_img_count'] > 0 ) {
+            $findings[] = [
+                'category' => 'SEO',
+                'severity' => 'low',
+                'title'    => "{$d['no_featured_img_count']} posts/pages missing a featured image",
+                'detail'   => 'Featured images are used for og:image, Twitter cards, and on-site article previews. Missing them weakens social sharing and can reduce click-through from search.',
+                'fix'      => 'Add a relevant featured image to each post. Use a 1200×630px image for best social media compatibility.',
+                'affected' => "{$d['no_featured_img_count']} posts/pages",
+            ];
+        }
+
+        if ( $d['autoload_kb'] > 800 ) {
+            $sev = $d['autoload_kb'] > 2000 ? 'critical' : ( $d['autoload_kb'] > 1200 ? 'high' : 'medium' );
+            $findings[] = [
+                'category' => 'Performance',
+                'severity' => $sev,
+                'title'    => "Autoloaded options: {$d['autoload_kb']} KB loaded on every page",
+                'detail'   => 'WordPress loads all autoloaded options on every page request. Values above 800 KB add measurable latency to every PHP execution. Common culprits are abandoned plugins that store large serialised data.',
+                'fix'      => 'Run a query to find the top 20 autoloaded options by size: SELECT option_name, length(option_value) as size FROM wp_options WHERE autoload="yes" ORDER BY size DESC LIMIT 20. Review and delete any from deactivated plugins.',
+                'affected' => "wp_options ({$d['autoload_kb']} KB autoloaded)",
+            ];
+        }
+
+        if ( $d['expired_transients'] > 50 ) {
+            $findings[] = [
+                'category' => 'Database',
+                'severity' => 'medium',
+                'title'    => "{$d['expired_transients']} expired transients in the database",
+                'detail'   => 'Expired transients are stale cache entries that WordPress has not yet purged. They bloat the wp_options table and slow down option queries.',
+                'fix'      => 'Use the WP-CLI command: wp transient delete --expired. Or install WP-Optimize to schedule automatic cleanup.',
+                'affected' => "wp_options table",
+            ];
+        }
+
+        if ( $d['revision_count'] > 500 ) {
+            $sev = $d['revision_count'] > 2000 ? 'medium' : 'low';
+            $findings[] = [
+                'category' => 'Database',
+                'severity' => $sev,
+                'title'    => "{$d['revision_count']} post revisions in the database",
+                'detail'   => 'Post revisions accumulate over time and are rarely used after the first few. Thousands of revisions bloat the wp_posts table and slow backup and export operations.',
+                'fix'      => "Add define('WP_POST_REVISIONS', 5) to wp-config.php to cap future revisions. Clean existing ones with: wp post delete \$(wp post list --post_type=revision --format=ids)",
+                'affected' => "wp_posts table ({$d['revision_count']} revisions)",
+            ];
+        }
+
+        if ( $d['orphan_postmeta'] > 100 ) {
+            $findings[] = [
+                'category' => 'Database',
+                'severity' => 'low',
+                'title'    => "{$d['orphan_postmeta']} orphaned post meta rows",
+                'detail'   => 'Orphaned meta rows belong to posts that no longer exist. They accumulate when posts are hard-deleted without cleaning up associated metadata.',
+                'fix'      => 'Run: DELETE pm FROM wp_postmeta pm LEFT JOIN wp_posts p ON pm.post_id = p.ID WHERE p.ID IS NULL; — or use a DB cleanup plugin.',
+                'affected' => "wp_postmeta table",
+            ];
+        }
+
+        if ( $d['inactive_plugins'] > 3 ) {
+            $findings[] = [
+                'category' => 'Plugins',
+                'severity' => 'medium',
+                'title'    => "{$d['inactive_plugins']} inactive plugins still installed",
+                'detail'   => "Inactive plugins don't run, but their files still exist on disk, expanding your attack surface. If a vulnerability is discovered in an inactive plugin it can still be exploited.",
+                'fix'      => 'Delete all plugins you are not using. Go to Plugins → deactivate and delete rather than just deactivate.',
+                'affected' => "{$d['inactive_plugins']} plugins",
+            ];
+        }
+
+        if ( $d['active_plugins'] > 25 ) {
+            $findings[] = [
+                'category' => 'Performance',
+                'severity' => 'medium',
+                'title'    => "{$d['active_plugins']} active plugins — consider reducing",
+                'detail'   => 'Each active plugin adds PHP execution time, database queries, and JavaScript/CSS to every page load. Beyond ~20 plugins, the cumulative overhead becomes measurable.',
+                'fix'      => 'Audit your plugin stack. Use the Optimizer tab to identify plugins that CloudScale already replaces. Aim for under 20 active plugins.',
+                'affected' => "{$d['active_plugins']} active plugins",
+            ];
+        }
+
+        if ( $d['wp_debug'] ) {
+            $findings[] = [
+                'category' => 'Security',
+                'severity' => 'high',
+                'title'    => 'WP_DEBUG is enabled on a production site',
+                'detail'   => 'WP_DEBUG outputs PHP errors and notices directly to the browser. This leaks server paths, database table names, plugin file structures, and other information useful to attackers.',
+                'fix'      => "Set define('WP_DEBUG', false) in wp-config.php. If you need debug logging, use WP_DEBUG_LOG with WP_DEBUG_DISPLAY set to false.",
+                'affected' => 'wp-config.php',
+            ];
+        }
+
+        if ( empty( $findings ) ) {
+            $findings[] = [
+                'category' => 'info',
+                'severity' => 'info',
+                'title'    => 'No significant issues detected',
+                'detail'   => "Your site passed all {$d['post_count']} content checks and database health checks with no major issues found. Add an AI key for deeper analysis and narrative recommendations.",
+                'fix'      => 'Continue monitoring regularly. Add an AI API key for richer audit reports.',
+                'affected' => "All {$d['post_count']} posts/pages",
+            ];
+        }
+
+        return $findings;
     }
 
     // ── AI dispatcher — Anthropic or Gemini ──────────────────────────

@@ -23,7 +23,7 @@ helpLib.run({
         'description': 'Free WordPress security plugin powered by Anthropic Claude and Google Gemini AI. Features: AI cyber audit, two-factor authentication, passkeys (WebAuthn), hide login URL, brute-force protection, CSP builder, server logs, SQL tool, and syntax-highlighted code blocks.',
         'url': 'https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-cyber-devtools-help/',
         'downloadUrl': 'https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip',
-        'softwareVersion': '1.9.117',
+        'softwareVersion': '1.9.118',
         'author': { '@type': 'Person', 'name': 'Andrew Baker', 'url': 'https://your-wordpress-site.example.com' },
         'isAccessibleForFree': true,
         'license': 'https://www.gnu.org/licenses/gpl-2.0.html',
@@ -42,12 +42,59 @@ helpLib.run({
 <div style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 60%,#1e3a5f 100%);border-radius:12px;padding:40px 36px 36px;margin:0 0 36px;color:#fff;position:relative;overflow:hidden;">
 <div style="position:absolute;top:-40px;right:-40px;width:260px;height:260px;background:rgba(99,102,241,.15);border-radius:50%;pointer-events:none;"></div>
 <div style="position:relative;">
-<p style="margin:0 0 10px;font-size:.85em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#818cf8;">Free &amp; Open Source · No Subscription · Your Own API Key</p>
-<h1 style="margin:0 0 18px;font-size:2em;font-weight:900;line-height:1.2;color:#fff;background:transparent!important;padding:0!important;border:none!important;">43% of the Internet Runs WordPress.<br>Most of It Is Dangerously Exposed.</h1>
-<p style="margin:0 0 22px;font-size:1.1em;line-height:1.75;color:#cbd5e1;max-width:700px;">CloudScale Cyber and Devtools brings the same AI-powered security intelligence used by enterprise security teams directly into your WordPress dashboard. Completely free, open-source, and running on your own server. Powered by <strong style="color:#fff;">Anthropic Claude 4</strong> and <strong style="color:#fff;">Google Gemini 2.5 Pro</strong>.</p>
+<p style="margin:0 0 8px;font-size:.82em;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#a5b4fc;">Free &amp; Open Source · No Subscription · Your Own API Key</p>
+<h1 style="margin:0 0 16px;font-size:2em;font-weight:900;line-height:1.2;color:#fff;background:transparent!important;padding:0!important;border:none!important;">Stop Paying $300/Year for a Plugin Stack That Doesn't Work Together.</h1>
+<p style="margin:0 0 18px;font-size:1.1em;line-height:1.75;color:#cbd5e1;max-width:700px;">CloudScale replaces your security scanner, 2FA plugin, SMTP mailer, code highlighting plugin, SQL tool, and log viewer. <strong style="color:#fff;">One free, open-source plugin</strong>, running entirely on your own server. No subscriptions, no CDN dependencies, no data leaving your site without your say-so. Powered by <strong style="color:#fff;">Anthropic Claude 4</strong> and <strong style="color:#fff;">Google Gemini 2.5 Pro</strong> — frontier AI sent direct from your server to the provider's API.</p>
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 24px;">
+<span style="background:rgba(255,255,255,.15);color:#e2e8f0;font-size:.82em;font-weight:600;padding:5px 14px;border-radius:20px;">✓ Replaces 8+ plugins</span>
+<span style="background:rgba(255,255,255,.15);color:#e2e8f0;font-size:.82em;font-weight:600;padding:5px 14px;border-radius:20px;">✓ Saves $200–$400/year</span>
+<span style="background:rgba(255,255,255,.15);color:#e2e8f0;font-size:.82em;font-weight:600;padding:5px 14px;border-radius:20px;">✓ Zero CDN calls</span>
+<span style="background:rgba(255,255,255,.15);color:#e2e8f0;font-size:.82em;font-weight:600;padding:5px 14px;border-radius:20px;">✓ AI audit in 60 seconds</span>
+</div>
 <div style="display:flex;flex-wrap:wrap;gap:12px;">
 <a href="#download" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;font-weight:700;font-size:.95em;padding:12px 28px;border-radius:8px;">Download Free Plugin</a>
 <a href="#cs-section-security" style="display:inline-block;background:rgba(255,255,255,.12);color:#fff;text-decoration:none;font-weight:600;font-size:.95em;padding:12px 28px;border-radius:8px;border:1px solid rgba(255,255,255,.2);">See the AI Audit →</a>
+</div>
+</div>
+</div>
+
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:28px 32px;margin:0 0 36px;">
+<h2 style="margin:0 0 6px;font-size:1.2em;font-weight:800;color:#0f172a;text-align:center;background:transparent!important;padding:0!important;border:none!important;">Before CloudScale vs After</h2>
+<div style="display:flex;gap:12px;justify-content:center;margin:0 0 20px;">
+<span style="font-size:.8em;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:.07em;">Before</span>
+<span style="color:#94a3b8;">vs</span>
+<span style="font-size:.8em;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:.07em;">After CloudScale</span>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px;">
+<div style="display:grid;grid-template-columns:24px 1fr 1fr;gap:10px;align-items:center;background:#fff;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;">
+<span style="font-weight:800;color:#94a3b8;font-size:.85em;text-align:center;">1</span>
+<span style="color:#dc2626;font-size:.92em;line-height:1.5;">8 separate plugins to manage and update</span>
+<span style="color:#16a34a;font-size:.92em;line-height:1.5;font-weight:600;">One plugin, one place to manage</span>
+</div>
+<div style="display:grid;grid-template-columns:24px 1fr 1fr;gap:10px;align-items:center;background:#f8fafc;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;">
+<span style="font-weight:800;color:#94a3b8;font-size:.85em;text-align:center;">2</span>
+<span style="color:#dc2626;font-size:.92em;line-height:1.5;">$300–$400/year in premium licenses</span>
+<span style="color:#16a34a;font-size:.92em;line-height:1.5;font-weight:600;">Free forever. No premium tier.</span>
+</div>
+<div style="display:grid;grid-template-columns:24px 1fr 1fr;gap:10px;align-items:center;background:#fff;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;">
+<span style="font-weight:800;color:#94a3b8;font-size:.85em;text-align:center;">3</span>
+<span style="color:#dc2626;font-size:.92em;line-height:1.5;">Conflicts between overlapping plugin features</span>
+<span style="color:#16a34a;font-size:.92em;line-height:1.5;font-weight:600;">Built as a system — designed to work together</span>
+</div>
+<div style="display:grid;grid-template-columns:24px 1fr 1fr;gap:10px;align-items:center;background:#f8fafc;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;">
+<span style="font-weight:800;color:#94a3b8;font-size:.85em;text-align:center;">4</span>
+<span style="color:#dc2626;font-size:.92em;line-height:1.5;">CDN scripts on every page (hurts Core Web Vitals)</span>
+<span style="color:#16a34a;font-size:.92em;line-height:1.5;font-weight:600;">Everything runs on your own server, zero external calls</span>
+</div>
+<div style="display:grid;grid-template-columns:24px 1fr 1fr;gap:10px;align-items:center;background:#fff;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;">
+<span style="font-weight:800;color:#94a3b8;font-size:.85em;text-align:center;">5</span>
+<span style="color:#dc2626;font-size:.92em;line-height:1.5;">Site data routed through vendor servers</span>
+<span style="color:#16a34a;font-size:.92em;line-height:1.5;font-weight:600;">Data goes direct to the AI API you choose</span>
+</div>
+<div style="display:grid;grid-template-columns:24px 1fr 1fr;gap:10px;align-items:center;background:#f8fafc;border-radius:8px;padding:12px 16px;border:1px solid #f1f5f9;">
+<span style="font-weight:800;color:#94a3b8;font-size:.85em;text-align:center;">6</span>
+<span style="color:#dc2626;font-size:.92em;line-height:1.5;">Security audit = expensive consultant or nothing</span>
+<span style="color:#16a34a;font-size:.92em;line-height:1.5;font-weight:600;">AI security audit in 60 seconds, on demand</span>
 </div>
 </div>
 </div>
@@ -67,6 +114,28 @@ helpLib.run({
 <p style="margin:0;color:#374151;line-height:1.7;">For years, WordPress security advice has come in the form of checklists: "enable these constants in wp-config.php, install a firewall plugin, keep plugins updated." This advice is correct but woefully incomplete. A checklist tells you <em>what</em> to check. It cannot tell you what your specific configuration actually means from a risk perspective, whether a combination of settings creates an exposure that no individual setting would reveal, or whether one of your installed plugins contains obfuscated code that bypasses every firewall rule written. Checklists treat all sites as identical. Your site is not identical to anyone else's.</p>
 </div>
 
+<h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:0 0 14px;background:transparent!important;padding:0!important;border:none!important;">The Plugin Stack You're Currently Paying For</h2>
+
+<p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;">Here is the typical WordPress security and developer tooling stack, with real 2025 pricing for sites that take this seriously:</p>
+
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:22px 24px;margin:0 0 20px;overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;font-size:.92em;color:#374151;">
+<thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;font-weight:700;border-bottom:2px solid #e2e8f0;">Plugin</th><th style="padding:10px 14px;text-align:left;font-weight:700;border-bottom:2px solid #e2e8f0;">What it does</th><th style="padding:10px 14px;text-align:right;font-weight:700;border-bottom:2px solid #e2e8f0;">Premium cost</th></tr></thead>
+<tbody>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;">Wordfence Premium</td><td style="padding:10px 14px;">Security scanner, firewall, malware detection</td><td style="padding:10px 14px;text-align:right;color:#dc2626;font-weight:600;">$119/year</td></tr>
+<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;">WP 2FA Pro</td><td style="padding:10px 14px;">Two-factor authentication for wp-admin</td><td style="padding:10px 14px;text-align:right;color:#dc2626;font-weight:600;">$79/year</td></tr>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;">WP Mail SMTP Pro</td><td style="padding:10px 14px;">Authenticated SMTP email delivery</td><td style="padding:10px 14px;text-align:right;color:#dc2626;font-weight:600;">$49/year</td></tr>
+<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;">Prismatic</td><td style="padding:10px 14px;">Syntax-highlighted code blocks</td><td style="padding:10px 14px;text-align:right;color:#dc2626;font-weight:600;">$29/year</td></tr>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;font-weight:600;">iThemes Security Pro</td><td style="padding:10px 14px;">Brute-force protection, hide login URL</td><td style="padding:10px 14px;text-align:right;color:#dc2626;font-weight:600;">$99/year</td></tr>
+<tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;"><td style="padding:10px 14px;font-weight:600;">WPScan</td><td style="padding:10px 14px;">Vulnerability scanning and audit reporting</td><td style="padding:10px 14px;text-align:right;color:#dc2626;font-weight:600;">$25–$75/month</td></tr>
+<tr style="background:#fff7ed;"><td style="padding:10px 14px;font-weight:800;color:#0f172a;">Total (conservative)</td><td style="padding:10px 14px;color:#64748b;font-size:.9em;">Minimum tiers, annual billing</td><td style="padding:10px 14px;text-align:right;font-weight:800;color:#dc2626;font-size:1.1em;">$375–$1,275/year</td></tr>
+<tr style="background:#f0fdf4;border-top:2px solid #16a34a;"><td style="padding:10px 14px;font-weight:800;color:#16a34a;">CloudScale</td><td style="padding:10px 14px;color:#374151;">Everything above, plus frontier AI audit</td><td style="padding:10px 14px;text-align:right;font-weight:800;color:#16a34a;font-size:1.1em;">Free</td></tr>
+</tbody>
+</table>
+</div>
+
+<p style="font-size:1.05em;color:#374151;margin:0 0 24px;line-height:1.75;">This isn't a feature comparison where CloudScale cuts corners to hit a free price point. It's a full implementation of each category — and the AI security audit isn't a cut-down version of a paid product. It's built on frontier models that outperform the signature-based scanners you're currently paying for.</p>
+
 <h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:0 0 14px;background:transparent!important;padding:0!important;border:none!important;">Why the Existing Security Tools Fall Short</h2>
 
 <div style="background:#f1f5f9;border-radius:8px;padding:20px 24px;margin:0 0 24px;">
@@ -78,22 +147,27 @@ helpLib.run({
 
 <p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;"><strong>Wordfence</strong> ($119/year for premium), <strong>Sucuri</strong> ($199/year), and <strong>WPScan</strong> ($25–$75/month) are the tools most security professionals will point you to. They are legitimate products that do real things: malware signature scanning, firewall rules, IP reputation blocking. But they share a fundamental architectural limitation. They are <em>signature-based</em>. They match what they see on your site against a database of known bad patterns. If the malware or misconfiguration isn't in their database yet, they don't flag it. They are inherently reactive; they require someone to be compromised first, for the attack pattern to be captured, analysed, and written into a rule. By definition they cannot identify novel threats, unusual configuration combinations, or the specific risk profile of your particular setup.</p>
 
-<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:22px 24px;margin:0 0 20px;">
-<h3 style="margin:0 0 14px;font-size:1.05em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">CloudScale vs WPScan: Side by Side</h3>
-<table style="width:100%;border-collapse:collapse;font-size:.92em;color:#374151;">
-<thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;font-weight:700;border-bottom:2px solid #e2e8f0;">Capability</th><th style="padding:10px 14px;text-align:center;font-weight:700;border-bottom:2px solid #e2e8f0;">WPScan</th><th style="padding:10px 14px;text-align:center;font-weight:700;color:#6366f1;border-bottom:2px solid #e2e8f0;">CloudScale</th></tr></thead>
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:22px 24px;margin:0 0 20px;overflow-x:auto;">
+<h3 style="margin:0 0 14px;font-size:1.05em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">CloudScale vs The Paid Stack: Full Comparison</h3>
+<table style="width:100%;border-collapse:collapse;font-size:.88em;color:#374151;">
+<thead><tr style="background:#f1f5f9;">
+<th style="padding:10px 14px;text-align:left;font-weight:700;border-bottom:2px solid #e2e8f0;">Capability</th>
+<th style="padding:8px 10px;text-align:center;font-weight:700;border-bottom:2px solid #e2e8f0;">WPScan<br><span style="font-weight:400;color:#dc2626;font-size:.88em;">$25–$75/mo</span></th>
+<th style="padding:8px 10px;text-align:center;font-weight:700;border-bottom:2px solid #e2e8f0;">Wordfence Premium<br><span style="font-weight:400;color:#dc2626;font-size:.88em;">$119/yr</span></th>
+<th style="padding:8px 10px;text-align:center;font-weight:700;color:#6366f1;border-bottom:2px solid #e2e8f0;">CloudScale<br><span style="font-weight:400;color:#16a34a;font-size:.88em;">Free</span></th>
+</tr></thead>
 <tbody>
-<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">Cost</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">$25–$75/month</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">Free</td></tr>
-<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">Analysis method</td><td style="padding:10px 14px;text-align:center;">CVE database lookup</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">Frontier AI reasoning</td></tr>
-<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">Novel / zero-day threats</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">✗ Must be in database first</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✓ Reasons from first principles</td></tr>
-<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">Context-aware findings</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">✗</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✓ Your specific config</td></tr>
-<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">PHP code static analysis</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">✗</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✓ AI-triaged</td></tr>
-<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">SSH / server hardening checks</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">✗</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✓</td></tr>
-<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">DNS / SPF / DMARC analysis</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">✗</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✓</td></tr>
-<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">Remediation steps</td><td style="padding:10px 14px;text-align:center;">Generic</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">Specific to your site</td></tr>
-<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">One-click quick fixes</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">✗</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✓</td></tr>
-<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:10px 14px;">Your data passes through vendor</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">Yes</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">No. Direct to AI provider.</td></tr>
-<tr><td style="padding:10px 14px;">Login security (2FA, passkeys)</td><td style="padding:10px 14px;text-align:center;color:#dc2626;">✗</td><td style="padding:10px 14px;text-align:center;color:#16a34a;font-weight:600;">✓ Included free</td></tr>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">AI security analysis</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗ Signature only</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ Frontier AI</td></tr>
+<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">Novel / zero-day threats</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗ DB only</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗ DB only</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ First-principles reasoning</td></tr>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">Context-aware findings</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ Your specific config</td></tr>
+<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">PHP code static analysis</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#64748b;">Limited</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ AI-triaged per plugin</td></tr>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">SSH / sshd_config checks</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ CRITICAL finding if open</td></tr>
+<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">DNS / SPF / DMARC analysis</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓</td></tr>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">One-click remediations</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#64748b;">Some</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ 7 quick fixes</td></tr>
+<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">2FA + Passkeys included</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ All three methods</td></tr>
+<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">Data via vendor server</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">Yes</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">Yes</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">No. Direct to AI API.</td></tr>
+<tr style="background:#f8fafc;border-bottom:1px solid #f1f5f9;"><td style="padding:9px 14px;">SQL tool + server log viewer</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ Included</td></tr>
+<tr><td style="padding:9px 14px;">SMTP + syntax-highlighted code blocks</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#dc2626;">✗</td><td style="padding:9px 10px;text-align:center;color:#16a34a;font-weight:600;">✓ Included</td></tr>
 </tbody>
 </table>
 </div>
@@ -138,6 +212,25 @@ helpLib.run({
 <p style="margin:0 0 12px;color:#374151;line-height:1.7;">Most "AI-powered" WordPress security products send your site's data to their own servers first, where it gets logged, processed, and potentially used to train their models, before eventually forwarding it to an AI provider. You're paying for a middleman who adds latency, a new privacy risk, and a business model dependency. When that vendor changes their pricing, gets acquired, or goes offline, your security tooling goes with it.</p>
 <p style="margin:0 0 12px;color:#374151;line-height:1.7;">CloudScale works differently. <strong>Your WordPress data goes directly from your server to the AI provider's API</strong> (Anthropic or Google) with no intermediary, no CloudScale server, no third-party logging. You supply your own API key, so you have a direct relationship with the provider and full control over your data. CloudScale never sees your site data at all.</p>
 <p style="margin:0;color:#374151;line-height:1.7;">When Anthropic releases Claude Opus 5 or Google ships Gemini 3, <strong>you get it immediately.</strong> No waiting for a plugin vendor to integrate it, no being held on an older model to protect their infrastructure margins. CloudScale ships support for the latest frontier models as soon as they launch. You choose your model, you own the key, you get the best intelligence available from day one.</p>
+</div>
+
+<h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:0 0 14px;background:transparent!important;padding:0!important;border:none!important;">Why WordPress Plugin Stacks Are Broken (And How CloudScale Fixes It)</h2>
+
+<p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;">The average WordPress site runs 17 active plugins. Each one adds its own JavaScript, its own CSS, and its own HTTP requests to every page load. Each has its own update cycle, its own support forum, its own settings panel, and its own potential for conflict with every other plugin on the site. They were not designed to work together. They were each designed to solve one problem in isolation.</p>
+
+<p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;">The result is a fragmentation tax. You end up with five different places to check security settings. Your SMTP plugin doesn't know about your security plugin's admin restrictions. Your 2FA plugin doesn't know about your brute-force protection plugin's lockout logic. Your code highlighting plugin loads from a CDN that your Content Security Policy blocks. The more plugins you add, the more attack surface you expose, and the more cognitive overhead you carry every time you log into wp-admin.</p>
+
+<p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;">CloudScale is designed as a unified layer from the ground up. The security scanner knows about the login settings. The 2FA system integrates with the brute-force protection. The performance monitor shows load contribution from every component in one overlay. It was built as a system, not assembled from parts written by different teams for different purposes and then bolted together with activation hooks.</p>
+
+<p style="font-size:1.05em;color:#374151;margin:0 0 24px;line-height:1.75;">One plugin to install. One plugin to update. One changelog to read. One GitHub repository to audit. One developer to contact when something breaks. That consolidation is itself a security feature: fewer moving parts means fewer attack vectors and fewer places for something to quietly go wrong.</p>
+
+<div style="text-align:center;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);border-radius:12px;padding:36px 32px;margin:0 0 36px;">
+<h2 style="margin:0 0 10px;font-size:1.4em;font-weight:800;color:#fff;background:transparent!important;padding:0!important;border:none!important;">Ready to protect your site?</h2>
+<p style="margin:0 0 24px;color:#94a3b8;font-size:1em;line-height:1.6;">Free, open-source, and installed in under 5 minutes. Google Gemini's free tier means zero cost for daily AI security scans.</p>
+<div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;">
+<a href="https://your-s3-bucket.s3.af-south-1.amazonaws.com/cloudscale-devtools.zip" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;font-weight:700;font-size:.95em;padding:14px 32px;border-radius:8px;">⬇ Download Free Plugin</a>
+<a href="https://github.com/andrewbakercloudscale/cloudscale-cyber-devtools" target="_blank" rel="noopener" style="display:inline-block;background:rgba(255,255,255,.12);color:#fff;text-decoration:none;font-weight:600;font-size:.95em;padding:14px 32px;border-radius:8px;border:1px solid rgba(255,255,255,.2);">View on GitHub →</a>
+</div>
 </div>
 
 <h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:0 0 14px;background:transparent!important;padding:0!important;border:none!important;">Installing the Plugin: Step by Step</h2>
@@ -198,6 +291,18 @@ helpLib.run({
 
 <p style="font-size:.92em;color:#64748b;margin:0 0 16px;"><strong>Requirements:</strong> WordPress 6.0 or later, PHP 7.4 or later. Works on shared hosting, VPS, and managed WordPress hosting (WP Engine, Kinsta, Cloudways, etc.). Does not require SSH access or command-line tools.</p>
 
+<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:18px 22px;margin:0 0 20px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#166534;background:transparent!important;padding:0!important;border:none!important;">Safe to try: what CloudScale does not do</h3>
+<ul style="margin:0;padding-left:20px;color:#374151;font-size:.93em;line-height:1.9;">
+<li>Does not modify any existing plugin settings or post content</li>
+<li>No external CDN or third-party script dependencies — everything runs on your own server</li>
+<li>Your site data goes direct to the AI provider API you choose; CloudScale never sees it</li>
+<li>Fully open-source — every line of code is on GitHub and auditable by anyone</li>
+<li>Clean uninstall: removes all plugin data from the database on deletion, no pollution</li>
+<li>Does not conflict with existing security plugins — runs alongside Wordfence, iThemes, etc.</li>
+</ul>
+</div>
+
 <div style="background:#fff7ed;border-left:4px solid #ea580c;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 32px;">
 <p style="margin:0;color:#374151;font-size:.95em;line-height:1.65;"><strong>Before you start hardening anything: take a backup.</strong> The Quick Fixes in this plugin modify wp-config.php, database tables, and server configuration. In the unlikely event something goes wrong, you want a restore point. The free <a href="https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-backup-restore-help/" target="_blank" rel="noopener"><strong>CloudScale Backup and Restore plugin</strong></a> does one-click full-site backups (database + files) to local storage or cloud. Five minutes now saves hours later.</p>
 </div>
@@ -246,7 +351,28 @@ helpLib.run({
 <li><a href="#cs-section-code-block" style="color:#6366f1;">Code Block</a> themes, languages, and usage</li>
 <li><a href="#cs-section-sql-tool" style="color:#6366f1;">SQL Query Tool</a> and built-in queries</li>
 <li><a href="#cs-section-server-logs" style="color:#6366f1;">Server Logs</a> viewer and tail mode</li>
+<li><a href="#cs-section-optimizer" style="color:#6366f1;">Plugin Optimizer</a> — plugin stack scanner and AI debugging</li>
 </ul>
+</div>
+</div>
+
+<h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:36px 0 20px;background:transparent!important;padding:0!important;border:none!important;">Who CloudScale Is For</h2>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin:0 0 32px;">
+<div style="background:#f0f9ff;border-top:3px solid #0e6b8f;border-radius:8px;padding:22px 22px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">For Developers</h3>
+<p style="margin:0 0 12px;color:#374151;font-size:.93em;line-height:1.7;">You manage multiple client sites. You need a SQL query tool, server log viewer, syntax-highlighted code blocks, and SMTP in one place — not six separate plugins to install, configure, and update on every new site.</p>
+<p style="margin:0;color:#374151;font-size:.93em;line-height:1.7;">CloudScale gives you the full dev toolkit. The AI audit means every client site gets enterprise-grade security analysis at zero cost to you or them.</p>
+</div>
+<div style="background:#fff7ed;border-top:3px solid #ea580c;border-radius:8px;padding:22px 22px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">For Site Owners</h3>
+<p style="margin:0 0 12px;color:#374151;font-size:.93em;line-height:1.7;">You run a WooCommerce store or a content site. Security isn't your day job, but getting hacked would be catastrophic. You need protection that works without requiring you to understand every CVE or hardening flag.</p>
+<p style="margin:0;color:#374151;font-size:.93em;line-height:1.7;">Run the AI audit once. Work through Quick Fixes. Enable 2FA. You're done — and better protected than most sites paying $300/year for plugin subscriptions.</p>
+</div>
+<div style="background:#fdf4ff;border-top:3px solid #9333ea;border-radius:8px;padding:22px 22px;">
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">For Agencies</h3>
+<p style="margin:0 0 12px;color:#374151;font-size:.93em;line-height:1.7;">You deploy sites for clients. Every additional plugin is a support burden, a potential conflict, and an update to manage across dozens of installs. Your clients ask why their security isn't working and you're the one who has to answer.</p>
+<p style="margin:0;color:#374151;font-size:.93em;line-height:1.7;">CloudScale replaces the entire standard stack in one install. One plugin to update, one changelog to read, one place to look when something goes wrong.</p>
 </div>
 </div>`,
 
@@ -319,6 +445,10 @@ helpLib.run({
           altText: 'WordPress read-only SQL query tool for safe database inspection inside wp-admin without phpMyAdmin' },
         { id: 'server-logs',label: 'Server Logs',           file: 'panel-server-logs.png', tabSelector: 'a[href*="tab=logs"]',    elementSelector: '#cs-panel-logs',
           altText: 'WordPress server log viewer for PHP error logs, debug logs, and web server logs without SSH access' },
+        { id: 'optimizer',  label: 'Plugin Optimizer',      file: 'panel-optimizer.png',   tabSelector: 'a[href*="tab=optimizer"]',
+          altText: 'WordPress plugin stack scanner showing which plugins CloudScale replaces with AI debugging assistant' },
+        { id: 'site-audit', label: 'AI Site Auditor',        file: 'panel-site-audit.png',  tabSelector: 'a[href*="tab=site-audit"]',
+          altText: 'WordPress AI site auditor scanning SEO, content, performance, and database health with prioritised findings' },
     ],
 
     docs: {
@@ -512,6 +642,78 @@ helpLib.run({
 <p><strong>Severity filter</strong> narrows results to Emergency, Alert, Critical, Error, Warning, Notice, Info, or Debug. Cuts through noise on busy production sites where Info and Debug lines dominate.</p>
 <p><strong>Auto-refresh tail mode</strong> polls for new entries every 30 seconds. Reproduce a bug in one browser tab while watching the log update in real time in another. It's the fastest way to trace an intermittent error.</p>
 <p><strong>Custom log paths:</strong> add any file path (Nginx error log, a custom application log, a cron output file). Paths persist across sessions.</p>
-<p><strong>One-click PHP error logging setup:</strong> if PHP error logging isn't configured on the server, a button writes the required <code>php.ini</code> directives automatically. No server configuration knowledge required.</p>`,
+<p><strong>One-click PHP error logging setup:</strong> if PHP error logging isn't configured on the server, a button writes the required <code>php.ini</code> directives automatically. No server configuration knowledge required.</p>
+
+<div style="background:#f1f5f9;border-left:4px solid #6366f1;border-radius:0 8px 8px 0;padding:18px 22px;margin:20px 0 0;">
+<h3 style="margin:0 0 8px;font-size:1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Server Logs as a Performance and Debugging Tool</h3>
+<p style="margin:0 0 10px;color:#374151;line-height:1.7;">The Server Logs panel is not just for security incidents. It's the fastest way to trace a performance problem to its root cause without SSH access. Load a slow-performing page in one tab, watch the PHP error log update in tail mode in another, and see exactly which hook or database query is generating warnings on that specific page. Reproduce an intermittent 500 error and catch the exception the moment it fires. Find the exact plugin throwing deprecated notices that is degrading your PHP performance score.</p>
+<p style="margin:0;color:#374151;line-height:1.7;">For growth and marketing teams: the auth log source (where SSH brute-force attempts are recorded) gives you a real-time picture of attack traffic against your server — useful context for understanding infrastructure load and the value of the protection CloudScale provides.</p>
+</div>`,
+
+        'site-audit': `
+<div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-left:4px solid #10b981;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔍 Your Entire Site Audited in Under 60 Seconds</h2>
+<p style="margin:0 0 10px;color:#374151;">One button. CloudScale scans all your published content and your database, then uses AI to return a prioritised list of issues scored by impact — SEO gaps, thin content, missing images, database bloat, inactive plugins, security misconfigurations. No external crawlers, no data sent to third parties, no Screaming Frog licence required.</p>
+<p style="margin:0;color:#374151;"><strong>Works without an AI key</strong> — rule-based findings run instantly. Add an API key on the Security tab for AI-written summaries, root-cause explanations, and deeper recommendations.</p>
+</div>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">What it checks</h3>
+<ul>
+<li><strong>SEO</strong> — missing meta descriptions, missing SEO title tags, duplicate page titles</li>
+<li><strong>Content</strong> — thin pages under 300 words, missing featured images</li>
+<li><strong>Performance</strong> — autoloaded options bloat (the most common hidden WordPress slowdown), excess active plugins</li>
+<li><strong>Database</strong> — expired transients, post revision accumulation, orphaned post meta rows</li>
+<li><strong>Plugins</strong> — inactive plugins still installed on disk</li>
+<li><strong>Security</strong> — WP_DEBUG enabled in production</li>
+</ul>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Reading the results</h3>
+<p>Findings are sorted by severity — <strong>Critical</strong> → <strong>High</strong> → <strong>Medium</strong> → <strong>Low</strong> → <strong>Info</strong>. The scorecard at the top gives you the count at each level so you know at a glance how much work you have.</p>
+<p>Each finding card shows:</p>
+<ul>
+<li>The <strong>severity badge</strong> and <strong>category</strong> so you can triage quickly</li>
+<li>An <strong>affected count</strong> — how many posts or which tables are involved</li>
+<li>A plain-English <strong>explanation</strong> of why it matters</li>
+<li>A specific <strong>fix instruction</strong> — not vague advice, a concrete next action</li>
+</ul>
+<p>Use the <strong>category filter buttons</strong> to focus on one area at a time — e.g. show only SEO findings, or only Database findings.</p>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:24px 0 10px;background:transparent!important;padding:0!important;border:none!important;">Privacy and data handling</h3>
+<p>All scanning runs inside your WordPress installation — no content or metadata leaves your server. If you have an AI API key configured, the gathered site statistics (post counts, word counts, database metrics) are sent to the AI provider. Your actual post content is never sent — only aggregated counts and statistics.</p>
+
+<div style="background:#f1f5f9;border-left:4px solid #6366f1;border-radius:0 8px 8px 0;padding:18px 22px;margin:20px 0 0;">
+<h3 style="margin:0 0 8px;font-size:1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Pro tip: run the audit before and after making changes</h3>
+<p style="margin:0;color:#374151;line-height:1.7;">Run the Site Audit before a major update or plugin change to establish a baseline. After making fixes, run it again. The scorecard comparison tells you exactly what improved. This is especially useful before and after cleaning up database bloat — the autoloaded options KB figure should drop significantly after removing redundant plugin data.</p>
+</div>`,
+
+        'optimizer': `
+<div style="background:linear-gradient(135deg,#f0f4ff,#f5f3ff);border-left:4px solid #6366f1;padding:18px 22px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+<h2 style="margin:0 0 8px;font-size:1.25em;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">🔧 Reduce Your Plugin Stack. Fix Errors Faster.</h2>
+<p style="margin:0 0 10px;color:#374151;">The average WordPress site runs 17 active plugins. Each one adds HTTP requests, CSS, JavaScript, and potential conflict vectors to every page load. The Optimizer tab gives you two tools to fight back: a plugin scanner that finds redundancy, and an AI assistant that diagnoses errors instantly.</p>
+<p style="margin:0;color:#374151;"><strong>No other plugin does this.</strong> The Plugin Stack Scanner is the only tool that maps your installed plugins against a known replacement table and tells you which ones to remove — with direct links to the CloudScale features that replace them.</p>
+</div>
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">Plugin Stack Scanner</h3>
+<p>Click <strong>Scan My Plugin Stack</strong>. CloudScale reads your list of active plugins and checks each one against a database of 30+ plugin categories it replaces — security scanners, 2FA plugins, SMTP mailers, code block plugins, SQL tools, log viewers, and social preview tools.</p>
+<p>The results show:</p>
+<ul>
+<li><strong>Plugin name and version</strong> — what you currently have installed</li>
+<li><strong>CloudScale feature that replaces it</strong> — specific feature and which tab to find it on</li>
+<li><strong>Annual license saving</strong> — only shown for premium plugins; free ones show a dash</li>
+<li><strong>Direct link to the tab</strong> — one click to set up the CloudScale equivalent</li>
+</ul>
+<p><strong>Before deactivating any plugin:</strong> always set up and verify the CloudScale equivalent is working correctly first. Take a backup. The free <a href="https://your-wordpress-site.example.com/wordpress-plugin-help/cloudscale-backup-restore-help/" target="_blank" rel="noopener"><strong>CloudScale Backup and Restore plugin</strong></a> does a one-click full-site snapshot before you make changes.</p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<h3 style="font-size:1.1em;font-weight:700;color:#0f172a;margin:0 0 10px;background:transparent!important;padding:0!important;border:none!important;">AI Debugging Assistant</h3>
+<p>Paste any PHP error, WordPress warning, stack trace, or plain-language problem description into the text area and click <strong>Diagnose with AI</strong>. The AI returns a structured diagnosis with three sections:</p>
+<ul>
+<li><strong>Root Cause</strong> — what is actually broken, in plain English</li>
+<li><strong>Why It Happens</strong> — the underlying mechanism so you understand it, not just fix it blindly</li>
+<li><strong>How to Fix It</strong> — numbered steps specific to the error you provided</li>
+</ul>
+<p>Works with PHP fatal errors, deprecated notices, plugin conflicts, database connection failures, 500 server errors, missing function errors, and more. The AI receives your WordPress version and PHP version as context for more accurate answers.</p>
+<p><strong>Requires an AI API key.</strong> Add one on the Security tab under AI Settings. Google Gemini's free tier works perfectly for debugging queries.</p>`,
     },
 }).catch(err => { console.error('ERROR:', err.message); process.exit(1); });
