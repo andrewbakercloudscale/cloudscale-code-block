@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.119
+Stable tag: 1.9.120
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,9 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 5. SQL Query Tool with quick queries and paginated results
 
 == Changelog ==
+
+= 1.9.120 =
+* fix: CSP unsafe-inline quick fix now visible — removed live wp_remote_get check from fixed-state evaluation; status derived from options only
 
 = 1.9.117 =
 * feat: SSH Brute-Force Monitor — WP-Cron reads /var/log/auth.log every 60 seconds, alerts via email + ntfy.sh push when ≥10 failures detected in 60 seconds; throttled to one alert per 5 minutes; configurable threshold; enabled by default

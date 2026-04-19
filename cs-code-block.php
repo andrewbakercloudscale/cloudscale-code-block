@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.119
+ * Version: 1.9.120
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -9071,25 +9071,9 @@ class CloudScale_DevTools {
                     : ( get_option( 'csdt_csp_nonces_enabled', '0' ) === '1'
                         ? "Nonce-based CSP is active. Scripts are protected with per-request nonces; 'unsafe-inline' has been removed from script-src."
                         : "The Content-Security-Policy allows 'unsafe-inline' in script-src, significantly weakening XSS protection. Nonce-based CSP replaces it with cryptographic per-request nonces while keeping WordPress scripts working." ),
-                'fixed'        => ( function () {
-                    if ( get_option( 'csdt_csp_inline_ack', '0' ) === '1' ) { return true; }
-                    if ( get_option( 'csdt_csp_nonces_enabled', '0' ) === '1' &&
-                         get_option( 'csdt_devtools_csp_enabled', '0' ) === '1' ) { return true; }
-                    // Check live CSP header for unsafe-inline in script-src
-                    $cached = get_transient( 'csdt_csp_unsafe_check' );
-                    if ( $cached !== false ) { return $cached === '0'; }
-                    $resp = wp_remote_get( home_url( '/' ), [ 'timeout' => 4, 'sslverify' => false ] );
-                    if ( is_wp_error( $resp ) ) { return false; }
-                    $csp = (string) wp_remote_retrieve_header( $resp, 'content-security-policy' );
-                    // Extract just script-src (or fall back to default-src) and check for unsafe-inline
-                    if ( preg_match( "/script-src[^;]*/i", $csp, $m ) ) {
-                        $has_unsafe = str_contains( $m[0], "'unsafe-inline'" );
-                    } else {
-                        $has_unsafe = str_contains( $csp, "'unsafe-inline'" );
-                    }
-                    set_transient( 'csdt_csp_unsafe_check', $has_unsafe ? '1' : '0', 300 );
-                    return ! $has_unsafe;
-                } )(),
+                'fixed'        => get_option( 'csdt_csp_inline_ack', '0' ) === '1'
+                    || ( get_option( 'csdt_csp_nonces_enabled', '0' ) === '1'
+                         && get_option( 'csdt_devtools_csp_enabled', '0' ) === '1' ),
                 'fix_label'    => 'Enable Nonce CSP',
                 'dismiss_label'=> 'Managed Externally',
                 'dismiss_id'   => 'csp_inline_ack',
