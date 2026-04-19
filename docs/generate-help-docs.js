@@ -62,14 +62,14 @@ helpLib.run({
 <p style="font-size:1.05em;color:#374151;margin:0 0 24px;line-height:1.75;">The consequences are binary and brutal. An unprotected login page or an SSH port open to the internet with no brute-force protection will either get your server recruited into a DDoS botnet (taking your site offline and potentially getting your IP blacklisted), or it hands attackers the keys to your admin dashboard. Servers with open SSH and no fail2ban are found by automated scanners within minutes of going online. Once inside, they don't just deface your site. They install backdoors, steal customer data, send spam through your mail server, and use your infrastructure to attack other targets. You often won't know for weeks.</p>
 
 <div style="background:#fff5f5;border-left:4px solid #dc2626;border-radius:0 8px 8px 0;padding:20px 24px;margin:0 0 28px;">
-<h3 style="margin:0 0 10px;font-size:1.05em;font-weight:700;color:#0f172a;">The Checklist Security Myth</h3>
+<h3 style="margin:0 0 10px;font-size:1.05em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">The Checklist Security Myth</h3>
 <p style="margin:0;color:#374151;line-height:1.7;">For years, WordPress security advice has come in the form of checklists: "enable these constants in wp-config.php, install a firewall plugin, keep plugins updated." This advice is correct but woefully incomplete. A checklist tells you <em>what</em> to check. It cannot tell you what your specific configuration actually means from a risk perspective, whether a combination of settings creates an exposure that no individual setting would reveal, or whether one of your installed plugins contains obfuscated code that bypasses every firewall rule written. Checklists treat all sites as identical. Your site is not identical to anyone else's.</p>
 </div>
 
 <h2 style="font-size:1.5em;font-weight:800;color:#0f172a;margin:0 0 14px;">Why the Existing Security Tools Fall Short</h2>
 
 <div style="background:#f1f5f9;border-radius:8px;padding:20px 24px;margin:0 0 24px;">
-<h3 style="margin:0 0 12px;font-size:1.02em;font-weight:700;color:#0f172a;">Understanding the Terminology</h3>
+<h3 style="margin:0 0 12px;font-size:1.02em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Understanding the Terminology</h3>
 <p style="margin:0 0 10px;color:#374151;line-height:1.7;"><strong>CVE (Common Vulnerabilities and Exposures)</strong> is a public database of known security flaws in software. Each one gets a unique ID like CVE-2024-1234. When a researcher discovers a bug in a WordPress plugin that could let an attacker take over a site, they file a CVE report. It gets added to the database. Security tools scan your plugins against this list.</p>
 <p style="margin:0 0 10px;color:#374151;line-height:1.7;"><strong>CVSS score</strong> (Common Vulnerability Scoring System) rates the severity of each CVE on a scale of 0–10. The four bands you'll see in CloudScale's reports: <strong>Critical (9–10):</strong> remote code execution, full site takeover, mass data theft possible with no user interaction. <strong>High (7–8.9):</strong> significant data exposure or privilege escalation. <strong>Medium (4–6.9):</strong> real risk but requires specific conditions. <strong>Low (0.1–3.9):</strong> minimal practical impact. Any Critical finding on a live site should be treated as a fire drill.</p>
 <p style="margin:0;color:#374151;line-height:1.7;"><strong>Zero-day</strong> refers to a vulnerability that is being actively exploited before a patch exists or before it has been added to any CVE database. The name comes from the fact that developers have had zero days to fix it. Zero-days are the most dangerous class of vulnerability because every signature-based scanner in the world is blind to them. The attacker knows about the flaw. The defenders don't. The only way to catch them is through code analysis and behavioural reasoning. That is exactly what CloudScale's AI Code Triage does.</p>
@@ -78,7 +78,7 @@ helpLib.run({
 <p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;"><strong>Wordfence</strong> ($119/year for premium), <strong>Sucuri</strong> ($199/year), and <strong>WPScan</strong> ($25–$75/month) are the tools most security professionals will point you to. They are legitimate products that do real things: malware signature scanning, firewall rules, IP reputation blocking. But they share a fundamental architectural limitation. They are <em>signature-based</em>. They match what they see on your site against a database of known bad patterns. If the malware or misconfiguration isn't in their database yet, they don't flag it. They are inherently reactive; they require someone to be compromised first, for the attack pattern to be captured, analysed, and written into a rule. By definition they cannot identify novel threats, unusual configuration combinations, or the specific risk profile of your particular setup.</p>
 
 <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:22px 24px;margin:0 0 20px;">
-<h3 style="margin:0 0 14px;font-size:1.05em;font-weight:700;color:#0f172a;">CloudScale vs WPScan: Side by Side</h3>
+<h3 style="margin:0 0 14px;font-size:1.05em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">CloudScale vs WPScan: Side by Side</h3>
 <table style="width:100%;border-collapse:collapse;font-size:.92em;color:#374151;">
 <thead><tr style="background:#f1f5f9;"><th style="padding:10px 14px;text-align:left;font-weight:700;border-bottom:2px solid #e2e8f0;">Capability</th><th style="padding:10px 14px;text-align:center;font-weight:700;border-bottom:2px solid #e2e8f0;">WPScan</th><th style="padding:10px 14px;text-align:center;font-weight:700;color:#6366f1;border-bottom:2px solid #e2e8f0;">CloudScale</th></tr></thead>
 <tbody>
@@ -100,7 +100,7 @@ helpLib.run({
 <p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;">The premium price also filters out the vast majority of WordPress site owners. There are 810 million WordPress sites and a fraction of them pay for premium security tooling. Everyone else: the personal bloggers, small business owners, freelancers building sites for local clients. They are either running free tools with heavily restricted capabilities, or running nothing at all.</p>
 
 <div style="background:#fefce8;border-left:4px solid #d97706;border-radius:0 8px 8px 0;padding:20px 24px;margin:0 0 28px;">
-<h3 style="margin:0 0 10px;font-size:1.05em;font-weight:700;color:#0f172a;">The "AI Security" Marketing Trap</h3>
+<h3 style="margin:0 0 10px;font-size:1.05em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">The "AI Security" Marketing Trap</h3>
 <p style="margin:0 0 10px;color:#374151;line-height:1.7;">Since ChatGPT became mainstream, the WordPress plugin directory has filled with plugins claiming "AI-powered security." Look closely at almost all of them and you find one of two things: either a bolt-on GPT-4 API call wrapped around the same signature-based scan output that existed before (the AI doesn't do the analysis, it just summarises it), or a marketing page full of AI language that describes what the plugin <em>could</em> detect with AI, without actually using AI to do it.</p>
 <p style="margin:0;color:#374151;line-height:1.7;">Real AI security analysis means sending your actual configuration, your actual plugin list, your actual code (not a pre-processed summary) to a frontier model and asking it to reason about the specific risk profile. It means the AI can identify that <em>your combination</em> of an outdated caching plugin, a relaxed CORS policy, and a public-facing REST API endpoint creates an exposure that no individual component would trigger on its own. That requires genuine frontier intelligence, not pattern-matching dressed up with AI branding.</p>
 </div>
@@ -120,7 +120,7 @@ helpLib.run({
 <p style="font-size:1.05em;color:#374151;margin:0 0 16px;line-height:1.75;">What frontier AI actually enables is something qualitatively different. Not a better summary of existing scan results. A different kind of analysis altogether. Claude Opus 4 has read more security research, CVE disclosures, penetration testing write-ups, and malware analyses than any human security team ever could. When it looks at your WordPress configuration, it is drawing on that entire body of knowledge simultaneously, applying it to your specific situation, and reasoning about what it actually means for you. That's not a better wrapper around signature matching. That's a different tool entirely.</p>
 
 <div style="background:linear-gradient(135deg,#0f172a,#1e293b);border-radius:8px;padding:24px 28px;margin:0 0 24px;color:#fff;">
-<h3 style="margin:0 0 14px;font-size:1.1em;font-weight:700;color:#e2e8f0;">Where This Goes Next</h3>
+<h3 style="margin:0 0 14px;font-size:1.1em;font-weight:700;color:#e2e8f0;background:transparent!important;padding:0!important;border:none!important;">Where This Goes Next</h3>
 <p style="margin:0 0 12px;color:#94a3b8;line-height:1.7;">We are at the beginning of a capability curve, not the middle. The models available today (Claude Sonnet 4.6, Claude Opus 4.7, Gemini 2.5 Pro) already outperform the security analysis you'd get from most paid consultants. The models coming in the next 12–24 months will make these look primitive.</p>
 <p style="margin:0 0 12px;color:#94a3b8;line-height:1.7;">Claude 5 and its successors will be capable of autonomous security research: actively probing your infrastructure, reasoning about multi-step attack chains, writing and testing proposed fixes, and explaining the second and third-order consequences of every configuration decision. The gap between "AI that helps you understand a scan" and "AI that autonomously hardens your infrastructure" is closing fast.</p>
 <p style="margin:0;color:#94a3b8;line-height:1.7;">CloudScale is built to absorb every new model the day it launches. No migration, no upgrade fee, no waiting. Your plugin gets smarter as the underlying AI gets smarter. The architecture was designed specifically for this: your site, your API key, your direct relationship with the provider. When the next breakthrough model drops, you flip a dropdown and you're on it.</p>
@@ -133,7 +133,7 @@ helpLib.run({
 <p style="font-size:1.05em;color:#374151;margin:0 0 20px;line-height:1.75;">The result is a full security audit that would normally cost hundreds of dollars from a consultant, available in your WordPress dashboard, for free, any time you want to run it. Set up daily or weekly scheduled scans and you'll get an email alert when new issues appear, so you know about problems before your users or Google do.</p>
 
 <div style="background:linear-gradient(135deg,#ecfdf5,#f0f9ff);border:1px solid #a7f3d0;border-radius:8px;padding:22px 24px;margin:0 0 28px;">
-<h3 style="margin:0 0 12px;font-size:1.1em;font-weight:700;color:#0f172a;">No Middleman. No Data Risk. Always the Latest Models.</h3>
+<h3 style="margin:0 0 12px;font-size:1.1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">No Middleman. No Data Risk. Always the Latest Models.</h3>
 <p style="margin:0 0 12px;color:#374151;line-height:1.7;">Most "AI-powered" WordPress security products send your site's data to their own servers first, where it gets logged, processed, and potentially used to train their models, before eventually forwarding it to an AI provider. You're paying for a middleman who adds latency, a new privacy risk, and a business model dependency. When that vendor changes their pricing, gets acquired, or goes offline, your security tooling goes with it.</p>
 <p style="margin:0 0 12px;color:#374151;line-height:1.7;">CloudScale works differently. <strong>Your WordPress data goes directly from your server to the AI provider's API</strong> (Anthropic or Google) with no intermediary, no CloudScale server, no third-party logging. You supply your own API key, so you have a direct relationship with the provider and full control over your data. CloudScale never sees your site data at all.</p>
 <p style="margin:0;color:#374151;line-height:1.7;">When Anthropic releases Claude Opus 5 or Google ships Gemini 3, <strong>you get it immediately.</strong> No waiting for a plugin vendor to integrate it, no being held on an older model to protect their infrastructure margins. CloudScale ships support for the latest frontier models as soon as they launch. You choose your model, you own the key, you get the best intelligence available from day one.</p>
@@ -203,7 +203,7 @@ helpLib.run({
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin:0 0 32px;">
 <div style="background:#fff5f5;border-left:4px solid #e53e3e;border-radius:0 8px 8px 0;padding:18px 20px;">
-<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🛡️ Security</h3>
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;background:transparent!important;padding:0!important;border:none!important;">🛡️ Security</h3>
 <ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
 <li><strong>AI Cyber Audit:</strong> scored security report in under 60 seconds using Claude or Gemini</li>
 <li><strong>Deep Dive Scan:</strong> HTTP probes, DNS checks, TLS, PHP code analysis</li>
@@ -214,7 +214,7 @@ helpLib.run({
 </ul>
 </div>
 <div style="background:#f0f9ff;border-left:4px solid #0e6b8f;border-radius:0 8px 8px 0;padding:18px 20px;">
-<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🔐 Login Security</h3>
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;background:transparent!important;padding:0!important;border:none!important;">🔐 Login Security</h3>
 <ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
 <li><strong>Hide Login URL:</strong> move /wp-login.php to a secret slug</li>
 <li><strong>Two-Factor Authentication:</strong> email OTP, TOTP (authenticator app), or passkeys</li>
@@ -225,7 +225,7 @@ helpLib.run({
 </ul>
 </div>
 <div style="background:#f0fdf4;border-left:4px solid #16a34a;border-radius:0 8px 8px 0;padding:18px 20px;">
-<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">🛠️ Developer Tools</h3>
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;background:transparent!important;padding:0!important;border:none!important;">🛠️ Developer Tools</h3>
 <ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
 <li><strong>Syntax-highlighted Code Block:</strong> 190+ languages, 14 themes, bundled locally</li>
 <li><strong>Code Block Migrator:</strong> batch-convert blocks from other plugins</li>
@@ -236,7 +236,7 @@ helpLib.run({
 </ul>
 </div>
 <div style="background:#fafafa;border-left:4px solid #6366f1;border-radius:0 8px 8px 0;padding:18px 20px;">
-<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;">What's Covered Below</h3>
+<h3 style="margin:0 0 10px;font-size:1em;font-weight:700;color:#1a202c;text-transform:uppercase;letter-spacing:.05em;background:transparent!important;padding:0!important;border:none!important;">What's Covered Below</h3>
 <ul style="margin:0;padding-left:18px;color:#374151;font-size:.95em;line-height:1.8;">
 <li><a href="#cs-section-hide-login" style="color:#6366f1;">Hide Login URL</a> setup and how it works</li>
 <li><a href="#cs-section-2fa" style="color:#6366f1;">Two-Factor Authentication</a> and enforcement</li>
@@ -395,7 +395,7 @@ helpLib.run({
 <p style="color:#64748b;margin:0 0 20px;font-size:.95em;">You need one API key to use the AI Cyber Audit. Google Gemini has a free tier with no credit card needed. Anthropic Claude requires a credit card but delivers the deepest analysis. Either works; both are excellent.</p>
 
 <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:22px 24px;margin:0 0 24px;">
-<h3 style="margin:0 0 16px;font-size:1.1em;font-weight:700;color:#0f172a;">Option A: Google Gemini (Free, No Credit Card)</h3>
+<h3 style="margin:0 0 16px;font-size:1.1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Option A: Google Gemini (Free, No Credit Card)</h3>
 <p style="margin:0 0 14px;color:#374151;line-height:1.7;">Google AI Studio's free tier gives you access to Gemini 2.0 Flash with generous daily limits, more than enough for daily WordPress security scans. No billing setup required. This is the recommended starting point if you've never used an AI API before.</p>
 <ol style="margin:0 0 14px;padding-left:20px;color:#374151;line-height:1.9;">
 <li>Go to <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener"><strong>aistudio.google.com/app/apikey</strong></a></li>
@@ -410,7 +410,7 @@ helpLib.run({
 </div>
 
 <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:22px 24px;margin:0 0 24px;">
-<h3 style="margin:0 0 16px;font-size:1.1em;font-weight:700;color:#0f172a;">Option B: Anthropic Claude (Deepest Analysis, Credit Card Required)</h3>
+<h3 style="margin:0 0 16px;font-size:1.1em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">Option B: Anthropic Claude (Deepest Analysis, Credit Card Required)</h3>
 <p style="margin:0 0 14px;color:#374151;line-height:1.7;">Claude Sonnet 4.6 and Opus 4.7 deliver the most thorough security reasoning available. Anthropic does not offer a free tier, but the cost is minimal: a deep dive audit with Claude Opus 4.7 typically costs $0.05–0.15. An entire month of daily scans with Claude Sonnet 4.6 costs under $1.</p>
 <ol style="margin:0 0 14px;padding-left:20px;color:#374151;line-height:1.9;">
 <li>Go to <a href="https://console.anthropic.com" target="_blank" rel="noopener"><strong>console.anthropic.com</strong></a> and create an account</li>
@@ -425,7 +425,7 @@ helpLib.run({
 </div>
 
 <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:22px 24px;margin:0 0 24px;">
-<h3 style="margin:0 0 12px;font-size:1.05em;font-weight:700;color:#0f172a;">⚡ Setting Up Automatic Top-Ups (Anthropic)</h3>
+<h3 style="margin:0 0 12px;font-size:1.05em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">⚡ Setting Up Automatic Top-Ups (Anthropic)</h3>
 <p style="margin:0 0 12px;color:#374151;line-height:1.7;">If you use scheduled daily scans with Claude, your credit balance will gradually decrease. Automatic top-ups ensure your scans never fail due to an empty balance. Anthropic recharges your account automatically when it drops below a threshold you set.</p>
 <ol style="margin:0;padding-left:20px;color:#374151;line-height:1.9;">
 <li>Go to <a href="https://console.anthropic.com/settings/billing" target="_blank" rel="noopener"><strong>console.anthropic.com/settings/billing</strong></a></li>
@@ -439,7 +439,7 @@ helpLib.run({
 </div>
 
 <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:22px 24px;margin:0 0 4px;">
-<h3 style="margin:0 0 12px;font-size:1.05em;font-weight:700;color:#0f172a;">⚡ Setting Up Spend Alerts (Google Paid Tier)</h3>
+<h3 style="margin:0 0 12px;font-size:1.05em;font-weight:700;color:#0f172a;background:transparent!important;padding:0!important;border:none!important;">⚡ Setting Up Spend Alerts (Google Paid Tier)</h3>
 <p style="margin:0 0 12px;color:#374151;line-height:1.7;">If you upgrade to Gemini 2.5 Pro on Google's pay-as-you-go tier, Google bills your card automatically as you use the API, with no manual top-up process. Usage is charged to your linked payment method at the end of each billing period.</p>
 <ol style="margin:0;padding-left:20px;color:#374151;line-height:1.9;">
 <li>Go to <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener"><strong>console.cloud.google.com/billing</strong></a></li>
