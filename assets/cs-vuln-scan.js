@@ -626,9 +626,9 @@
                     html += '<button type="button" class="cs-btn-primary cs-btn-sm" onclick="document.getElementById(\'' + escHtml(fix.fix_modal) + '\').style.display=\'flex\';">' + escHtml(fix.fix_label) + '</button>';
                 } else {
                     html += '<button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.id) + '">' + escHtml(fix.fix_label) + '</button>';
-                    if (fix.dismiss_label && fix.dismiss_id) {
-                        html += '<button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.dismiss_id) + '" style="font-size:11px;">' + escHtml(fix.dismiss_label) + '</button>';
-                    }
+                }
+                if (fix.dismiss_label && fix.dismiss_id) {
+                    html += '<button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.dismiss_id) + '" style="font-size:11px;">' + escHtml(fix.dismiss_label) + '</button>';
                 }
                 html += '</div>';
             }
