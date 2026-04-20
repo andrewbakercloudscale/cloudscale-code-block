@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.183
+ * Version: 1.9.184
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.183';
+    const VERSION      = '1.9.184';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -346,6 +346,11 @@ class CloudScale_DevTools {
         add_action( 'csdt_ssh_monitor',                         [ __CLASS__, 'monitor_ssh_failures' ] );
         add_action( 'csdt_php_error_monitor',                   [ __CLASS__, 'monitor_php_errors' ] );
         add_action( 'wp_ajax_csdt_php_error_monitor_save',      [ __CLASS__, 'ajax_php_error_monitor_save' ] );
+        add_action( 'csdt_threat_monitor',                      [ __CLASS__, 'monitor_threats' ] );
+        add_action( 'wp_ajax_csdt_threat_monitor_save',         [ __CLASS__, 'ajax_threat_monitor_save' ] );
+        add_action( 'wp_ajax_csdt_threat_integrity_reset',      [ __CLASS__, 'ajax_threat_integrity_reset' ] );
+        add_action( 'user_register',                            [ __CLASS__, 'on_user_registered' ] );
+        add_action( 'set_user_role',                            [ __CLASS__, 'on_set_user_role' ], 10, 3 );
         add_filter( 'cron_schedules',                           [ __CLASS__, 'add_cron_schedules' ] );
         add_action( 'wp_ajax_csdt_plugin_stack_scan',           [ __CLASS__, 'ajax_plugin_stack_scan' ] );
         add_action( 'wp_ajax_csdt_ai_debug_log',                [ __CLASS__, 'ajax_ai_debug_log' ] );
@@ -388,6 +393,15 @@ class CloudScale_DevTools {
             }
         } else {
             wp_clear_scheduled_hook( 'csdt_php_error_monitor' );
+        }
+
+        // Schedule threat monitor (default on)
+        if ( get_option( 'csdt_threat_monitor_enabled', '1' ) === '1' ) {
+            if ( ! wp_next_scheduled( 'csdt_threat_monitor' ) ) {
+                wp_schedule_event( time() + 300, 'csdt_every_5min', 'csdt_threat_monitor' );
+            }
+        } else {
+            wp_clear_scheduled_hook( 'csdt_threat_monitor' );
         }
 
         add_action( 'csdt_devtools_run_vuln_scan', [ __CLASS__, 'cron_vuln_scan' ] );
@@ -11184,6 +11198,107 @@ bantime  = 86400</pre>
                     </div>
                 </div>
 
+                <!-- ── Threat Monitor ──────────────────────────── -->
+                <?php
+                $tm_enabled       = get_option( 'csdt_threat_monitor_enabled',        '1' ) === '1';
+                $tm_file_enabled  = get_option( 'csdt_threat_file_integrity_enabled', '1' ) === '1';
+                $tm_admin_enabled = get_option( 'csdt_threat_new_admin_enabled',      '1' ) === '1';
+                $tm_probe_enabled = get_option( 'csdt_threat_probe_enabled',          '1' ) === '1';
+                $tm_threshold     = get_option( 'csdt_threat_probe_threshold',        '25' );
+                $tm_last_file     = get_option( 'csdt_threat_last_file_alert',        null );
+                $tm_last_admin    = get_option( 'csdt_threat_last_admin_alert',       null );
+                $tm_last_probe    = get_option( 'csdt_threat_last_probe_alert',       null );
+                $tm_baseline_ver  = get_option( 'csdt_file_integrity_wp_ver',         '' );
+                $tm_baseline      = get_option( 'csdt_file_integrity_baseline',       [] );
+                ?>
+                <div class="cs-panel" id="cs-panel-threat-monitor">
+                    <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #dc2626;">
+                        <span>🔎 <?php esc_html_e( 'Threat Monitor', 'cloudscale-devtools' ); ?></span>
+                        <span class="cs-header-hint"><?php esc_html_e( 'File integrity · New admin alert · Probe detection — alerts once per incident, not per event', 'cloudscale-devtools' ); ?></span>
+                    </div>
+                    <div class="cs-panel-body">
+
+                        <div class="cs-field-row">
+                            <div class="cs-field">
+                                <label class="cs-label">
+                                    <input type="checkbox" id="csdt-tm-enabled" <?php checked( $tm_enabled ); ?>>
+                                    <?php esc_html_e( 'Enable Threat Monitor', 'cloudscale-devtools' ); ?>
+                                </label>
+                                <span class="cs-hint"><?php esc_html_e( 'Master switch. Runs checks every 5 minutes. Alerts via email and ntfy.sh.', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+
+                        <div id="csdt-tm-options" style="<?php echo $tm_enabled ? '' : 'opacity:.5;pointer-events:none;'; ?>">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+
+                                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;">
+                                    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#1e293b;">
+                                        <input type="checkbox" id="csdt-tm-file" <?php checked( $tm_file_enabled ); ?> style="margin-top:2px;flex-shrink:0;">
+                                        🗂️ <?php esc_html_e( 'File Integrity', 'cloudscale-devtools' ); ?>
+                                    </label>
+                                    <div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.5;"><?php esc_html_e( 'Alerts if wp-includes/ or wp-admin/ core files are modified. Ignores WP core updates automatically. Alerts once per unique change.', 'cloudscale-devtools' ); ?></div>
+                                    <?php if ( $tm_last_file ) : ?>
+                                    <div style="margin-top:8px;font-size:11px;color:#dc2626;font-weight:600;">
+                                        🚨 <?php echo esc_html( human_time_diff( $tm_last_file['ts'] ) . ' ago' ); ?> —
+                                        <?php echo (int) $tm_last_file['count']; ?> file<?php echo $tm_last_file['count'] === 1 ? '' : 's'; ?>
+                                    </div>
+                                    <?php elseif ( $tm_baseline ) : ?>
+                                    <div style="margin-top:8px;font-size:11px;color:#16a34a;">✓ <?php printf( esc_html__( 'Baseline: WP %s (%d files)', 'cloudscale-devtools' ), esc_html( $tm_baseline_ver ), count( $tm_baseline ) ); ?></div>
+                                    <?php else : ?>
+                                    <div style="margin-top:8px;font-size:11px;color:#64748b;"><?php esc_html_e( 'Baseline will be created on first run.', 'cloudscale-devtools' ); ?></div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;">
+                                    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#1e293b;">
+                                        <input type="checkbox" id="csdt-tm-admin" <?php checked( $tm_admin_enabled ); ?> style="margin-top:2px;flex-shrink:0;">
+                                        👤 <?php esc_html_e( 'New Admin Alert', 'cloudscale-devtools' ); ?>
+                                    </label>
+                                    <div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.5;"><?php esc_html_e( 'Instant alert when a new administrator account is created or a user is promoted to admin. Fires once per user.', 'cloudscale-devtools' ); ?></div>
+                                    <?php if ( $tm_last_admin ) : ?>
+                                    <div style="margin-top:8px;font-size:11px;color:#dc2626;font-weight:600;">
+                                        🚨 <?php echo esc_html( human_time_diff( $tm_last_admin['ts'] ) . ' ago — ' . $tm_last_admin['login'] ); ?>
+                                    </div>
+                                    <?php else : ?>
+                                    <div style="margin-top:8px;font-size:11px;color:#16a34a;">✓ <?php esc_html_e( 'No new admin accounts detected.', 'cloudscale-devtools' ); ?></div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;">
+                                    <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#1e293b;">
+                                        <input type="checkbox" id="csdt-tm-probe" <?php checked( $tm_probe_enabled ); ?> style="margin-top:2px;flex-shrink:0;">
+                                        🔍 <?php esc_html_e( 'Probe Detection', 'cloudscale-devtools' ); ?>
+                                    </label>
+                                    <div style="font-size:12px;color:#64748b;margin-top:6px;line-height:1.5;"><?php esc_html_e( 'Counts requests to sensitive endpoints (wp-login, xmlrpc, .env, .git) in the access log. Throttled to one alert per hour.', 'cloudscale-devtools' ); ?></div>
+                                    <div style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+                                        <label style="font-size:11px;color:#64748b;"><?php esc_html_e( 'Threshold:', 'cloudscale-devtools' ); ?></label>
+                                        <input type="number" id="csdt-tm-probe-threshold" min="5" max="500"
+                                               value="<?php echo esc_attr( $tm_threshold ); ?>"
+                                               style="width:60px;padding:2px 6px;font-size:12px;border:1px solid #d1d5db;border-radius:4px;">
+                                        <span style="font-size:11px;color:#64748b;"><?php esc_html_e( 'requests / 5 min', 'cloudscale-devtools' ); ?></span>
+                                    </div>
+                                    <?php if ( $tm_last_probe ) : ?>
+                                    <div style="margin-top:6px;font-size:11px;color:#d97706;font-weight:600;">
+                                        ⚠ <?php echo esc_html( human_time_diff( $tm_last_probe['ts'] ) . ' ago — ' . $tm_last_probe['count'] . ' probes' ); ?>
+                                    </div>
+                                    <?php endif; ?>
+                                </div>
+
+                            </div>
+                        </div>
+
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <button type="button" class="cs-btn-primary" id="csdt-tm-save">💾 <?php esc_html_e( 'Save Threat Monitor Settings', 'cloudscale-devtools' ); ?></button>
+                            <span class="cs-settings-saved" id="csdt-tm-saved">✓ <?php esc_html_e( 'Saved', 'cloudscale-devtools' ); ?></span>
+                            <?php if ( $tm_baseline ) : ?>
+                            <button type="button" class="cs-btn-secondary" id="csdt-tm-reset" style="font-size:12px;margin-left:auto;">↺ <?php esc_html_e( 'Reset File Baseline', 'cloudscale-devtools' ); ?></button>
+                            <span id="csdt-tm-reset-msg" style="font-size:12px;color:#16a34a;display:none;"></span>
+                            <?php endif; ?>
+                        </div>
+
+                    </div>
+                </div>
+
                 <?php self::render_csp_panel(); ?>
 
                 <hr class="cs-sec-divider">
@@ -15034,6 +15149,261 @@ PROMPT;
         }
 
         wp_send_json_success();
+    }
+
+    // ── Threat Monitor ────────────────────────────────────────────────────────
+
+    public static function monitor_threats(): void {
+        if ( get_option( 'csdt_threat_monitor_enabled', '1' ) !== '1' ) {
+            return;
+        }
+        if ( get_option( 'csdt_threat_file_integrity_enabled', '1' ) === '1' ) {
+            self::check_file_integrity();
+        }
+        if ( get_option( 'csdt_threat_probe_enabled', '1' ) === '1' ) {
+            self::check_probe_patterns();
+        }
+    }
+
+    private static function check_file_integrity(): void {
+        $abspath    = rtrim( ABSPATH, DIRECTORY_SEPARATOR );
+        $wp_version = get_bloginfo( 'version' );
+        $baseline   = get_option( 'csdt_file_integrity_baseline', [] );
+        $alerted    = get_option( 'csdt_file_integrity_alerted',  [] );
+        $saved_ver  = get_option( 'csdt_file_integrity_wp_ver',   '' );
+
+        $scan_files = array_merge(
+            [ $abspath . '/wp-config.php', $abspath . '/wp-login.php' ],
+            glob( $abspath . '/wp-includes/*.php' ) ?: [],
+            glob( $abspath . '/wp-admin/*.php' )    ?: []
+        );
+
+        // Build or rebuild baseline (first run, or after a WP core update)
+        if ( empty( $baseline ) || $saved_ver !== $wp_version ) {
+            $new_baseline = [];
+            foreach ( $scan_files as $f ) {
+                if ( file_exists( $f ) ) {
+                    $new_baseline[ $f ] = (int) filemtime( $f );
+                }
+            }
+            update_option( 'csdt_file_integrity_baseline', $new_baseline, false );
+            update_option( 'csdt_file_integrity_wp_ver',   $wp_version,   false );
+            update_option( 'csdt_file_integrity_alerted',  [],            false );
+            return; // No alert on baseline creation
+        }
+
+        $modified = [];
+        foreach ( $scan_files as $f ) {
+            if ( ! file_exists( $f ) ) {
+                continue;
+            }
+            $current = (int) filemtime( $f );
+            $base    = isset( $baseline[ $f ] ) ? (int) $baseline[ $f ] : null;
+            $prev    = isset( $alerted[ $f ] )  ? (int) $alerted[ $f ]  : null;
+
+            // New file not in baseline, or mtime changed and we haven't alerted on this mtime yet
+            if ( $base === null || ( $current !== $base && $current !== $prev ) ) {
+                $modified[ $f ] = $current;
+            }
+        }
+
+        if ( empty( $modified ) ) {
+            return;
+        }
+
+        // Record that we've alerted for these mtimes — prevents repeat alerts for the same change
+        update_option( 'csdt_file_integrity_alerted', array_merge( $alerted, $modified ), false );
+
+        $site      = get_bloginfo( 'name' ) ?: home_url();
+        $admin_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        $count     = count( $modified );
+        $file_list = implode( "\n", array_map(
+            fn( $f ) => '  ' . str_replace( ABSPATH, '', $f ),
+            array_keys( $modified )
+        ) );
+
+        $subject = sprintf( '[%s] ⚠️ Core file modification detected (%d file%s)', $site, $count, $count === 1 ? '' : 's' );
+        $body    = sprintf(
+            "WordPress core file modification detected on %s.\n\n%d file%s changed:\n%s\n\nIf you did not update WordPress or install a plugin, investigate immediately — this may indicate a compromise.\n\nSecurity dashboard: %s",
+            home_url(), $count, $count === 1 ? '' : 's', $file_list, $admin_url
+        );
+
+        self::send_threat_alert( $subject, $body, 'urgent', 'rotating_light,lock', $admin_url );
+        update_option( 'csdt_threat_last_file_alert', [ 'ts' => time(), 'count' => $count, 'files' => array_keys( $modified ) ], false );
+    }
+
+    private static function check_probe_patterns(): void {
+        $log_candidates = [
+            '/var/log/nginx/access.log',
+            '/var/log/apache2/access.log',
+            '/var/log/httpd/access_log',
+            '/var/log/apache2/other_vhosts_access.log',
+        ];
+        foreach ( self::get_log_sources() as $s ) {
+            if ( ! empty( $s['path'] ) && strpos( $s['path'], 'access' ) !== false ) {
+                $log_candidates[] = $s['path'];
+            }
+        }
+        $log_path = '';
+        foreach ( $log_candidates as $p ) {
+            if ( is_readable( $p ) ) { $log_path = $p; break; }
+        }
+        if ( ! $log_path ) {
+            return;
+        }
+
+        $threshold = max( 5, (int) get_option( 'csdt_threat_probe_threshold', '25' ) );
+        $last_pos  = get_option( 'csdt_threat_probe_last_pos', [] );
+        $now       = time();
+        $size      = filesize( $log_path );
+        $saved     = isset( $last_pos[ $log_path ] ) ? (int) $last_pos[ $log_path ] : null;
+
+        update_option( 'csdt_threat_probe_last_pos', array_merge( $last_pos, [ $log_path => $size ] ), false );
+
+        if ( $saved === null || $saved > $size ) {
+            return; // First run or log rotated — just record position
+        }
+        $unread = $size - $saved;
+        if ( $unread <= 0 ) {
+            return;
+        }
+
+        $handle = @fopen( $log_path, 'rb' );
+        if ( ! $handle ) {
+            return;
+        }
+        fseek( $handle, $size - min( $unread, 524288 ) );
+        $chunk = fread( $handle, min( $unread, 524288 ) );
+        fclose( $handle );
+
+        if ( ! $chunk ) {
+            return;
+        }
+
+        $sensitive = [ 'wp-login.php', 'xmlrpc.php', 'wp-config', '.env', '/.git/', '/.svn/', '.sql', '.bak', '.dump', 'eval(', 'base64_', 'cmd=', 'exec=' ];
+        $count     = 0;
+        foreach ( explode( "\n", $chunk ) as $line ) {
+            foreach ( $sensitive as $pat ) {
+                if ( strpos( $line, $pat ) !== false ) {
+                    $count++;
+                    break;
+                }
+            }
+        }
+
+        if ( $count < $threshold ) {
+            return;
+        }
+
+        // Throttle: one alert per hour
+        $last_alert = (int) get_option( 'csdt_threat_probe_last_alert', 0 );
+        if ( ( $now - $last_alert ) < 3600 ) {
+            return;
+        }
+        update_option( 'csdt_threat_probe_last_alert', $now, false );
+
+        $site      = get_bloginfo( 'name' ) ?: home_url();
+        $admin_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
+        $subject   = sprintf( '[%s] 🔍 Probe attack — %d requests to sensitive paths', $site, $count );
+        $body      = sprintf(
+            "%d requests to sensitive paths (wp-login, xmlrpc, .env, .git, etc.) detected in the last 5 minutes on %s.\n\nThis indicates active scanning or an attack. Consider blocking the source IP via fail2ban or Cloudflare.\n\nSecurity dashboard: %s",
+            $count, home_url(), $admin_url
+        );
+        self::send_threat_alert( $subject, $body, 'high', 'warning,shield', $admin_url );
+        update_option( 'csdt_threat_last_probe_alert', [ 'ts' => $now, 'count' => $count ], false );
+    }
+
+    public static function on_user_registered( int $user_id ): void {
+        if ( get_option( 'csdt_threat_monitor_enabled', '1' ) !== '1' ) return;
+        if ( get_option( 'csdt_threat_new_admin_enabled', '1' ) !== '1' ) return;
+        $user = get_userdata( $user_id );
+        if ( ! $user || ! in_array( 'administrator', (array) $user->roles, true ) ) return;
+        self::alert_new_admin( $user );
+    }
+
+    public static function on_set_user_role( int $user_id, string $new_role, array $old_roles ): void {
+        if ( get_option( 'csdt_threat_monitor_enabled', '1' ) !== '1' ) return;
+        if ( get_option( 'csdt_threat_new_admin_enabled', '1' ) !== '1' ) return;
+        if ( $new_role !== 'administrator' ) return;
+        if ( in_array( 'administrator', $old_roles, true ) ) return;
+        $user = get_userdata( $user_id );
+        if ( ! $user ) return;
+        self::alert_new_admin( $user );
+    }
+
+    private static function alert_new_admin( \WP_User $user ): void {
+        $alerted = get_option( 'csdt_threat_alerted_admins', [] );
+        if ( in_array( $user->ID, $alerted, true ) ) return;
+        $alerted[] = $user->ID;
+        if ( count( $alerted ) > 100 ) {
+            $alerted = array_slice( $alerted, -100 );
+        }
+        update_option( 'csdt_threat_alerted_admins', $alerted, false );
+
+        $site      = get_bloginfo( 'name' ) ?: home_url();
+        $admin_url = admin_url( 'users.php' );
+        $subject   = sprintf( '[%s] 🚨 New administrator created: %s', $site, $user->user_login );
+        $body      = sprintf(
+            "A new administrator account was created on %s.\n\nUsername: %s\nEmail: %s\nRegistered: %s\n\nIf you did not create this account, revoke it immediately.\n\nManage users: %s",
+            home_url(), $user->user_login, $user->user_email, $user->user_registered, $admin_url
+        );
+        self::send_threat_alert( $subject, $body, 'urgent', 'rotating_light,bust_in_silhouette', $admin_url );
+        update_option( 'csdt_threat_last_admin_alert', [ 'ts' => time(), 'login' => $user->user_login, 'email' => $user->user_email ], false );
+    }
+
+    private static function send_threat_alert( string $subject, string $body, string $priority, string $tags, string $click_url ): void {
+        if ( get_option( 'csdt_scan_schedule_email', '1' ) === '1' ) {
+            add_filter( 'wp_mail_content_type', [ __CLASS__, 'email_content_type_html' ] );
+            wp_mail( get_option( 'admin_email' ), $subject, nl2br( esc_html( $body ) ) );
+            remove_filter( 'wp_mail_content_type', [ __CLASS__, 'email_content_type_html' ] );
+        }
+        $ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
+        if ( $ntfy_url ) {
+            $headers = [ 'Title' => $subject, 'Priority' => $priority, 'Tags' => $tags, 'Click' => $click_url ];
+            $ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
+            if ( $ntfy_tok ) {
+                $headers['Authorization'] = 'Bearer ' . $ntfy_tok;
+            }
+            wp_remote_post( $ntfy_url, [ 'timeout' => 10, 'headers' => $headers, 'body' => $body ] );
+        }
+    }
+
+    public static function ajax_threat_monitor_save(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $enabled   = ( $_POST['enabled']         ?? '0' ) === '1' ? '1' : '0';
+        $file_int  = ( $_POST['file_integrity']  ?? '0' ) === '1' ? '1' : '0';
+        $new_admin = ( $_POST['new_admin']        ?? '0' ) === '1' ? '1' : '0';
+        $probe     = ( $_POST['probe']            ?? '0' ) === '1' ? '1' : '0';
+        $threshold = max( 5, min( 500, (int) ( $_POST['probe_threshold'] ?? 25 ) ) );
+
+        update_option( 'csdt_threat_monitor_enabled',          $enabled,            false );
+        update_option( 'csdt_threat_file_integrity_enabled',   $file_int,           false );
+        update_option( 'csdt_threat_new_admin_enabled',        $new_admin,          false );
+        update_option( 'csdt_threat_probe_enabled',            $probe,              false );
+        update_option( 'csdt_threat_probe_threshold',          (string) $threshold, false );
+
+        if ( $enabled === '1' ) {
+            if ( ! wp_next_scheduled( 'csdt_threat_monitor' ) ) {
+                wp_schedule_event( time() + 300, 'csdt_every_5min', 'csdt_threat_monitor' );
+            }
+        } else {
+            wp_clear_scheduled_hook( 'csdt_threat_monitor' );
+        }
+        wp_send_json_success();
+    }
+
+    public static function ajax_threat_integrity_reset(): void {
+        check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        delete_option( 'csdt_file_integrity_baseline' );
+        delete_option( 'csdt_file_integrity_wp_ver' );
+        delete_option( 'csdt_file_integrity_alerted' );
+        wp_send_json_success( [ 'message' => 'Baseline cleared. A new baseline will be built on the next cron run (within 5 minutes).' ] );
     }
 
     // ── SSH Brute-Force Monitor ───────────────────────────────────────────────

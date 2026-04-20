@@ -979,4 +979,55 @@
         });
     }());
 
+    // ── Threat Monitor ────────────────────────────────────────────────────────
+
+    (function () {
+        var saveBtn   = document.getElementById('csdt-tm-save');
+        var savedMsg  = document.getElementById('csdt-tm-saved');
+        var resetBtn  = document.getElementById('csdt-tm-reset');
+        var resetMsg  = document.getElementById('csdt-tm-reset-msg');
+        var masterChk = document.getElementById('csdt-tm-enabled');
+        var optPanel  = document.getElementById('csdt-tm-options');
+
+        if (!saveBtn) return;
+
+        if (masterChk && optPanel) {
+            masterChk.addEventListener('change', function () {
+                optPanel.style.opacity         = this.checked ? '1' : '0.5';
+                optPanel.style.pointerEvents   = this.checked ? '' : 'none';
+            });
+        }
+
+        saveBtn.addEventListener('click', function () {
+            saveBtn.disabled = true;
+            post('csdt_threat_monitor_save', {
+                enabled:         document.getElementById('csdt-tm-enabled')?.checked ? '1' : '0',
+                file_integrity:  document.getElementById('csdt-tm-file')?.checked    ? '1' : '0',
+                new_admin:       document.getElementById('csdt-tm-admin')?.checked   ? '1' : '0',
+                probe:           document.getElementById('csdt-tm-probe')?.checked   ? '1' : '0',
+                probe_threshold: document.getElementById('csdt-tm-probe-threshold')?.value || '25',
+            }).then(function (res) {
+                saveBtn.disabled = false;
+                if (res.success && savedMsg) {
+                    savedMsg.classList.add('visible');
+                    setTimeout(function () { savedMsg.classList.remove('visible'); }, 2500);
+                }
+            }).catch(function () { saveBtn.disabled = false; });
+        });
+
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function () {
+                resetBtn.disabled = true;
+                post('csdt_threat_integrity_reset', {}).then(function (res) {
+                    resetBtn.disabled = false;
+                    if (res.success && resetMsg) {
+                        resetMsg.textContent = res.data.message || 'Baseline reset.';
+                        resetMsg.style.display = '';
+                        setTimeout(function () { resetMsg.style.display = 'none'; }, 5000);
+                    }
+                }).catch(function () { resetBtn.disabled = false; });
+            });
+        }
+    }());
+
 })();
