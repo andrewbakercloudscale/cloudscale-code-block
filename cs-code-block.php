@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.184
+ * Version: 1.9.185
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.184';
+    const VERSION      = '1.9.185';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9407,16 +9407,20 @@ class CloudScale_DevTools {
                 $missing       = ! $next_delete || ! $next_transient;
                 $overdue       = ( $next_delete   && $next_delete    < $now - $overdue_secs )
                               || ( $next_transient && $next_transient < $now - $overdue_secs );
-                $healthy       = ! $cron_disabled && ! $missing && ! $overdue;
+                // Healthy = events scheduled and not overdue.
+                // DISABLE_WP_CRON is handled by its own separate quick-fix item;
+                // don't double-report it here. If events are scheduled, they'll fire
+                // when a system cron triggers wp-cron.php — that's the correct setup.
+                $healthy = ! $missing && ! $overdue;
 
-                if ( $healthy ) {
+                if ( $healthy && $cron_disabled ) {
+                    $detail = 'Cleanup events are scheduled. DISABLE_WP_CRON is set — ensure a system cron triggers wp-cron.php (e.g. */10 * * * * curl -s ' . home_url( '/wp-cron.php?doing_wp_cron' ) . ').';
+                } elseif ( $healthy ) {
                     $next_label = 'next in ' . human_time_diff( $now, min(
                         $next_delete    ?: PHP_INT_MAX,
                         $next_transient ?: PHP_INT_MAX
                     ) );
                     $detail = "WP-Cron cleanup events are scheduled and running on time ({$next_label}).";
-                } elseif ( $cron_disabled ) {
-                    $detail = 'DISABLE_WP_CRON is set — WordPress will never run scheduled cleanup on its own. A system cron calling wp-cron.php or wp-cli is required.';
                 } elseif ( $missing ) {
                     $detail = 'One or more core cleanup cron events (wp_scheduled_delete, delete_expired_transients) are missing from the schedule. They will be rescheduled on fix.';
                 } else {
@@ -9427,11 +9431,11 @@ class CloudScale_DevTools {
                 return [
                     'id'        => 'cron_health',
                     'title'     => $healthy
-                        ? 'WP-Cron cleanup events are scheduled and on time'
-                        : ( $cron_disabled ? 'DISABLE_WP_CRON is set — scheduled cleanup will not run' : 'WP-Cron cleanup events are missing or overdue' ),
+                        ? 'WP-Cron cleanup events are scheduled'
+                        : 'WP-Cron cleanup events are missing or overdue',
                     'detail'    => $detail,
                     'fixed'     => $healthy,
-                    'fix_label' => $cron_disabled ? 'Reschedule Events' : 'Reschedule & Run Now',
+                    'fix_label' => 'Reschedule & Run Now',
                 ];
             } )(),
             ( function () {
@@ -9454,11 +9458,50 @@ class CloudScale_DevTools {
                 ];
             } )(),
             ( function () {
+                $ack = get_option( 'csdt_devtools_dismissed_checks', [] );
+                if ( in_array( 'fail2ban_external', (array) $ack, true ) ) {
+                    return [
+                        'id'     => 'ssh_brute_force',
+                        'title'  => 'SSH brute-force protection (externally managed)',
+                        'detail' => 'fail2ban is marked as managed outside this server — e.g. on the host OS, a firewall appliance, or Cloudflare.',
+                        'fixed'  => true,
+                    ];
+                }
+                $bin_paths = [
+                    '/usr/bin/fail2ban-client',
+                    '/usr/sbin/fail2ban-client',
+                    '/usr/local/bin/fail2ban-client',
+                    '/usr/local/sbin/fail2ban-client',
+                    '/opt/fail2ban/bin/fail2ban-client',
+                ];
                 $installed = false;
-                foreach ( [ '/usr/bin/fail2ban-client', '/usr/sbin/fail2ban-client', '/usr/local/bin/fail2ban-client' ] as $p ) {
+                foreach ( $bin_paths as $p ) {
                     if ( file_exists( $p ) ) { $installed = true; break; }
                 }
-                $running    = $installed && ( file_exists( '/var/run/fail2ban/fail2ban.pid' ) || file_exists( '/run/fail2ban/fail2ban.pid' ) );
+                // Fallback: exec-based detection (works even if binary is outside standard paths)
+                if ( ! $installed && function_exists( 'exec' ) ) {
+                    $out = [];
+                    @exec( 'which fail2ban-client 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+                    $installed = ! empty( $out[0] ) && trim( $out[0] ) !== '';
+                }
+                $pid_paths = [
+                    '/var/run/fail2ban/fail2ban.pid',
+                    '/run/fail2ban/fail2ban.pid',
+                    '/var/run/fail2ban/fail2ban.sock',
+                    '/run/fail2ban/fail2ban.sock',
+                ];
+                $running = false;
+                if ( $installed ) {
+                    foreach ( $pid_paths as $p ) {
+                        if ( file_exists( $p ) ) { $running = true; break; }
+                    }
+                    // Fallback: service status check via exec
+                    if ( ! $running && function_exists( 'exec' ) ) {
+                        $out = [];
+                        @exec( 'systemctl is-active fail2ban 2>/dev/null', $out ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec
+                        $running = isset( $out[0] ) && trim( $out[0] ) === 'active';
+                    }
+                }
                 $last_check = get_option( 'csdt_ssh_monitor_last_check', null );
                 $recent     = ( is_array( $last_check ) && isset( $last_check['count'] ) ) ? (int) $last_check['count'] : null;
                 $age        = ( is_array( $last_check ) && isset( $last_check['ts'] ) ) ? (int) ( time() - $last_check['ts'] ) : null;
@@ -9466,25 +9509,28 @@ class CloudScale_DevTools {
                     ? sprintf( ' — %d failed attempt%s in the last 60 s', $recent, $recent === 1 ? '' : 's' )
                     : '';
                 return [
-                    'id'        => 'ssh_brute_force',
-                    'title'     => 'SSH brute-force protection' . $count_note,
-                    'detail'    => $installed
+                    'id'            => 'ssh_brute_force',
+                    'title'         => 'SSH brute-force protection' . $count_note,
+                    'detail'        => $installed
                         ? ( $running
                             ? 'fail2ban is installed and the daemon is running — SSH brute-force attempts are being blocked automatically.'
                             : 'fail2ban is installed but the daemon is not running. Start it: sudo systemctl start fail2ban && sudo systemctl enable fail2ban' )
                         : 'CRITICAL: fail2ban is not installed. Unprotected SSH is scanned 24/7 — attackers attempt thousands of passwords per minute and compromised servers are immediately enlisted into DDoS botnets.',
-                    'fixed'     => $running,
-                    'fix_label' => 'Copy fail2ban config',
-                    'fix_modal' => 'csdt-fail2ban-modal',
+                    'fixed'         => $running,
+                    'fix_label'     => 'Copy fail2ban config',
+                    'fix_modal'     => 'csdt-fail2ban-modal',
+                    'dismiss_label' => 'Externally Managed',
+                    'dismiss_id'    => 'fail2ban_external',
                 ];
             } )(),
             ( function () {
                 $cfg_file = ABSPATH . 'wp-config.php';
-                $fixed    = false;
-                if ( is_readable( $cfg_file ) ) {
+                // Check runtime constant first — covers mu-plugin or non-standard define formats
+                $fixed = defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON;
+                if ( ! $fixed && is_readable( $cfg_file ) ) {
                     // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
                     $cfg   = file_get_contents( $cfg_file );
-                    $fixed = (bool) preg_match( "/define\s*\(\s*['\"]DISABLE_WP_CRON['\"]\s*,\s*true\s*\)\s*;/i", $cfg );
+                    $fixed = (bool) preg_match( "/define\s*\(\s*['\"]DISABLE_WP_CRON['\"]\s*,\s*(?:true|1)\s*\)\s*;/i", $cfg );
                 }
                 return [
                     'id'        => 'disable_wp_cron',
@@ -11215,6 +11261,12 @@ bantime  = 86400</pre>
                     <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #dc2626;">
                         <span>🔎 <?php esc_html_e( 'Threat Monitor', 'cloudscale-devtools' ); ?></span>
                         <span class="cs-header-hint"><?php esc_html_e( 'File integrity · New admin alert · Probe detection — alerts once per incident, not per event', 'cloudscale-devtools' ); ?></span>
+                        <?php self::render_explain_btn( 'threat-monitor', 'Threat Monitor', [
+                            [ 'name' => 'File Integrity',   'rec' => 'Critical', 'html' => 'Scans <code>wp-includes/*.php</code> and <code>wp-admin/*.php</code> every 5 minutes and compares file modification times against a stored baseline. If any file changes — outside of a normal WordPress core update — you receive an email and push alert immediately.<br><br>Anti-spam: when WordPress is updated to a new version the baseline is rebuilt silently (all core files change legitimately during an update). The same mtime is never alerted twice, so you will not receive repeated alerts for the same modification. Use <strong>Reset File Baseline</strong> after a manual core update to clear false-positive alerts.' ],
+                            [ 'name' => 'New Admin Alert', 'rec' => 'Critical', 'html' => 'Hooks into WordPress\'s <code>user_register</code> and <code>set_user_role</code> events. The instant a new administrator account is created — or an existing user is promoted to admin — an alert fires.<br><br>Anti-spam: alerts fire exactly once per user ID. If the same account is flagged and you acknowledge it, no further alerts fire for that user. The alerted-user list is capped at 100 entries to prevent unbounded growth.' ],
+                            [ 'name' => 'Probe Detection', 'rec' => 'High',     'html' => 'Reads only the new bytes appended to the web server access log since the last check (byte-offset tracking). Counts requests to sensitive endpoints: <code>wp-login.php</code>, <code>xmlrpc.php</code>, <code>wp-config.php</code>, <code>.env</code>, <code>.git/</code>, <code>.sql</code>, <code>.bak</code>, and shell-injection patterns.<br><br>Anti-spam: an alert only fires when the count exceeds the configured threshold (default: 25 requests per 5-minute window) AND at most once per hour. You will never receive probe alerts more frequently than once per hour regardless of how many probes occur.' ],
+                            [ 'name' => 'Alert channels',  'rec' => 'Setup',    'html' => 'Alerts are sent via <strong>email</strong> (to the site administrator address) and <strong>ntfy.sh push notification</strong> if a topic URL is configured under Security Scan → Scheduled Scans. No additional configuration is needed — the Threat Monitor shares the same alert infrastructure as the SSH Monitor and PHP Error Alerting.' ],
+                        ] ); ?>
                     </div>
                     <div class="cs-panel-body">
 
@@ -11308,6 +11360,12 @@ bantime  = 86400</pre>
                         <div class="cs-scan-col-header">
                             <span class="cs-scan-col-title"><?php esc_html_e( 'Internal Config Audit', 'cloudscale-devtools' ); ?></span>
                             <span class="cs-scan-col-hint"><?php esc_html_e( 'WordPress settings, plugins, users, debug flags — fast', 'cloudscale-devtools' ); ?></span>
+                            <?php self::render_explain_btn( 'standard-scan', 'AI Cyber Audit', [
+                                [ 'name' => 'What it checks',  'rec' => 'Overview',     'html' => 'Collects your WordPress environment — PHP version, WP version, all active plugins, file permissions on key files, exposed debug flags (<code>WP_DEBUG</code>, <code>WP_DEBUG_LOG</code>), user account and role counts, 2FA coverage, brute-force protection state, and key <code>wp-config.php</code> security constants — then sends this to the AI for analysis.' ],
+                                [ 'name' => 'AI analysis',     'rec' => 'How it works', 'html' => 'The AI model receives a structured JSON snapshot and returns findings scored <strong>Critical / High / Medium / Low / Good</strong>. Each finding includes a plain-English explanation of the risk and a specific remediation step. The AI cross-references findings — for example, flagging when an outdated plugin is combined with exposed debug output.' ],
+                                [ 'name' => 'Speed',           'rec' => 'Fast (15–30s)', 'html' => 'The standard scan collects only server-side data — no outbound HTTP probes. Typical completion time is 15–30 seconds depending on the AI provider and number of plugins installed.' ],
+                                [ 'name' => 'No timeout risk', 'rec' => 'Technical',    'html' => 'The scan uses <code>fastcgi_finish_request()</code> to close the browser connection immediately, then continues in the background. A progress bar polls every 3 seconds. This does not depend on WP-Cron.' ],
+                            ] ); ?>
                         </div>
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                             <button id="cs-vuln-scan-btn" class="cs-btn-primary" disabled>
@@ -11329,6 +11387,12 @@ bantime  = 86400</pre>
                         <div class="cs-scan-col-header">
                             <span class="cs-scan-col-title"><?php esc_html_e( 'AI Deep Dive Cyber Audit', 'cloudscale-devtools' ); ?></span>
                             <span class="cs-scan-col-hint"><?php esc_html_e( 'Internal config + plugin code scan + external exposure: SSL cert, login/xmlrpc, REST user enum, author enum, directory listing — 30–60s', 'cloudscale-devtools' ); ?></span>
+                            <?php self::render_explain_btn( 'deep-scan', 'AI Deep Dive Cyber Audit', [
+                                [ 'name' => 'What it adds',       'rec' => 'Overview',       'html' => 'Runs everything the standard scan checks, then adds <strong>live HTTP probes</strong> of your own site: SSL/TLS certificate validity and strength, login page exposure, XML-RPC state, REST API user enumeration, author enumeration, directory listing, and server version headers. It also performs <strong>DNS checks</strong> (SPF, DMARC, DKIM) and static analysis of plugin PHP files.' ],
+                                [ 'name' => 'Plugin code triage', 'rec' => 'AI static scan',  'html' => 'The AI pre-screens plugin PHP files for suspicious patterns (eval, base64_decode, remote code execution sinks) and classifies each finding as <strong>Confirmed / False Positive / Needs Context</strong> before the main analysis. This reduces noise and focuses the main report on real risks.' ],
+                                [ 'name' => 'Speed',              'rec' => '30–90s',          'html' => 'The deep dive makes outbound HTTP and DNS requests, so duration depends on your network and the number of plugins. Typical completion is 30–90 seconds. The browser connection is closed immediately via <code>fastcgi_finish_request()</code>; a progress bar polls every 3 seconds.' ],
+                                [ 'name' => 'DNS checks',         'rec' => 'Email security',  'html' => 'SPF, DMARC, and DKIM records are checked only when your domain has an MX record. If you have no email configured, these checks are skipped and the report notes &ldquo;no email configured&rdquo; as a good finding — no false positives.' ],
+                            ] ); ?>
                         </div>
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                             <button id="cs-deep-scan-btn" class="cs-btn-primary cs-btn-deep" disabled>

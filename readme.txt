@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.184
+Stable tag: 1.9.185
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,7 +85,7 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
-= 1.9.184 =
+= 1.9.185 =
 * feat: Threat Monitor — file integrity check (wp-includes/wp-admin core files), new admin account alert, and probe attack detection; alerts once per incident via email + ntfy.sh; no spam — WP core updates rebuild baseline silently, new admin fires once per user, probe throttled to once per hour
 
 = 1.9.183 =
