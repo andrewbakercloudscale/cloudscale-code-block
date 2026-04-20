@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.179
+ * Version: 1.9.183
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.179';
+    const VERSION      = '1.9.183';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -344,6 +344,8 @@ class CloudScale_DevTools {
         add_action( 'csdt_cleanup_test_accounts',                [ __CLASS__, 'cleanup_expired_test_accounts' ] );
         add_action( 'csdt_scheduled_scan',                      [ __CLASS__, 'run_scheduled_scan' ] );
         add_action( 'csdt_ssh_monitor',                         [ __CLASS__, 'monitor_ssh_failures' ] );
+        add_action( 'csdt_php_error_monitor',                   [ __CLASS__, 'monitor_php_errors' ] );
+        add_action( 'wp_ajax_csdt_php_error_monitor_save',      [ __CLASS__, 'ajax_php_error_monitor_save' ] );
         add_filter( 'cron_schedules',                           [ __CLASS__, 'add_cron_schedules' ] );
         add_action( 'wp_ajax_csdt_plugin_stack_scan',           [ __CLASS__, 'ajax_plugin_stack_scan' ] );
         add_action( 'wp_ajax_csdt_ai_debug_log',                [ __CLASS__, 'ajax_ai_debug_log' ] );
@@ -377,6 +379,15 @@ class CloudScale_DevTools {
             }
         } else {
             wp_clear_scheduled_hook( 'csdt_ssh_monitor' );
+        }
+
+        // Schedule PHP error monitor (default on)
+        if ( get_option( 'csdt_php_error_monitor_enabled', '1' ) === '1' ) {
+            if ( ! wp_next_scheduled( 'csdt_php_error_monitor' ) ) {
+                wp_schedule_event( time() + 300, 'csdt_every_5min', 'csdt_php_error_monitor' );
+            }
+        } else {
+            wp_clear_scheduled_hook( 'csdt_php_error_monitor' );
         }
 
         add_action( 'csdt_devtools_run_vuln_scan', [ __CLASS__, 'cron_vuln_scan' ] );
@@ -1287,10 +1298,11 @@ class CloudScale_DevTools {
                 true
             );
             wp_localize_script( 'csdt-debug', 'csdtDebug', [
-                'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
-                'logsNonce' => wp_create_nonce( 'csdt_devtools_server_logs' ),
-                'aiNonce'   => wp_create_nonce( 'csdt_optimizer_nonce' ),
-                'sources'   => self::get_log_sources(),
+                'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
+                'logsNonce'  => wp_create_nonce( 'csdt_devtools_server_logs' ),
+                'aiNonce'    => wp_create_nonce( 'csdt_optimizer_nonce' ),
+                'debugNonce' => wp_create_nonce( 'csdt_debug_nonce' ),
+                'sources'    => self::get_log_sources(),
             ] );
         }
 
@@ -1827,6 +1839,71 @@ class CloudScale_DevTools {
                 </div>
 
                 <div id="csdt-debug-result" style="display:none;"></div>
+
+                <hr style="border:none;border-top:1px solid #1e293b;margin:28px 0;">
+
+                <!-- PHP Error Alerting settings -->
+                <?php
+                $mon_enabled   = get_option( 'csdt_php_error_monitor_enabled', '1' ) === '1';
+                $mon_threshold = (int) get_option( 'csdt_php_error_monitor_threshold', '1' );
+                $last_trigger  = get_option( 'csdt_php_error_monitor_last_trigger', null );
+                $ntfy_set      = ! empty( get_option( 'csdt_scan_schedule_ntfy_url', '' ) );
+                $last_pos      = get_option( 'csdt_php_error_last_pos', [] );
+                ?>
+                <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:20px 24px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+                        <div>
+                            <strong style="color:#e2e8f0;">🔔 <?php esc_html_e( 'PHP Error Alerting', 'cloudscale-devtools' ); ?></strong>
+                            <span style="display:block;font-size:.82em;color:#64748b;margin-top:2px;"><?php esc_html_e( 'Polls PHP + WP debug logs every 5 min — alerts via email and ntfy.sh when new fatals appear', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" id="csdt-errmon-enabled" <?php checked( $mon_enabled ); ?>>
+                                <span style="font-size:.85em;color:#94a3b8;"><?php esc_html_e( 'Enabled', 'cloudscale-devtools' ); ?></span>
+                            </label>
+                            <button type="button" id="csdt-errmon-save" class="cs-btn-sm cs-btn-primary"><?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?></button>
+                            <span id="csdt-errmon-status" style="font-size:.82em;color:#94a3b8;"></span>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:.82em;color:#64748b;">
+                        <span>
+                            <?php esc_html_e( 'Alert after', 'cloudscale-devtools' ); ?>
+                            <input type="number" id="csdt-errmon-threshold" min="1" max="50" value="<?php echo esc_attr( $mon_threshold ); ?>" style="width:52px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:2px 6px;font-size:1em;text-align:center;">
+                            <?php esc_html_e( 'new error(s) per check (fatals always alert)', 'cloudscale-devtools' ); ?>
+                        </span>
+                        <?php if ( ! $ntfy_set ) : ?>
+                            <span style="color:#f59e0b;">
+                                <?php
+                                printf(
+                                    wp_kses(
+                                        /* translators: %s: link to site audit settings */
+                                        __( '⚠ No ntfy.sh topic set — <a href="%s" style="color:#f59e0b;">configure in Site Audit → Scheduled Scans</a>', 'cloudscale-devtools' ),
+                                        [ 'a' => [ 'href' => [], 'style' => [] ] ]
+                                    ),
+                                    esc_url( admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=site-audit' ) )
+                                );
+                                ?>
+                            </span>
+                        <?php endif; ?>
+                        <?php if ( $last_trigger ) : ?>
+                            <span>
+                                <?php
+                                printf(
+                                    /* translators: 1: human time diff, 2: fatal count, 3: error count */
+                                    esc_html__( 'Last alert: %1$s ago (%2$d fatal, %3$d error)', 'cloudscale-devtools' ),
+                                    esc_html( human_time_diff( (int) $last_trigger['ts'] ) ),
+                                    (int) $last_trigger['fatal'],
+                                    (int) $last_trigger['errors']
+                                );
+                                ?>
+                            </span>
+                        <?php elseif ( $mon_enabled && ! empty( $last_pos ) ) : ?>
+                            <span style="color:#86efac;"><?php esc_html_e( 'Monitoring — no new errors detected', 'cloudscale-devtools' ); ?></span>
+                        <?php elseif ( $mon_enabled ) : ?>
+                            <span style="color:#94a3b8;"><?php esc_html_e( 'Will begin monitoring on next cron run (within 5 min)', 'cloudscale-devtools' ); ?></span>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </div>
         </div>
         <?php
@@ -15093,6 +15170,170 @@ PROMPT;
                 'body'    => $body,
             ] );
         }
+    }
+
+    public static function monitor_php_errors(): void {
+        if ( get_option( 'csdt_php_error_monitor_enabled', '1' ) !== '1' ) {
+            return;
+        }
+
+        $sources     = self::get_log_sources();
+        $watch_keys  = [ 'php_error', 'wp_debug' ];
+        $last_pos    = get_option( 'csdt_php_error_last_pos', [] );
+        $new_pos     = $last_pos;
+        $new_lines   = [];
+        $fatal_lines = [];
+        $now         = time();
+        $is_first_run = empty( $last_pos );
+
+        foreach ( $watch_keys as $key ) {
+            if ( empty( $sources[ $key ]['path'] ) ) {
+                continue;
+            }
+            $path = $sources[ $key ]['path'];
+            if ( ! file_exists( $path ) || ! is_readable( $path ) ) {
+                continue;
+            }
+
+            $size     = filesize( $path );
+            $saved    = isset( $last_pos[ $key ] ) ? (int) $last_pos[ $key ] : null;
+            $new_pos[ $key ] = $size;
+
+            // First run or file truncated — just record position, don't alert
+            if ( $saved === null || $saved > $size ) {
+                continue;
+            }
+
+            $unread = $size - $saved;
+            if ( $unread <= 0 ) {
+                continue;
+            }
+
+            // Cap at 128 KB of new content per source to avoid memory issues
+            $read_bytes = min( $unread, 131072 );
+            // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+            $handle = @fopen( $path, 'rb' );
+            if ( ! $handle ) {
+                continue;
+            }
+            fseek( $handle, $size - $read_bytes );
+            $chunk = fread( $handle, $read_bytes );
+            fclose( $handle );
+
+            if ( ! $chunk ) {
+                continue;
+            }
+
+            foreach ( explode( "\n", $chunk ) as $line ) {
+                $line = trim( $line );
+                if ( ! $line ) {
+                    continue;
+                }
+                $lower = strtolower( $line );
+                if ( strpos( $lower, 'fatal' ) !== false || strpos( $lower, 'critical' ) !== false ) {
+                    $fatal_lines[] = $line;
+                } elseif ( strpos( $lower, 'php error' ) !== false || preg_match( '/\bPHP (?:Warning|Parse error|Error)\b/i', $line ) ) {
+                    $new_lines[] = $line;
+                }
+            }
+        }
+
+        update_option( 'csdt_php_error_last_pos', $new_pos, false );
+
+        if ( $is_first_run || ( empty( $fatal_lines ) && empty( $new_lines ) ) ) {
+            return;
+        }
+
+        $threshold = (int) get_option( 'csdt_php_error_monitor_threshold', '1' );
+        $has_alert = ! empty( $fatal_lines ) || count( $new_lines ) >= $threshold;
+
+        if ( ! $has_alert ) {
+            return;
+        }
+
+        // Throttle: max one alert per 15 minutes
+        $last_alert = (int) get_option( 'csdt_php_error_monitor_last_alert', 0 );
+        if ( ( $now - $last_alert ) < 900 ) {
+            return;
+        }
+        update_option( 'csdt_php_error_monitor_last_alert', $now, false );
+
+        $site      = get_bloginfo( 'name' ) ?: home_url();
+        $debug_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=debug' );
+        $is_fatal  = ! empty( $fatal_lines );
+        $all_new   = array_merge( $fatal_lines, $new_lines );
+        $excerpt   = implode( "\n", array_slice( $all_new, 0, 5 ) );
+
+        if ( $is_fatal ) {
+            $subject = sprintf( '[%s] PHP Fatal Error detected', $site );
+            $priority = 'urgent';
+            $tags     = 'rotating_light,computer';
+        } else {
+            $subject = sprintf( '[%s] %d new PHP error%s detected', $site, count( $new_lines ), count( $new_lines ) === 1 ? '' : 's' );
+            $priority = 'high';
+            $tags     = 'warning,computer';
+        }
+
+        $body = sprintf(
+            "%s on %s\n\nRecent entries:\n%s\n\nOpen Debug AI to analyze: %s",
+            $subject,
+            home_url(),
+            $excerpt,
+            $debug_url
+        );
+
+        // Email
+        add_filter( 'wp_mail_content_type', [ __CLASS__, 'email_content_type_html' ] );
+        wp_mail( get_option( 'admin_email' ), $subject, nl2br( esc_html( $body ) ) );
+        remove_filter( 'wp_mail_content_type', [ __CLASS__, 'email_content_type_html' ] );
+
+        // ntfy.sh
+        $ntfy_url = get_option( 'csdt_scan_schedule_ntfy_url', '' );
+        if ( $ntfy_url ) {
+            $headers = [
+                'Title'    => $subject,
+                'Priority' => $priority,
+                'Tags'     => $tags,
+                'Click'    => $debug_url,
+            ];
+            $ntfy_tok = get_option( 'csdt_scan_schedule_ntfy_token', '' );
+            if ( $ntfy_tok ) {
+                $headers['Authorization'] = 'Bearer ' . $ntfy_tok;
+            }
+            wp_remote_post( $ntfy_url, [
+                'timeout' => 10,
+                'headers' => $headers,
+                'body'    => $excerpt,
+            ] );
+        }
+
+        update_option( 'csdt_php_error_monitor_last_trigger', [
+            'ts'      => $now,
+            'fatal'   => count( $fatal_lines ),
+            'errors'  => count( $new_lines ),
+            'excerpt' => $excerpt,
+        ], false );
+    }
+
+    public static function ajax_php_error_monitor_save(): void {
+        check_ajax_referer( 'csdt_debug_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $enabled   = isset( $_POST['enabled'] ) && $_POST['enabled'] === '1' ? '1' : '0';
+        $threshold = max( 1, min( 50, (int) ( $_POST['threshold'] ?? 1 ) ) );
+        update_option( 'csdt_php_error_monitor_enabled',   $enabled,           false );
+        update_option( 'csdt_php_error_monitor_threshold', (string) $threshold, false );
+        if ( $enabled === '1' ) {
+            if ( ! wp_next_scheduled( 'csdt_php_error_monitor' ) ) {
+                wp_schedule_event( time() + 300, 'csdt_every_5min', 'csdt_php_error_monitor' );
+            }
+            // Reset position so first run doesn't re-scan old log
+            delete_option( 'csdt_php_error_last_pos' );
+        } else {
+            wp_clear_scheduled_hook( 'csdt_php_error_monitor' );
+        }
+        wp_send_json_success( [ 'enabled' => $enabled, 'threshold' => $threshold ] );
     }
 
     public static function cleanup_expired_test_accounts(): void {

@@ -172,4 +172,32 @@
         loadSource( 'php_error' );
     }
 
+    // PHP Error Alerting save button
+    var saveBtn     = document.getElementById( 'csdt-errmon-save' );
+    var enabledChk  = document.getElementById( 'csdt-errmon-enabled' );
+    var thresholdIn = document.getElementById( 'csdt-errmon-threshold' );
+    var saveStatus  = document.getElementById( 'csdt-errmon-status' );
+
+    if ( saveBtn && enabledChk ) {
+        saveBtn.addEventListener( 'click', function () {
+            saveBtn.disabled = true;
+            if ( saveStatus ) { saveStatus.textContent = '\u23F3 Saving\u2026'; }
+            post( 'csdt_php_error_monitor_save', {
+                enabled:   enabledChk.checked ? '1' : '0',
+                threshold: thresholdIn ? thresholdIn.value : '1',
+            }, cfg.debugNonce )
+                .then( function ( res ) {
+                    saveBtn.disabled = false;
+                    if ( saveStatus ) {
+                        saveStatus.textContent = res.success ? '\u2705 Saved' : '\u274C ' + esc( ( res.data && res.data.message ) || 'Failed' );
+                        setTimeout( function () { if ( saveStatus ) { saveStatus.textContent = ''; } }, 3000 );
+                    }
+                } )
+                .catch( function () {
+                    saveBtn.disabled = false;
+                    if ( saveStatus ) { saveStatus.textContent = 'Request failed.'; }
+                } );
+        } );
+    }
+
 }() );

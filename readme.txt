@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.179
+Stable tag: 1.9.183
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,17 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 5. SQL Query Tool with quick queries and paginated results
 
 == Changelog ==
+
+= 1.9.183 =
+* feat: PHP Error Alerting — cron polls PHP error log and WP debug log every 5 minutes; sends ntfy.sh + email alert when new fatals/errors detected; throttled to once per 15 minutes; byte-position tracking avoids re-reading old content
+* feat: Debug AI tab — PHP Error Alerting settings panel with enable toggle, threshold input, and live status display
+
+= 1.9.179 =
+* feat: AI Debugging Assistant — new Debug AI tab; load PHP/WP/web error logs, click any error line, submit to Claude/Gemini for Root Cause / Why It Happens / How to Fix It analysis; auto-loads PHP error log on tab open
+
+= 1.9.177 =
+* feat: Quick Fixes — Enforce 2FA for Admins (one-click sets csdt_devtools_2fa_force_admins); Disable External wp-cron (writes DISABLE_WP_CRON to wp-config.php with system-cron reminder)
+* fix: Test Account Manager — orphaned cs_devtools_test and temp-* accounts now auto-deleted by cleanup cron
 
 = 1.9.158 =
 * fix: Test Account Manager — replace single-use checkbox with Max Logins number input (0 = unlimited, 1 = single-use, N = N logins)
