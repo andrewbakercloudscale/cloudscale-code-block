@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.160
+ * Version: 1.9.162
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.160';
+    const VERSION      = '1.9.162';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2624,7 +2624,7 @@ class CloudScale_DevTools {
         /* ── Test Account Manager ─────────────────────────────────────── */
         $ta_enabled     = get_option( 'csdt_test_accounts_enabled', '0' ) === '1';
         $ta_ttl         = get_option( 'csdt_test_account_ttl', '1800' );
-        $ta_max_logins  = (int) get_option( 'csdt_test_account_max_logins', '0' );
+        $ta_max_logins  = (int) get_option( 'csdt_test_account_max_logins', '1' );
         $ta_accounts    = self::get_active_test_accounts();
         ?>
         <div class="cs-panel" id="cs-panel-test-accounts">
@@ -2674,7 +2674,7 @@ class CloudScale_DevTools {
                                     <input type="number" id="cs-ta-max-logins" min="0" step="1" value="<?php echo esc_attr( $ta_max_logins ); ?>" style="width:80px;" class="cs-sec-select">
                                     <span style="font-size:13px;color:#6b7280;"><?php esc_html_e( '(0 = unlimited)', 'cloudscale-devtools' ); ?></span>
                                 </div>
-                                <span class="cs-hint"><?php esc_html_e( 'Delete the account after this many successful authentications. Set to 1 for single-use (maximum security); set to 0 to keep the account until it expires.', 'cloudscale-devtools' ); ?></span>
+                                <span class="cs-hint"><?php esc_html_e( 'Delete the account after this many successful authentications. 0 = unlimited; 1 = single-use (default); higher = allow N logins before deleting.', 'cloudscale-devtools' ); ?></span>
                             </div>
                         </div>
 
@@ -14422,7 +14422,7 @@ PROMPT;
         $user->set_role( 'subscriber' );
 
         $expires_at  = time() + $ttl;
-        $max_logins  = max( 0, (int) get_option( 'csdt_test_account_max_logins', '0' ) );
+        $max_logins  = max( 0, (int) get_option( 'csdt_test_account_max_logins', '1' ) );
 
         update_user_meta( $user_id, 'csdt_test_account',     '1' );
         update_user_meta( $user_id, 'csdt_test_expires_at',  $expires_at );
