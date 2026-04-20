@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.162
+ * Version: 1.9.164
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.162';
+    const VERSION      = '1.9.164';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2635,7 +2635,7 @@ class CloudScale_DevTools {
                     [ 'name' => 'What is a test account?', 'rec' => 'Overview',     'html' => 'A test account is a temporary <strong>subscriber-level</strong> WordPress user with an Application Password. It bypasses admin 2FA enforcement, making it safe for automated Playwright and CI pipelines to authenticate against the REST API without disabling security for real admin accounts.' ],
                     [ 'name' => 'TTL / Expiry',           'rec' => 'Recommended',  'html' => 'Accounts expire automatically after the TTL you set (default 30 minutes). A scheduled CRON runs every 15 minutes to delete expired accounts. You can also revoke accounts manually from the active accounts list.' ],
                     [ 'name' => 'Single-use',             'rec' => 'Optional',     'html' => 'When single-use is enabled, the account is deleted immediately after its first successful REST API authentication. Use this for one-shot CI jobs where you want zero lingering credentials.' ],
-                    [ 'name' => 'Setup scripts',          'rec' => 'Recommended',  'html' => 'Each plugin repository includes <code>setup-playwright-test-account.sh</code> and <code>delete-playwright-test-account.sh</code>. Run setup before your test suite and delete after. Credentials are written to <code>.env.test</code> and never committed to git.' ],
+                    [ 'name' => 'CI / Playwright usage',  'rec' => 'Recommended',  'html' => 'Create a test account before your test suite runs and revoke it after. Use the REST API credentials (username + app password) with HTTP Basic Auth — e.g. <code>curl -u "username:app_password" https://yoursite.com/wp-json/wp/v2/posts</code>. Store credentials in environment variables or a <code>.env</code> file and never commit them to git.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
