@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.164
+ * Version: 1.9.166
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.164';
+    const VERSION      = '1.9.166';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2658,6 +2658,7 @@ class CloudScale_DevTools {
                             <span class="cs-sec-label"><?php esc_html_e( 'Default TTL:', 'cloudscale-devtools' ); ?></span>
                             <div class="cs-sec-control">
                                 <select id="cs-ta-ttl" class="cs-sec-select" style="width:auto;">
+                                    <option value="300"   <?php selected( $ta_ttl, '300' );   ?>><?php esc_html_e( '5 minutes',  'cloudscale-devtools' ); ?></option>
                                     <option value="1800"  <?php selected( $ta_ttl, '1800' );  ?>><?php esc_html_e( '30 minutes', 'cloudscale-devtools' ); ?></option>
                                     <option value="3600"  <?php selected( $ta_ttl, '3600' );  ?>><?php esc_html_e( '1 hour',     'cloudscale-devtools' ); ?></option>
                                     <option value="7200"  <?php selected( $ta_ttl, '7200' );  ?>><?php esc_html_e( '2 hours',    'cloudscale-devtools' ); ?></option>
@@ -14494,7 +14495,7 @@ PROMPT;
         check_ajax_referer( 'csdt_devtools_login_nonce', 'nonce' );
 
         $enabled     = ( $_POST['enabled']     ?? '0' ) === '1' ? '1' : '0';
-        $ttl         = in_array( (string) ( $_POST['ttl'] ?? '1800' ), [ '1800', '3600', '7200', '86400' ], true )
+        $ttl         = in_array( (string) ( $_POST['ttl'] ?? '1800' ), [ '300', '1800', '3600', '7200', '86400' ], true )
                        ? (string) $_POST['ttl'] : '1800';
         $max_logins  = max( 0, (int) ( $_POST['max_logins'] ?? 0 ) );
 
