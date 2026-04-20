@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.123
+ * Version: 1.9.124
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -11329,7 +11329,7 @@ PROMPT;
                     ! empty( get_option( 'csdt_devtools_gemini_key', '' ) );
 
         if ( $has_key ) {
-            $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first). IMPORTANT: Do NOT generate findings about missing backup plugins or missing SEO plugins — those are handled separately.';
+            $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first). IMPORTANT: (1) Do NOT generate findings about missing backup plugins or missing SEO plugins — those are handled separately. (2) The field "template_rendered_pages" lists pages whose post_content is empty because they use a custom theme template or page builder — their actual rendered content may be substantial. Do NOT flag these as thin or empty content.';
 
             $user_msg = "Audit this WordPress site and return findings as a JSON array:\n\n" . wp_json_encode( $data, JSON_PRETTY_PRINT );
 
@@ -11405,9 +11405,11 @@ PROMPT;
         }
 
         // ── Analyse posts ──
-        $issues          = [ 'no_meta_desc' => [], 'no_title_tag' => [], 'thin_content' => [], 'no_featured_image' => [], 'duplicate_titles' => [] ];
-        $title_counts    = [];
-        $word_count_data = [];
+        $issues            = [ 'no_meta_desc' => [], 'no_title_tag' => [], 'thin_content' => [], 'no_featured_image' => [], 'duplicate_titles' => [] ];
+        $title_counts      = [];
+        $word_count_data   = [];
+        $front_page_id     = (int) get_option( 'page_on_front', 0 );
+        $template_pages    = [];   // pages whose content is entirely theme/builder rendered
 
         $meta_desc_keys = [ '_yoast_wpseo_metadesc', 'rank_math_description', '_aioseop_description' ];
         $title_keys     = [ '_yoast_wpseo_title', 'rank_math_title', '_aioseop_title' ];
@@ -11434,10 +11436,15 @@ PROMPT;
             }
             if ( ! $has_title ) { $issues['no_title_tag'][] = $title; }
 
-            // Word count
-            $words = str_word_count( wp_strip_all_tags( $p['post_content'] ) );
-            if ( $words < 300 ) { $issues['thin_content'][] = [ 'title' => $title, 'words' => $words ]; }
-            $word_count_data[] = $words;
+            // Word count — skip pages whose content is entirely theme/builder rendered
+            $raw_words = str_word_count( wp_strip_all_tags( $p['post_content'] ) );
+            $is_template_rendered = ( $raw_words === 0 && $p['post_type'] === 'page' );
+            if ( $is_template_rendered ) {
+                $template_pages[] = $title;
+            } else {
+                if ( $raw_words < 300 ) { $issues['thin_content'][] = [ 'title' => $title, 'words' => $raw_words ]; }
+                $word_count_data[] = $raw_words;
+            }
 
             // Featured image
             if ( empty( $meta['_thumbnail_id'] ) ) { $issues['no_featured_image'][] = $title; }
@@ -11509,7 +11516,8 @@ PROMPT;
             'thin_content_count'  => count( $issues['thin_content'] ),
             'thin_content_sample' => array_slice( $issues['thin_content'], 0, 5 ),
             'no_featured_img_count' => count( $issues['no_featured_image'] ),
-            'duplicate_titles'    => $issues['duplicate_titles'],
+            'duplicate_titles'      => $issues['duplicate_titles'],
+            'template_rendered_pages' => $template_pages,
             'autoload_kb'         => $autoload_kb,
             'expired_transients'  => $expired_transients,
             'revision_count'      => $revision_count,
