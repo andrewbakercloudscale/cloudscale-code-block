@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.166
+ * Version: 1.9.168
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.166';
+    const VERSION      = '1.9.168';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2624,6 +2624,7 @@ class CloudScale_DevTools {
         /* ── Test Account Manager ─────────────────────────────────────── */
         $ta_enabled     = get_option( 'csdt_test_accounts_enabled', '0' ) === '1';
         $ta_ttl         = get_option( 'csdt_test_account_ttl', '1800' );
+        $ta_single_use  = get_option( 'csdt_test_account_single_use', '1' ) === '1';
         $ta_max_logins  = (int) get_option( 'csdt_test_account_max_logins', '1' );
         $ta_accounts    = self::get_active_test_accounts();
         ?>
@@ -2669,13 +2670,24 @@ class CloudScale_DevTools {
                         </div>
 
                         <div class="cs-sec-row">
+                            <span class="cs-sec-label"><?php esc_html_e( 'Single-use:', 'cloudscale-devtools' ); ?></span>
+                            <div class="cs-sec-control">
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                    <input type="checkbox" id="cs-ta-single-use" <?php checked( $ta_single_use ); ?>>
+                                    <span><?php esc_html_e( 'Delete account on first successful authentication', 'cloudscale-devtools' ); ?></span>
+                                </label>
+                                <span class="cs-hint"><?php esc_html_e( 'Maximum security — each test run gets fresh credentials. When enabled, Max Logins is locked to 1.', 'cloudscale-devtools' ); ?></span>
+                            </div>
+                        </div>
+
+                        <div class="cs-sec-row">
                             <span class="cs-sec-label"><?php esc_html_e( 'Max logins:', 'cloudscale-devtools' ); ?></span>
                             <div class="cs-sec-control">
                                 <div style="display:flex;align-items:center;gap:8px;">
-                                    <input type="number" id="cs-ta-max-logins" min="0" step="1" value="<?php echo esc_attr( $ta_max_logins ); ?>" style="width:80px;" class="cs-sec-select">
+                                    <input type="number" id="cs-ta-max-logins" min="0" step="1" value="<?php echo esc_attr( $ta_max_logins ); ?>" style="width:80px;" class="cs-sec-select" <?php echo $ta_single_use ? 'disabled' : ''; ?>>
                                     <span style="font-size:13px;color:#6b7280;"><?php esc_html_e( '(0 = unlimited)', 'cloudscale-devtools' ); ?></span>
                                 </div>
-                                <span class="cs-hint"><?php esc_html_e( 'Delete the account after this many successful authentications. 0 = unlimited; 1 = single-use (default); higher = allow N logins before deleting.', 'cloudscale-devtools' ); ?></span>
+                                <span class="cs-hint"><?php esc_html_e( 'Delete the account after this many successful authentications. 0 = unlimited; higher = allow N logins before deleting.', 'cloudscale-devtools' ); ?></span>
                             </div>
                         </div>
 
@@ -14497,10 +14509,12 @@ PROMPT;
         $enabled     = ( $_POST['enabled']     ?? '0' ) === '1' ? '1' : '0';
         $ttl         = in_array( (string) ( $_POST['ttl'] ?? '1800' ), [ '300', '1800', '3600', '7200', '86400' ], true )
                        ? (string) $_POST['ttl'] : '1800';
-        $max_logins  = max( 0, (int) ( $_POST['max_logins'] ?? 0 ) );
+        $single_use  = ( $_POST['single_use'] ?? '0' ) === '1' ? '1' : '0';
+        $max_logins  = $single_use === '1' ? 1 : max( 0, (int) ( $_POST['max_logins'] ?? 0 ) );
 
         update_option( 'csdt_test_accounts_enabled',    $enabled );
         update_option( 'csdt_test_account_ttl',         $ttl );
+        update_option( 'csdt_test_account_single_use',  $single_use );
         update_option( 'csdt_test_account_max_logins',  (string) $max_logins );
 
         if ( $enabled === '1' ) {

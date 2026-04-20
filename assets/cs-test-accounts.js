@@ -104,16 +104,30 @@
             });
         }
 
+        /* Single-use toggle */
+        var chkSingleUse  = el('cs-ta-single-use');
+        var maxLoginsEl   = el('cs-ta-max-logins');
+        if (chkSingleUse && maxLoginsEl) {
+            chkSingleUse.addEventListener('change', function () {
+                if (chkSingleUse.checked) {
+                    maxLoginsEl.value    = '1';
+                    maxLoginsEl.disabled = true;
+                } else {
+                    maxLoginsEl.disabled = false;
+                }
+            });
+        }
+
         /* Save settings */
         var btnSave  = el('cs-ta-save');
         var savedMsg = el('cs-ta-saved');
         if (btnSave) {
             btnSave.addEventListener('click', function () {
                 btnSave.disabled = true;
-                var maxLoginsEl = el('cs-ta-max-logins');
                 var payload = {
                     enabled:    chkEnabled && chkEnabled.checked ? '1' : '0',
                     ttl:        (el('cs-ta-ttl') || {}).value || '1800',
+                    single_use: chkSingleUse && chkSingleUse.checked ? '1' : '0',
                     max_logins: maxLoginsEl ? (parseInt(maxLoginsEl.value, 10) || 0) : 0,
                 };
                 post('csdt_test_account_settings_save', payload, function (res) {
