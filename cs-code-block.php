@@ -1358,7 +1358,7 @@ class CloudScale_DevTools {
             <!-- Banner -->
             <div id="cs-banner">
                 <div>
-                    <div id="cs-banner-title">⚡ CloudScale Cyber and Devtools</div>
+                    <div id="cs-banner-title">🔐 CloudScale Cyber and Devtools</div>
                     <div id="cs-banner-sub"><?php esc_html_e( 'Code blocks, SQL tools, code migrator, site monitor &amp; login security', 'cloudscale-devtools' ); ?> &middot; v<?php echo esc_html( self::VERSION ); ?></div>
                 </div>
                 <div id="cs-banner-right">

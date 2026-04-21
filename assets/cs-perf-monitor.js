@@ -52,6 +52,62 @@
 
     var issuesList = [];
 
+    // ── Editor debug (browser-side fetch / JS error capture) ─────────────────
+    var editorLogs     = [];   // {ts, type:'ok'|'fail'|'jserr', method, url, status, dur, detail}
+    var editorFailCount = 0;
+    var editorBadgeEl   = null;
+
+    (function initEditorDebug() {
+        var origFetch = window.fetch;
+        window.fetch = function (input, init) {
+            var method = (init && init.method) || 'GET';
+            var url    = typeof input === 'string' ? input : (input && input.url) || String(input);
+            var t0     = performance.now();
+            return origFetch.apply(this, arguments).then(function (resp) {
+                var dur = Math.round(performance.now() - t0);
+                var ok  = resp.ok;
+                if (!ok) {
+                    // Clone to read body without consuming the original
+                    resp.clone().text().then(function (body) {
+                        pushEditorLog({ type:'fail', method:method, url:url, status:resp.status, dur:dur, detail:body.slice(0,300) });
+                    }).catch(function () {
+                        pushEditorLog({ type:'fail', method:method, url:url, status:resp.status, dur:dur });
+                    });
+                } else {
+                    pushEditorLog({ type:'ok', method:method, url:url, status:resp.status, dur:dur });
+                }
+                return resp;
+            }, function (err) {
+                pushEditorLog({ type:'fail', method:method, url:url, status:'ERR', dur:Math.round(performance.now()-t0), detail:String(err) });
+                throw err;
+            });
+        };
+
+        window.addEventListener('error', function (e) {
+            if (e.target && e.target !== window) { return; } // resource errors handled separately
+            pushEditorLog({ type:'jserr', detail: e.message + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '') });
+        });
+
+        window.addEventListener('unhandledrejection', function (e) {
+            var msg = e.reason && (e.reason.message || String(e.reason)) || 'Unhandled rejection';
+            pushEditorLog({ type:'jserr', detail:'Promise rejection: ' + msg });
+        });
+    })();
+
+    function pushEditorLog(entry) {
+        var d = new Date();
+        entry.ts = ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2)+'.'+('00'+d.getMilliseconds()).slice(-3);
+        editorLogs.unshift(entry);
+        if (editorLogs.length > 200) { editorLogs.pop(); }
+        if (entry.type === 'fail' || entry.type === 'jserr') {
+            editorFailCount++;
+            if (editorBadgeEl) { editorBadgeEl.textContent = editorFailCount; }
+            computeIssues();
+            renderIssues();
+        }
+        if (activeTab === 'editor') { renderEditor(); }
+    }
+
     // ── Bootstrap ─────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', function () {
         panel        = document.getElementById('cs-perf');
@@ -95,6 +151,7 @@
         templateWrap = document.getElementById('cs-template-wrap');
         transTbody   = document.getElementById('cs-trans-rows');
         transCount   = document.getElementById('cs-ptc-trans');
+        editorBadgeEl = document.getElementById('cs-ptc-editor');
 
         if (!panel) return;
 
@@ -119,6 +176,7 @@
         renderTemplate();
         renderTransients();
         renderSummary();
+        renderEditor();
         restoreState();
         bindEvents();
     });
@@ -252,6 +310,7 @@
         if (logFiltersEl)    logFiltersEl.style.display    = tab === 'logs'   ? '' : 'none';
         if (assetsFiltersEl) assetsFiltersEl.style.display = tab === 'assets' ? '' : 'none';
         if (hooksFiltersEl)  hooksFiltersEl.style.display  = tab === 'hooks'  ? '' : 'none';
+        if (tab === 'editor') { renderEditor(); }
     }
 
     // ── Plugin filter dropdown ────────────────────────────────────────────────
@@ -1312,6 +1371,20 @@
                 detail: renderBlocking.map(function (s) { return s.handle; }).join(', '), plugin: '' });
         }
 
+        // Editor fetch failures and JS errors
+        editorLogs.forEach(function (e) {
+            if (e.type === 'fail') {
+                var path = (e.url||'').replace(window.location.origin,'').split('?')[0];
+                issuesList.push({ sev: 'critical', tab: 'editor',
+                    title: 'Editor request failed — ' + (e.method||'GET') + ' ' + path + ' → ' + e.status,
+                    detail: e.detail ? e.detail.slice(0,100) : '', plugin: '' });
+            } else if (e.type === 'jserr') {
+                issuesList.push({ sev: 'critical', tab: 'editor',
+                    title: 'JS Error — ' + (e.detail||'').slice(0,100),
+                    detail: '', plugin: '' });
+            }
+        });
+
         // Sort: critical → warning → info
         var order = { critical: 0, warning: 1, info: 2 };
         issuesList.sort(function (a, b) { return (order[a.sev] || 0) - (order[b.sev] || 0); });
@@ -1815,10 +1888,12 @@
             }
             var fix = getIssueFix(issue);
             var fixId = 'cs-fix-' + idx;
+            var tabLink = issue.tab ? ' <span class="cs-issue-tab-link" data-tab="' + esc(issue.tab) + '" style="font-size:10px;opacity:.6;cursor:pointer;text-decoration:underline;">→ ' + esc(issue.tab) + ' tab</span>' : '';
             html += '<div class="cs-issue-row cs-issue-' + esc(issue.sev) + '">'
                 + '<div class="cs-issue-top">'
                     + '<span class="cs-issue-title">' + esc(issue.title) + '</span>'
                     + (issue.plugin ? pluginChip(issue.plugin) : '')
+                    + tabLink
                     + (fix ? '<span class="cs-issue-arrow cs-issue-arrow-expand">&#9658;</span>' : '')
                 + '</div>'
                 + (issue.detail ? '<div class="cs-issue-detail">' + esc(issue.detail) + '</div>' : '')
@@ -1838,6 +1913,14 @@
                 var open = fixWrap.classList.contains('cs-fix-open');
                 fixWrap.classList.toggle('cs-fix-open', !open);
                 if (arrow) arrow.innerHTML = open ? '&#9658;' : '&#9660;';
+            });
+        });
+
+        // Tab-link chips navigate to the relevant tab
+        Array.prototype.forEach.call(issuesWrap.querySelectorAll('.cs-issue-tab-link'), function (chip) {
+            chip.addEventListener('click', function (e) {
+                e.stopPropagation();
+                switchTab(chip.dataset.tab, true);
             });
         });
     }
@@ -2467,6 +2550,57 @@
 
         var sumPdfBtn = document.getElementById('cs-sum-pdf-btn');
         if (sumPdfBtn) sumPdfBtn.addEventListener('click', function () { exportPDF(); });
+    }
+
+    // ── Editor debug tab ──────────────────────────────────────────────────────
+    function renderEditor() {
+        var wrap = document.getElementById('cs-pp-editor-body');
+        if (!wrap) { return; }
+
+        if (editorLogs.length === 0) {
+            wrap.innerHTML = '<div class="cs-empty">Monitoring browser requests&hellip; No activity yet.</div>';
+            return;
+        }
+
+        var html = '<table class="cs-ptable"><thead><tr>'
+            + '<th style="width:80px">Time</th>'
+            + '<th style="width:54px">Method</th>'
+            + '<th>URL</th>'
+            + '<th style="width:60px">Status</th>'
+            + '<th style="width:60px">Duration</th>'
+            + '</tr></thead><tbody>';
+
+        editorLogs.forEach(function (e) {
+            var isFail = e.type === 'fail' || e.type === 'jserr';
+            var rowCls = isFail ? ' class="cs-row-slow"' : '';
+            var color  = isFail ? '#f87171' : '#a6e3a1';
+
+            if (e.type === 'jserr') {
+                html += '<tr' + rowCls + '>'
+                    + '<td class="c-t"><span class="cs-badge cs-badge-c">JS</span></td>'
+                    + '<td>ERR</td>'
+                    + '<td colspan="2" style="color:' + color + ';font-size:11px;" title="' + esc(e.detail||'') + '">' + esc((e.detail||'').slice(0,120)) + '</td>'
+                    + '<td>—</td>'
+                    + '</tr>';
+            } else {
+                var path = (e.url||'').replace(window.location.origin,'').split('?')[0];
+                html += '<tr' + rowCls + '>'
+                    + '<td class="c-t">' + esc(e.ts) + '</td>'
+                    + '<td>' + esc(e.method||'GET') + '</td>'
+                    + '<td style="color:' + color + '" title="' + esc(e.url||'') + '">' + esc(path) + '</td>'
+                    + '<td style="color:' + color + '">' + esc(String(e.status||'')) + '</td>'
+                    + '<td>' + (e.dur !== undefined ? e.dur + 'ms' : '—') + '</td>'
+                    + '</tr>';
+                if (isFail && e.detail) {
+                    html += '<tr' + rowCls + '>'
+                        + '<td></td><td colspan="4" style="font-size:10px;font-family:monospace;color:#fca5a5;white-space:pre-wrap;padding-bottom:6px;">'
+                        + esc(e.detail.slice(0,400)) + '</td></tr>';
+                }
+            }
+        });
+
+        html += '</tbody></table>';
+        wrap.innerHTML = html;
     }
 
     // ── Footer ────────────────────────────────────────────────────────────────
