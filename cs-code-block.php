@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.199
+ * Version: 1.9.200
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.199';
+    const VERSION      = '1.9.200';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -5432,8 +5432,8 @@ class CloudScale_DevTools {
                         . '<button class="cs-ptab"         data-tab="request"   role="tab" aria-selected="false">Request</button>'
                         . '<button class="cs-ptab"         data-tab="template"  role="tab" aria-selected="false">Template</button>'
                         . '<button class="cs-ptab"         data-tab="transients" role="tab" aria-selected="false">Transients <span id="cs-ptc-trans">0</span></button>'
-                        . '<button class="cs-ptab"         data-tab="summary"   role="tab" aria-selected="false">Summary</button>'
                         . '<button class="cs-ptab"         data-tab="editor"    role="tab" aria-selected="false">Browser <span id="cs-ptc-editor">0</span></button>'
+                        . '<button class="cs-ptab"         data-tab="summary"   role="tab" aria-selected="false">Summary</button>'
                     . '</div>'
                     . '<button id="cs-perf-copy" class="cs-ptab-copy" title="Copy current tab to clipboard">&#128203; Copy</button>'
                 . '</div>'
