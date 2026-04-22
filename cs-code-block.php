@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.211
+ * Version: 1.9.212
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.211';
+    const VERSION      = '1.9.212';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -10346,94 +10346,128 @@ class CloudScale_DevTools {
             var scanResults = document.getElementById('cs-csp-scan-results');
             var scanSpinner = document.getElementById('cs-csp-scan-spinner');
 
-            var SCAN_HDRS = [
-                {key:'content-security-policy',             label:'CSP'},
-                {key:'content-security-policy-report-only', label:'CSP (RO)'},
-                {key:'strict-transport-security',           label:'HSTS'},
-                {key:'x-frame-options',                     label:'X-Frame-Options'},
-                {key:'x-content-type-options',              label:'X-Content-Type-Options'},
-                {key:'referrer-policy',                     label:'Referrer-Policy'},
-                {key:'permissions-policy',                  label:'Permissions-Policy'},
-            ];
-            var MANDATORY = ['content-security-policy','strict-transport-security','x-frame-options','x-content-type-options'];
+            var SEC_KEYS = ['content-security-policy','content-security-policy-report-only','strict-transport-security','x-frame-options','x-content-type-options','referrer-policy','permissions-policy'];
+            var SEC_LABELS = {'content-security-policy':'Content-Security-Policy','content-security-policy-report-only':'CSP-Report-Only','strict-transport-security':'Strict-Transport-Security','x-frame-options':'X-Frame-Options','x-content-type-options':'X-Content-Type-Options','referrer-policy':'Referrer-Policy','permissions-policy':'Permissions-Policy'};
+            var GRADE_COLORS = {'A+':'#15803d','A':'#16a34a','B':'#1d4ed8','C':'#b45309','D':'#c2410c','F':'#991b1b'};
+
+            function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+            function secBox(title, content) {
+                return '<div style="border:1px solid #d1d5db;border-radius:6px;overflow:hidden;margin-bottom:12px;">' +
+                    '<div style="background:#e8edf5;padding:9px 14px;border-bottom:1px solid #d1d5db;">' +
+                    '<strong style="font-size:13px;color:#1e293b;">' + title + '</strong></div>' +
+                    '<div style="padding:14px 16px;">' + content + '</div></div>';
+            }
 
             function renderScanResults(data) {
                 if (!scanResults) return;
-                if (!data || !data.results || !data.results.length) {
-                    scanResults.innerHTML = '<p style="color:#94a3b8;font-size:12px;margin:0;">No results returned.</p>';
-                    return;
-                }
-                var html = '<div style="overflow-x:auto;margin-bottom:10px;"><table style="width:100%;border-collapse:collapse;font-size:11px;">';
-                html += '<thead><tr style="background:#f8fafc;">';
-                html += '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;min-width:120px;">URL</th>';
-                SCAN_HDRS.forEach(function(h) {
-                    html += '<th style="padding:5px 6px;text-align:center;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;white-space:nowrap;font-size:10px;" title="' + h.key + '">' + h.label + '</th>';
-                });
-                html += '</tr></thead><tbody>';
-                data.results.forEach(function(row, i) {
-                    var bg = i % 2 ? '#f8fafc' : '#fff';
-                    if (row.error) {
-                        html += '<tr style="background:' + bg + '"><td colspan="' + (SCAN_HDRS.length + 1) + '" style="padding:5px 8px;color:#dc2626;font-size:11px;">✗ ' + row.url + ' — ' + row.error + '</td></tr>';
-                        return;
-                    }
-                    var slug = (row.url.replace(/^https?:\/\/[^/]+/, '') || '/');
-                    if (slug.length > 34) slug = slug.slice(0, 31) + '…';
-                    html += '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;">';
-                    html += '<td style="padding:5px 8px;font-family:monospace;color:#374151;font-size:10px;" title="' + row.url + '">' + slug + '</td>';
-                    SCAN_HDRS.forEach(function(h) {
-                        var hdr = row.headers ? row.headers[h.key] : null;
-                        if (!hdr || hdr.status === 'missing') {
-                            var isMand = MANDATORY.indexOf(h.key) !== -1;
-                            html += '<td style="text-align:center;padding:5px 4px;" title="Missing">' +
-                                (isMand ? '<span style="color:#dc2626;font-weight:700;">✗</span>' : '<span style="color:#d1d5db;">−</span>') + '</td>';
-                        } else if (hdr.status === 'duplicate') {
-                            html += '<td style="text-align:center;padding:5px 4px;" title="DUPLICATE: ' + hdr.values.length + ' headers"><span style="color:#d97706;font-weight:700;">⚠' + hdr.values.length + '</span></td>';
-                        } else {
-                            html += '<td style="text-align:center;padding:5px 4px;" title="' + (hdr.values[0]||'').replace(/"/g,'&quot;').slice(0,120) + '"><span style="color:#16a34a;font-weight:700;">✓</span></td>';
-                        }
-                    });
-                    html += '</tr>';
-                });
-                html += '</tbody></table></div>';
+                var home = data && data.home;
+                if (!home) { scanResults.innerHTML = '<p style="color:#94a3b8;font-size:12px;">No data returned.</p>'; return; }
 
-                // Issues panel
-                var issues = [];
-                data.results.forEach(function(row) {
-                    if (!row.headers) return;
-                    SCAN_HDRS.forEach(function(h) {
-                        var hdr = row.headers[h.key];
-                        if (!hdr) return;
-                        var slug2 = (row.url.replace(/^https?:\/\/[^/]+/,'') || '/');
-                        if (hdr.status === 'duplicate') {
-                            issues.push({ sev:'error', msg: '<strong>' + h.label + ' duplicate</strong> on <code>' + slug2 + '</code> — ' + hdr.values.length + ' conflicting headers (likely two plugins both setting this header)' });
-                        } else if (hdr.status === 'missing' && MANDATORY.indexOf(h.key) !== -1) {
-                            issues.push({ sev:'warn', msg: '<strong>' + h.label + ' missing</strong> on <code>' + slug2 + '</code>' });
+                var html = '';
+
+                // ── 1. Security Report Summary ───────────────────────────────
+                if (home.error) {
+                    html += secBox('Security Report Summary', '<p style="color:#dc2626;font-size:12px;margin:0;">Error: ' + esc(home.error) + '</p>');
+                } else {
+                    var grade = home.grade || '?';
+                    var gc    = GRADE_COLORS[grade] || '#64748b';
+                    var sec   = home.sec || {};
+                    var now   = new Date();
+                    var ts    = now.toISOString().replace('T',' ').slice(0,19) + ' UTC';
+
+                    // Build header pills
+                    var pills = '';
+                    SEC_KEYS.forEach(function(k) {
+                        var s = sec[k] ? sec[k].status : 'missing';
+                        var lbl = SEC_LABELS[k] || k;
+                        if (s === 'present') {
+                            pills += '<span style="display:inline-flex;align-items:center;gap:4px;background:#15803d;color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;margin:2px 3px 2px 0;white-space:nowrap;">✓ ' + lbl + '</span>';
+                        } else if (s === 'duplicate') {
+                            pills += '<span style="display:inline-flex;align-items:center;gap:4px;background:#d97706;color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;margin:2px 3px 2px 0;white-space:nowrap;">⚠ ' + lbl + '</span>';
+                        } else {
+                            pills += '<span style="display:inline-flex;align-items:center;gap:4px;background:#dc2626;color:#fff;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;margin:2px 3px 2px 0;white-space:nowrap;">✗ ' + lbl + '</span>';
                         }
                     });
-                });
-                // Dedupe warnings (same header missing on multiple pages → one entry)
-                var seen = {}, deduped = [];
-                issues.forEach(function(i) {
-                    if (i.sev === 'warn') {
-                        var k = i.msg.replace(/<code>.*<\/code>/, '');
-                        if (seen[k]) return;
-                        seen[k] = true;
-                        i.msg = i.msg.replace(' on <code>' + i.msg.match(/<code>(.*?)<\/code>/)[1] + '</code>', ' (all pages)');
+
+                    var warnSummary = '';
+                    if (home.warnings && home.warnings.length) {
+                        warnSummary = 'Grade capped at ' + grade + ', please see warnings below.';
                     }
-                    deduped.push(i);
-                });
-                if (deduped.length) {
-                    html += '<div style="background:#fef9f0;border:1px solid #fed7aa;border-radius:6px;padding:10px 12px;">';
-                    html += '<div style="font-size:11px;font-weight:700;color:#92400e;margin-bottom:6px;">Issues found</div>';
-                    deduped.forEach(function(i) {
-                        var ic = i.sev === 'error' ? '#991b1b' : '#78350f';
-                        var prefix = i.sev === 'error' ? '🔴 ' : '🟡 ';
-                        html += '<div style="font-size:11px;color:' + ic + ';margin-bottom:4px;line-height:1.5;">' + prefix + i.msg + '</div>';
-                    });
-                    html += '</div>';
-                } else {
-                    html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px 12px;font-size:11px;color:#14532d;">✓ No duplicate or missing critical headers detected.</div>';
+
+                    var summaryInner =
+                        '<div style="display:flex;gap:16px;align-items:flex-start;">' +
+                        '<div style="width:80px;height:80px;min-width:80px;background:' + gc + ';border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' +
+                        '<span style="color:#fff;font-size:44px;font-weight:900;line-height:1;">' + grade + '</span></div>' +
+                        '<table style="flex:1;font-size:12px;border-collapse:collapse;width:100%;">' +
+                        '<tr><td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap;vertical-align:top;color:#374151;width:110px;">Site:</td>' +
+                        '<td style="padding:4px 0;color:#374151;"><a href="' + esc(home.url) + '" target="_blank" rel="noopener" style="color:#2563eb;">' + esc(home.url) + '</a></td></tr>';
+                    if (home.ip) {
+                        summaryInner += '<tr><td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap;vertical-align:top;color:#374151;">IP Address:</td>' +
+                            '<td style="padding:4px 0;color:#374151;">' + esc(home.ip) + '</td></tr>';
+                    }
+                    summaryInner +=
+                        '<tr><td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap;vertical-align:top;color:#374151;">Report Time:</td>' +
+                        '<td style="padding:4px 0;color:#374151;">' + ts + '</td></tr>' +
+                        '<tr><td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap;vertical-align:top;color:#374151;">Headers:</td>' +
+                        '<td style="padding:4px 0;line-height:1.8;">' + pills + '</td></tr>';
+                    if (warnSummary) {
+                        summaryInner += '<tr><td style="padding:4px 8px 4px 0;font-weight:700;white-space:nowrap;vertical-align:top;color:#374151;">Warning:</td>' +
+                            '<td style="padding:4px 0;color:#374151;">' + esc(warnSummary) + '</td></tr>';
+                    }
+                    summaryInner += '</table></div>';
+                    html += secBox('Security Report Summary', summaryInner);
+
+                    // ── 2. Warnings ──────────────────────────────────────────
+                    if (home.warnings && home.warnings.length) {
+                        var warnRows = '';
+                        home.warnings.forEach(function(w) {
+                            warnRows += '<tr style="border-bottom:1px solid #f1f5f9;">' +
+                                '<td style="padding:10px 12px 10px 0;font-weight:700;color:#b45309;white-space:nowrap;vertical-align:top;width:220px;font-size:12px;">' + esc(w.header) + '</td>' +
+                                '<td style="padding:10px 0;color:#374151;font-size:12px;">' + esc(w.msg) + '</td></tr>';
+                        });
+                        html += secBox('Warnings', '<table style="width:100%;border-collapse:collapse;">' + warnRows + '</table>');
+                    }
+
+                    // ── 3. Raw Headers ───────────────────────────────────────
+                    if (home.all_headers) {
+                        var rawRows = '';
+                        Object.keys(home.all_headers).forEach(function(hk) {
+                            var val = home.all_headers[hk];
+                            var isSec = SEC_KEYS.indexOf(hk) !== -1;
+                            var valStr = Array.isArray(val) ? val.join(', ') : String(val || '');
+                            rawRows += '<tr style="border-bottom:1px solid #f1f5f9;">' +
+                                '<td style="padding:7px 12px 7px 0;font-weight:700;white-space:nowrap;vertical-align:top;font-size:12px;width:200px;' + (isSec ? 'color:#15803d;' : 'color:#374151;') + '">' + esc(hk) + '</td>' +
+                                '<td style="padding:7px 0;font-size:12px;' + (isSec ? 'font-weight:600;color:#1e293b;' : 'color:#374151;') + 'word-break:break-all;">' + esc(valStr) + '</td></tr>';
+                        });
+                        html += secBox('Raw Headers', '<table style="width:100%;border-collapse:collapse;">' + rawRows + '</table>');
+                    }
                 }
+
+                // ── 4. Other pages compact table ─────────────────────────────
+                if (data.pages && data.pages.length) {
+                    var pageRows = '<tr style="background:#f8fafc;">' +
+                        '<th style="padding:5px 8px;text-align:left;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;font-size:11px;">Page</th>';
+                    SEC_KEYS.slice(0,4).forEach(function(k) { pageRows += '<th style="padding:5px 6px;text-align:center;font-weight:600;color:#374151;border-bottom:1px solid #e2e8f0;font-size:10px;white-space:nowrap;">' + SEC_LABELS[k] + '</th>'; });
+                    pageRows += '</tr>';
+                    data.pages.forEach(function(row, i) {
+                        var bg = i % 2 ? '#f8fafc' : '#fff';
+                        if (row.error) { pageRows += '<tr style="background:' + bg + '"><td colspan="5" style="padding:5px 8px;color:#dc2626;font-size:11px;">' + esc(row.url) + ' — ' + esc(row.error) + '</td></tr>'; return; }
+                        var slug = (row.url.replace(/^https?:\/\/[^/]+/,'') || '/');
+                        if (slug.length > 50) slug = slug.slice(0,47) + '…';
+                        pageRows += '<tr style="background:' + bg + ';border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;font-size:11px;color:#374151;" title="' + esc(row.url) + '">' + esc(slug) + '</td>';
+                        SEC_KEYS.slice(0,4).forEach(function(k) {
+                            var s = row.sec && row.sec[k] ? row.sec[k].status : 'missing';
+                            var cell = s === 'present' ? '<span style="color:#16a34a;font-weight:700;">✓</span>'
+                                     : s === 'duplicate' ? '<span style="color:#d97706;font-weight:700;">⚠</span>'
+                                     : '<span style="color:#dc2626;font-weight:700;">✗</span>';
+                            pageRows += '<td style="text-align:center;padding:5px 4px;">' + cell + '</td>';
+                        });
+                        pageRows += '</tr>';
+                    });
+                    html += secBox('Last 10 Pages', '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' + pageRows + '</table></div>');
+                }
+
                 scanResults.innerHTML = html;
             }
 
@@ -10451,9 +10485,9 @@ class CloudScale_DevTools {
                             scanBtn.disabled = false;
                             if (scanSpinner) scanSpinner.style.display = 'none';
                             if (resp && resp.success) renderScanResults(resp.data);
-                            else if (scanResults) scanResults.innerHTML = '<p style="color:#dc2626;font-size:12px;">Scan failed: ' + (resp && resp.data ? resp.data : 'unknown error') + '</p>';
+                            else if (scanResults) scanResults.innerHTML = '<p style="color:#dc2626;font-size:12px;">Scan failed: ' + (resp && resp.data ? esc(resp.data) : 'unknown error') + '</p>';
                         })
-                        .catch(function(e) {
+                        .catch(function() {
                             scanBtn.disabled = false;
                             if (scanSpinner) scanSpinner.style.display = 'none';
                             if (scanResults) scanResults.innerHTML = '<p style="color:#dc2626;font-size:12px;">Request failed.</p>';
@@ -10839,21 +10873,7 @@ class CloudScale_DevTools {
         check_ajax_referer( 'csdt_devtools_security_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
 
-        $urls  = [ home_url( '/' ) ];
-        $posts = get_posts( [
-            'numberposts' => 10,
-            'post_status' => 'publish',
-            'post_type'   => [ 'post', 'page' ],
-            'orderby'     => 'date',
-            'order'       => 'DESC',
-        ] );
-        foreach ( $posts as $post ) {
-            $url = get_permalink( $post->ID );
-            if ( $url ) { $urls[] = $url; }
-        }
-        $urls = array_values( array_unique( $urls ) );
-
-        $header_keys = [
+        $sec_keys = [
             'content-security-policy',
             'content-security-policy-report-only',
             'strict-transport-security',
@@ -10862,35 +10882,118 @@ class CloudScale_DevTools {
             'referrer-policy',
             'permissions-policy',
         ];
+        $mandatory = [ 'content-security-policy', 'strict-transport-security', 'x-frame-options', 'x-content-type-options' ];
 
-        $results = [];
-        foreach ( $urls as $url ) {
+        // ── Helper: analyse one URL ──────────────────────────────────────────
+        $analyse = static function ( string $url ) use ( $sec_keys, $mandatory ): array {
             $resp = wp_remote_get( $url, [
-                'timeout'    => 10,
-                'sslverify'  => false,
-                'redirection'=> 3,
-                'user-agent' => 'CloudScale-Header-Scanner/1.0',
+                'timeout'     => 10,
+                'sslverify'   => false,
+                'redirection' => 3,
+                'user-agent'  => 'CloudScale-Header-Scanner/1.0',
             ] );
             if ( is_wp_error( $resp ) ) {
-                $results[] = [ 'url' => $url, 'error' => $resp->get_error_message() ];
-                continue;
+                return [ 'url' => $url, 'error' => $resp->get_error_message() ];
             }
-            $headers = wp_remote_retrieve_headers( $resp );
-            $row     = [ 'url' => $url, 'headers' => [] ];
-            foreach ( $header_keys as $hkey ) {
+            $headers     = wp_remote_retrieve_headers( $resp );
+            $status_code = (int) wp_remote_retrieve_response_code( $resp );
+            $sec         = [];
+            foreach ( $sec_keys as $hkey ) {
                 $val = $headers[ $hkey ] ?? null;
                 if ( null === $val ) {
-                    $row['headers'][ $hkey ] = [ 'status' => 'missing', 'values' => [] ];
+                    $sec[ $hkey ] = [ 'status' => 'missing', 'values' => [] ];
                 } elseif ( is_array( $val ) ) {
-                    $row['headers'][ $hkey ] = [ 'status' => count( $val ) > 1 ? 'duplicate' : 'present', 'values' => $val ];
+                    $sec[ $hkey ] = [ 'status' => count( $val ) > 1 ? 'duplicate' : 'present', 'values' => $val ];
                 } else {
-                    $row['headers'][ $hkey ] = [ 'status' => 'present', 'values' => [ $val ] ];
+                    $sec[ $hkey ] = [ 'status' => 'present', 'values' => [ $val ] ];
                 }
             }
-            $results[] = $row;
+            return [
+                'url'         => $url,
+                'status_code' => $status_code,
+                'sec'         => $sec,
+                'all_headers' => $headers->getAll(),
+            ];
+        };
+
+        // ── Homepage — full analysis ─────────────────────────────────────────
+        $home_url  = home_url( '/' );
+        $home_data = $analyse( $home_url );
+
+        // Grade + warnings from homepage
+        $grade    = 'A+';
+        $warnings = [];
+        if ( ! isset( $home_data['error'] ) ) {
+            $sec          = $home_data['sec'];
+            $missing_mand = 0;
+            foreach ( $mandatory as $hk ) {
+                if ( ( $sec[ $hk ]['status'] ?? 'missing' ) === 'missing' ) { $missing_mand++; }
+            }
+            // Grade by missing mandatory headers
+            if ( $missing_mand >= 3 )     { $grade = 'F'; }
+            elseif ( $missing_mand === 2 ) { $grade = 'D'; }
+            elseif ( $missing_mand === 1 ) { $grade = 'C'; }
+            else                           { $grade = 'A+'; }
+
+            // CSP quality warnings
+            $csp_val = $sec['content-security-policy']['values'][0] ?? '';
+            if ( $csp_val ) {
+                if ( str_contains( $csp_val, "'unsafe-inline'" ) ) {
+                    $warnings[] = [ 'header' => 'Content-Security-Policy', 'msg' => "This policy contains 'unsafe-inline' which is dangerous in the script-src directive." ];
+                    if ( $grade === 'A+' ) { $grade = 'A'; }
+                }
+                if ( str_contains( $csp_val, "'unsafe-eval'" ) ) {
+                    $warnings[] = [ 'header' => 'Content-Security-Policy', 'msg' => "This policy contains 'unsafe-eval' which allows dynamic code execution." ];
+                    if ( in_array( $grade, [ 'A+', 'A' ], true ) ) { $grade = 'B'; }
+                }
+            }
+            // Duplicate headers
+            foreach ( $sec as $hk => $hdata ) {
+                if ( $hdata['status'] === 'duplicate' ) {
+                    $warnings[] = [ 'header' => $hk, 'msg' => count( $hdata['values'] ) . ' duplicate headers detected — likely a plugin conflict. Browser uses only the first.' ];
+                    if ( $grade === 'A+' ) { $grade = 'A'; }
+                }
+            }
+            // Optional headers missing
+            foreach ( [ 'referrer-policy', 'permissions-policy' ] as $opt ) {
+                if ( ( $sec[ $opt ]['status'] ?? 'missing' ) === 'missing' && in_array( $grade, [ 'A+', 'A' ], true ) ) {
+                    $grade = 'B';
+                }
+            }
+            // HSTS quality
+            $hsts = $sec['strict-transport-security']['values'][0] ?? '';
+            if ( $hsts && preg_match( '/max-age=(\d+)/', $hsts, $m ) && (int) $m[1] < 31536000 ) {
+                $warnings[] = [ 'header' => 'Strict-Transport-Security', 'msg' => 'max-age is less than 31536000 (1 year). Increase to at least 31536000.' ];
+                if ( $grade === 'A+' ) { $grade = 'A'; }
+            }
+            $home_data['grade']    = $grade;
+            $home_data['warnings'] = $warnings;
+            // Server IP
+            $host = parse_url( $home_url, PHP_URL_HOST );
+            $home_data['ip'] = $host ? @gethostbyname( $host ) : '';
         }
 
-        wp_send_json_success( [ 'results' => $results ] );
+        // ── Last 10 posts/pages — security headers only ──────────────────────
+        $posts    = get_posts( [
+            'numberposts' => 10,
+            'post_status' => 'publish',
+            'post_type'   => [ 'post', 'page' ],
+            'orderby'     => 'date',
+            'order'       => 'DESC',
+        ] );
+        $page_results = [];
+        foreach ( $posts as $post ) {
+            $purl = get_permalink( $post->ID );
+            if ( ! $purl || $purl === $home_url ) { continue; }
+            $d = $analyse( $purl );
+            if ( isset( $d['sec'] ) ) { unset( $d['all_headers'] ); } // keep payload small
+            $page_results[] = $d;
+        }
+
+        wp_send_json_success( [
+            'home'  => $home_data,
+            'pages' => $page_results,
+        ] );
     }
 
     public static function register_dashboard_widget(): void {
