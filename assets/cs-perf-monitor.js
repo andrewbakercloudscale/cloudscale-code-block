@@ -3157,6 +3157,17 @@
             togglePanel();
         });
         if (exportBtn) exportBtn.addEventListener('click', function (e) { e.stopPropagation(); exportJSON(); });
+        var clearBtn = document.getElementById('cs-perf-clear');
+        if (clearBtn) clearBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            editorLogs = [];
+            editorFailCount = 0;
+            if (editorBadgeEl) { editorBadgeEl.textContent = ''; }
+            computeIssues();
+            renderIssues();
+            renderEditor();
+            updateBadges();
+        });
         var copyBtn = document.getElementById('cs-perf-copy');
         if (copyBtn) copyBtn.addEventListener('click', function (e) { e.stopPropagation(); copyCurrentTab(); });
 
