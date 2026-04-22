@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.239
+ * Version: 1.9.250
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.239';
+    const VERSION      = '1.9.250';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -355,6 +355,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_fpm_worker_status',            [ __CLASS__, 'ajax_fpm_worker_status' ] );
         add_action( 'wp_ajax_csdt_fpm_setup_detect',             [ __CLASS__, 'ajax_fpm_setup_detect' ] );
         add_action( 'wp_ajax_csdt_fpm_setup_patch',              [ __CLASS__, 'ajax_fpm_setup_patch' ] );
+        add_action( 'wp_ajax_csdt_fpm_worker_detail',            [ __CLASS__, 'ajax_fpm_worker_detail' ] );
         add_action( 'wp_ajax_nopriv_csdt_fpm_report',            [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'wp_ajax_csdt_fpm_report',                   [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'csdt_threat_monitor',                      [ __CLASS__, 'monitor_threats' ] );
@@ -2068,9 +2069,34 @@ class CloudScale_DevTools {
                             <span style="color:#64748b;"><?php esc_html_e( 'Total:', 'cloudscale-devtools' ); ?></span>
                             <span id="csdt-fpm-w-total" style="color:#94a3b8;font-weight:700;">—</span>
                         </span>
-                        <button type="button" id="csdt-fpm-workers-refresh" class="cs-btn-sm cs-btn-secondary" style="padding:2px 10px;font-size:.78em;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
-                        <button type="button" id="csdt-fpm-setup-btn" class="cs-btn-sm cs-btn-secondary" style="padding:2px 10px;font-size:.78em;background:#3b82f6;color:#fff;border-color:#2563eb;">⚙ <?php esc_html_e( 'Setup Status Page', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" id="csdt-fpm-workers-refresh" class="cs-btn-sm cs-btn-secondary" style="padding:5px 12px;font-size:.78em;line-height:1.4;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" id="csdt-fpm-setup-btn" class="cs-btn-sm cs-btn-secondary" style="padding:5px 12px;font-size:.78em;line-height:1.4;background:#1e3a5f;color:#60a5fa;border-color:#2563eb;">⚙ <?php esc_html_e( 'Setup Status Page', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" id="csdt-fpm-detail-toggle" class="cs-btn-sm cs-btn-secondary" style="padding:5px 12px;font-size:.78em;line-height:1.4;margin-left:auto;">▼ <?php esc_html_e( 'Workers', 'cloudscale-devtools' ); ?></button>
                         <span id="csdt-fpm-workers-status" style="font-size:.78em;color:#64748b;"></span>
+                    </div>
+
+                    <!-- Per-worker detail table -->
+                    <div id="csdt-fpm-detail-panel" style="display:none;margin-bottom:14px;">
+                        <div style="overflow-x:auto;">
+                            <table id="csdt-fpm-detail-table" style="width:100%;border-collapse:collapse;font-size:.76em;color:#e2e8f0;">
+                                <thead>
+                                    <tr style="border-bottom:1px solid #334155;color:#94a3b8;text-align:left;">
+                                        <th style="padding:5px 8px;white-space:nowrap;">PID</th>
+                                        <th style="padding:5px 8px;white-space:nowrap;">State</th>
+                                        <th style="padding:5px 8px;white-space:nowrap;">Reqs</th>
+                                        <th style="padding:5px 8px;white-space:nowrap;">Running</th>
+                                        <th style="padding:5px 8px;white-space:nowrap;">Last URI</th>
+                                        <th style="padding:5px 8px;white-space:nowrap;">Script</th>
+                                        <th style="padding:5px 8px;white-space:nowrap;">CPU%</th>
+                                        <th style="padding:5px 8px;white-space:nowrap;">Mem</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="csdt-fpm-detail-tbody">
+                                    <tr><td colspan="8" style="padding:8px;color:#475569;">Loading…</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="csdt-fpm-pool-info" style="margin-top:8px;font-size:.74em;color:#94a3b8;"></div>
                     </div>
 
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
@@ -13768,7 +13794,7 @@ PROMPT;
             'thin_content_count'  => count( $issues['thin_content'] ),
             'thin_content_sample' => array_slice( $issues['thin_content'], 0, 10 ),
             'no_featured_img_count'  => count( $issues['no_featured_image'] ),
-            'no_featured_img_sample' => array_slice( $issues['no_featured_image'], 0, 5 ),
+            'no_featured_img_sample' => array_slice( $issues['no_featured_image'], 0, 10 ),
             'duplicate_titles'      => $issues['duplicate_titles'],
             'template_rendered_pages' => $template_pages,
             'autoload_kb'         => $autoload_kb,
@@ -13907,20 +13933,20 @@ PROMPT;
         }
 
         if ( $d['thin_content_count'] > 0 ) {
-            $sev     = 'medium';
-            $samples = ! empty( $d['thin_content_sample'] )
-                ? ' Examples: ' . implode( ', ', array_map(
-                    fn( $s ) => '"' . $s['title'] . '" (' . $s['words'] . ' words, ' . $s['url'] . ')',
-                    array_slice( $d['thin_content_sample'], 0, 5 )
-                  ) ) . '.'
-                : '';
+            $sev        = 'medium';
             $findings[] = [
                 'category' => 'Content',
                 'severity' => $sev,
                 'title'    => "{$d['thin_content_count']} posts/pages with fewer than 300 words",
-                'detail'   => 'Thin content is a known Google ranking penalty trigger. Pages under 300 words rarely rank for competitive terms and may dilute the authority of the whole site.' . $samples,
+                'detail'   => 'Thin content is a known Google ranking penalty trigger. Pages under 300 words rarely rank for competitive terms and may dilute the authority of the whole site.',
                 'fix'      => 'Expand these pages with useful content, merge them into a comprehensive page, or set them to noindex if they serve a utility purpose only.',
                 'affected' => "{$d['thin_content_count']} posts/pages",
+                'links'    => ! empty( $d['thin_content_sample'] )
+                    ? array_map(
+                        fn( $s ) => [ 'url' => $s['url'], 'words' => $s['words'] ],
+                        array_slice( $d['thin_content_sample'], 0, 10 )
+                      )
+                    : [],
             ];
         }
 
@@ -13941,20 +13967,20 @@ PROMPT;
         }
 
         if ( $d['no_featured_img_count'] > 0 ) {
-            $sev     = $d['no_featured_img_count'] > 20 ? 'medium' : 'low';
-            $samples = ! empty( $d['no_featured_img_sample'] )
-                ? ' Examples: ' . implode( ', ', array_map(
-                    fn( $s ) => '"' . $s['title'] . '" (' . $s['url'] . ')',
-                    array_slice( $d['no_featured_img_sample'], 0, 5 )
-                  ) ) . '.'
-                : '';
+            $sev        = $d['no_featured_img_count'] > 20 ? 'medium' : 'low';
             $findings[] = [
                 'category' => 'SEO',
                 'severity' => $sev,
                 'title'    => "{$d['no_featured_img_count']} posts/pages missing a featured image",
-                'detail'   => 'Featured images are used for og:image, Twitter cards, and on-site article previews. Missing them weakens social sharing and can reduce click-through from search.' . $samples,
+                'detail'   => 'Featured images are used for og:image, Twitter cards, and on-site article previews. Missing them weakens social sharing and can reduce click-through from search.',
                 'fix'      => 'Add a relevant featured image to each post. Use a 1200×630px image for best social media compatibility.',
                 'affected' => "{$d['no_featured_img_count']} posts/pages",
+                'links'    => ! empty( $d['no_featured_img_sample'] )
+                    ? array_map(
+                        fn( $s ) => [ 'url' => $s['url'] ],
+                        array_slice( $d['no_featured_img_sample'], 0, 10 )
+                      )
+                    : [],
             ];
         }
 
@@ -14284,6 +14310,19 @@ PROMPT;
                 'detail'   => 'Passkeys use Face ID, Touch ID, Windows Hello, or hardware security keys for cryptographically strong authentication. They cannot be phished and require no code entry.',
                 'fix'      => 'Go to Login Security → Passkeys (WebAuthn) and click + Add Passkey to register your device.',
                 'affected' => 'Administrator accounts',
+            ];
+        }
+
+        // ── DB table prefix ──
+        if ( ! empty( $d['db_prefix_default'] ) ) {
+            $findings[] = [
+                'category'   => 'Security',
+                'severity'   => 'medium',
+                'title'      => 'Default database table prefix (wp_) — enumeration risk',
+                'detail'     => 'The default wp_ prefix is a well-known attack target. SQL injection probes and automated scanners guess wp_ table names directly. Renaming to a random prefix adds a layer of obscurity.',
+                'fix'        => 'Use the DB Prefix Migrator to rename all tables to a unique prefix and update wp-config.php automatically — no downtime required.',
+                'fix_action' => 'db_prefix_modal',
+                'affected'   => 'All database tables',
             ];
         }
 
@@ -16667,6 +16706,92 @@ PROMPT;
             'active' => $parse( 'active processes' ),
             'idle'   => $parse( 'idle processes' ),
             'total'  => $parse( 'total processes' ),
+        ] );
+    }
+
+    public static function ajax_fpm_worker_detail(): void {
+        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $probe_url  = rtrim( get_option( 'csdt_fpm_probe_url', 'http://localhost:8082/' ), '/' );
+        $status_url = $probe_url . '/fpm-status?full&json';
+        $response   = wp_remote_get( $status_url, [ 'timeout' => 5, 'sslverify' => false ] );
+        if ( is_wp_error( $response ) ) {
+            wp_send_json_error( [ 'message' => $response->get_error_message() ] );
+        }
+        $code = (int) wp_remote_retrieve_response_code( $response );
+        $body = wp_remote_retrieve_body( $response );
+        if ( $code !== 200 || empty( $body ) ) {
+            wp_send_json_error( [ 'message' => 'HTTP ' . $code ] );
+        }
+
+        // Try JSON first (supported since PHP-FPM 7.x with ?json)
+        $json = json_decode( $body, true );
+        if ( $json && isset( $json['processes'] ) ) {
+            wp_send_json_success( [
+                'pool'     => $json['pool'] ?? '',
+                'pm'       => $json['process manager'] ?? '',
+                'accepted' => $json['accepted conn'] ?? 0,
+                'workers'  => array_map( static function ( array $p ): array {
+                    return [
+                        'pid'      => $p['pid'] ?? 0,
+                        'state'    => $p['state'] ?? '',
+                        'reqs'     => $p['requests'] ?? 0,
+                        'since'    => $p['start since'] ?? 0,
+                        'duration' => $p['request duration'] ?? 0,
+                        'method'   => $p['request method'] ?? '',
+                        'uri'      => ( $p['request uri'] ?? '' ) . ( ! empty( $p['query string'] ) ? '?' . $p['query string'] : '' ),
+                        'script'   => basename( $p['script'] ?? '' ),
+                        'cpu'      => $p['last request cpu'] ?? 0,
+                        'mem'      => $p['last request memory'] ?? 0,
+                        'user'     => $p['user'] ?? '-',
+                    ];
+                }, $json['processes'] ),
+            ] );
+        }
+
+        // Fall back to text parsing
+        $sections = preg_split( '/\*{8,}/', $body );
+        $pool_info = [];
+        $workers   = [];
+        if ( ! empty( $sections[0] ) ) {
+            foreach ( explode( "\n", $sections[0] ) as $line ) {
+                if ( preg_match( '/^([^:]+):\s*(.+)$/', trim( $line ), $m ) ) {
+                    $pool_info[ trim( $m[1] ) ] = trim( $m[2] );
+                }
+            }
+        }
+        foreach ( array_slice( $sections, 1 ) as $section ) {
+            $w = [];
+            foreach ( explode( "\n", $section ) as $line ) {
+                if ( preg_match( '/^([^:]+):\s*(.*)$/', trim( $line ), $m ) ) {
+                    $w[ trim( $m[1] ) ] = trim( $m[2] );
+                }
+            }
+            if ( ! empty( $w['pid'] ) ) {
+                $uri = $w['request URI'] ?? '';
+                $qs  = $w['query string'] ?? '';
+                $workers[] = [
+                    'pid'      => (int) $w['pid'],
+                    'state'    => $w['state'] ?? '',
+                    'reqs'     => (int) ( $w['requests'] ?? 0 ),
+                    'since'    => (int) ( $w['start since'] ?? 0 ),
+                    'duration' => (int) ( $w['request duration'] ?? 0 ),
+                    'method'   => $w['request method'] ?? '',
+                    'uri'      => $uri . ( $qs ? '?' . $qs : '' ),
+                    'script'   => basename( $w['script'] ?? '' ),
+                    'cpu'      => (float) ( $w['last request cpu'] ?? 0 ),
+                    'mem'      => (int) ( $w['last request memory'] ?? 0 ),
+                    'user'     => $w['user'] ?? '-',
+                ];
+            }
+        }
+        wp_send_json_success( [
+            'pool'     => $pool_info['pool'] ?? '',
+            'pm'       => $pool_info['process manager'] ?? '',
+            'accepted' => (int) ( $pool_info['accepted conn'] ?? 0 ),
+            'workers'  => $workers,
         ] );
     }
 

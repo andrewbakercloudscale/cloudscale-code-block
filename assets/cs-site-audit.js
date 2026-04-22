@@ -79,8 +79,9 @@
         }
         var fixActionHtml = '';
         if (f.fix_action) {
-            var seoFixActions = { seo_ai_desc: 1, seo_ai_title: 1 };
+            var seoFixActions   = { seo_ai_desc: 1, seo_ai_title: 1 };
             var quickFixActions = { cron_health: 'cron_health', expired_transients: 'expired_transients' };
+            var modalFixActions = { db_prefix_modal: 'csdt-db-prefix-modal' };
             if (seoFixActions[f.fix_action]) {
                 fixActionHtml = '<div style="margin-top:8px;"><a href="' + escHtml(csdtSiteAudit.seoAiUrl || '') +
                     '" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;">⚡ Fix It — Open SEO AI</a></div>';
@@ -89,7 +90,22 @@
                     '<button class="csdt-fix-it-btn" data-fix-id="' + escHtml(quickFixActions[f.fix_action]) +
                     '" style="background:#10b981;color:#fff;border:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;cursor:pointer;">⚡ Fix It</button>' +
                     '<span class="csdt-fix-it-status" style="display:none;margin-left:8px;font-size:.82em;"></span></div>';
+            } else if (modalFixActions[f.fix_action]) {
+                fixActionHtml = '<div style="margin-top:8px;">' +
+                    '<button class="csdt-modal-fix-btn" data-modal="' + escHtml(modalFixActions[f.fix_action]) +
+                    '" style="background:#10b981;color:#fff;border:none;font-size:.8em;font-weight:700;padding:6px 14px;border-radius:6px;cursor:pointer;">⚡ Fix It →</button>' +
+                    '</div>';
             }
+        }
+        var linksHtml = '';
+        if (f.links && f.links.length) {
+            linksHtml = '<ul style="margin:0 0 8px;padding-left:0;list-style:none;font-size:.83em;">' +
+                f.links.map(function (l) {
+                    return '<li style="margin-bottom:3px;">' +
+                        '<a href="' + escHtml(l.url) + '" target="_blank" rel="noopener" style="color:#2563eb;word-break:break-all;">' + escHtml(l.url) + '</a>' +
+                        (l.words ? ' <span style="color:#6b7280;">(' + l.words + ' words)</span>' : '') +
+                        '</li>';
+                }).join('') + '</ul>';
         }
         return '<div style="background:' + col.bg + ';border:1px solid ' + col.border +
             ';border-radius:8px;padding:16px 20px;margin-bottom:12px;">' +
@@ -103,6 +119,7 @@
             '</div>' +
             '<p style="margin:0 0 6px;font-weight:700;color:#0f172a;font-size:.95em;line-height:1.4;">' + escHtml(f.title || '') + '</p>' +
             '<p style="margin:0 0 8px;color:#4b5563;font-size:.87em;line-height:1.6;">' + escHtml(f.detail || '') + '</p>' +
+            linksHtml +
             '<div style="background:rgba(255,255,255,.7);border-left:2px solid ' + col.badge + ';padding:8px 12px;border-radius:0 4px 4px 0;font-size:.85em;color:#374151;line-height:1.5;">' +
             '<strong style="color:' + col.text + ';">Fix: </strong>' + escHtml(f.fix || '') +
             '</div>' +
@@ -186,6 +203,15 @@
                     card.style.display = ( filter === 'all' || cat === filter ) ? '' : 'none';
                 });
             });
+        });
+
+        // Wire modal Fix It buttons
+        resultsDiv.addEventListener('click', function (e) {
+            var mBtn = e.target.closest('.csdt-modal-fix-btn');
+            if (mBtn) {
+                var modal = document.getElementById(mBtn.getAttribute('data-modal'));
+                if (modal) modal.style.display = 'flex';
+            }
         });
 
         // Wire Fix It buttons
