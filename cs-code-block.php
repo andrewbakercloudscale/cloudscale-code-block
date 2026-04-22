@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.224
+ * Version: 1.9.226
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.224';
+    const VERSION      = '1.9.226';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -9695,7 +9695,7 @@ class CloudScale_DevTools {
                     ? "Acknowledged — 'unsafe-inline' in script-src is managed externally (nginx, Cloudflare, or CDN)."
                     : ( get_option( 'csdt_csp_nonces_enabled', '0' ) === '1'
                         ? "Nonce-based CSP is active. Scripts are protected with per-request nonces; 'unsafe-inline' has been removed from script-src."
-                        : "The Content-Security-Policy allows 'unsafe-inline' in script-src, significantly weakening XSS protection. Nonce-based CSP replaces it with cryptographic per-request nonces while keeping WordPress scripts working." ),
+                        : "Clicking 'Enable Nonce CSP' will start in Report-Only mode — nothing is blocked yet. Browse your site and check the CSP Violation Log before switching to Enforce. ⚠️ Never go straight to Enforce — some plugins use eval() (underscore.min.js templates) and will break." ),
                 'fixed'        => get_option( 'csdt_csp_inline_ack', '0' ) === '1'
                     || ( get_option( 'csdt_csp_nonces_enabled', '0' ) === '1'
                          && get_option( 'csdt_devtools_csp_enabled', '0' ) === '1' ),
@@ -9915,7 +9915,7 @@ class CloudScale_DevTools {
         $use_nonces  = get_option( 'csdt_csp_nonces_enabled', '0' ) === '1';
         $script_src  = $use_nonces
             ? [ "'self'", "'nonce-" . self::get_csp_nonce() . "'", "'strict-dynamic'" ]
-            : [ "'self'", "'unsafe-inline'" ];
+            : [ "'self'", "'unsafe-inline'", "'unsafe-eval'" ];
 
         $d = [
             'default-src' => [ "'self'" ],
@@ -12434,10 +12434,10 @@ bantime  = 86400</pre>
                 break;
             case 'csp_unsafe_inline':
                 update_option( 'csdt_csp_nonces_enabled', '1' );
-                // Auto-enable the plugin's own CSP if not already on
+                // Auto-enable the plugin's own CSP in Report-Only mode first — never jump straight to Enforce
                 if ( get_option( 'csdt_devtools_csp_enabled', '0' ) !== '1' ) {
                     update_option( 'csdt_devtools_csp_enabled', '1' );
-                    update_option( 'csdt_devtools_csp_mode', 'enforce' );
+                    update_option( 'csdt_devtools_csp_mode', 'report_only' );
                 }
                 delete_transient( 'csdt_csp_unsafe_check' );
                 break;
