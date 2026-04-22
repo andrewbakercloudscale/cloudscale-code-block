@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.230
+ * Version: 1.9.239
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.230';
+    const VERSION      = '1.9.239';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -353,6 +353,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_php_error_monitor_save',      [ __CLASS__, 'ajax_php_error_monitor_save' ] );
         add_action( 'wp_ajax_csdt_fpm_monitor_save',             [ __CLASS__, 'ajax_fpm_monitor_save' ] );
         add_action( 'wp_ajax_csdt_fpm_worker_status',            [ __CLASS__, 'ajax_fpm_worker_status' ] );
+        add_action( 'wp_ajax_csdt_fpm_setup_detect',             [ __CLASS__, 'ajax_fpm_setup_detect' ] );
+        add_action( 'wp_ajax_csdt_fpm_setup_patch',              [ __CLASS__, 'ajax_fpm_setup_patch' ] );
         add_action( 'wp_ajax_nopriv_csdt_fpm_report',            [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'wp_ajax_csdt_fpm_report',                   [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'csdt_threat_monitor',                      [ __CLASS__, 'monitor_threats' ] );
@@ -2067,6 +2069,7 @@ class CloudScale_DevTools {
                             <span id="csdt-fpm-w-total" style="color:#94a3b8;font-weight:700;">—</span>
                         </span>
                         <button type="button" id="csdt-fpm-workers-refresh" class="cs-btn-sm cs-btn-secondary" style="padding:2px 10px;font-size:.78em;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" id="csdt-fpm-setup-btn" class="cs-btn-sm cs-btn-secondary" style="padding:2px 10px;font-size:.78em;background:#3b82f6;color:#fff;border-color:#2563eb;">⚙ <?php esc_html_e( 'Setup Status Page', 'cloudscale-devtools' ); ?></button>
                         <span id="csdt-fpm-workers-status" style="font-size:.78em;color:#64748b;"></span>
                     </div>
 
@@ -2172,6 +2175,48 @@ class CloudScale_DevTools {
                         <span style="color:#475569;"><?php esc_html_e( 'No saturation events recorded yet. Install the host cron and set FPM_CALLBACK_URL + FPM_CALLBACK_TOKEN to enable the audit trail.', 'cloudscale-devtools' ); ?></span>
                     </div>
                     <?php endif; ?>
+                </div>
+
+                <!-- PHP-FPM Status Page Setup Modal (inline so it's always in the DOM with the button) -->
+                <div id="csdt-fpm-setup-modal" style="display:none;position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.7);align-items:center;justify-content:center;">
+                    <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;max-width:620px;width:94%;padding:24px;position:relative;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);">
+                        <button id="csdt-fpm-setup-close" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;line-height:1;" title="Close">✕</button>
+                        <h3 style="margin:0 0 4px;font-size:15px;font-weight:700;color:#e2e8f0;">⚙ PHP-FPM Status Page Setup</h3>
+                        <p style="font-size:12px;color:#64748b;margin:0 0 18px;">Enables the <code style="background:#1e293b;padding:1px 5px;border-radius:3px;color:#86efac;">/fpm-status</code> endpoint so the Current Workers panel shows live counts.</p>
+                        <div id="csdt-fpm-setup-steps" style="display:flex;gap:0;margin-bottom:20px;">
+                            <?php foreach ( [ 1 => 'Detect', 2 => 'www.conf', 3 => 'nginx' ] as $n => $lbl ) : ?>
+                            <div class="csdt-fpm-step" data-step="<?php echo $n; ?>" style="flex:1;text-align:center;padding:6px 0;font-size:11px;font-weight:600;border-bottom:2px solid #1e293b;color:#475569;"><?php echo $n; ?>. <?php echo esc_html( $lbl ); ?></div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div id="csdt-fpm-step-1">
+                            <p style="font-size:13px;color:#94a3b8;margin:0 0 14px;">Scans for your PHP-FPM config file and probes common URLs to find nginx.</p>
+                            <button type="button" id="csdt-fpm-detect-btn" class="button button-primary" style="font-size:13px;">🔍 Run Detection</button>
+                            <div id="csdt-fpm-detect-result" style="margin-top:14px;font-size:12px;"></div>
+                        </div>
+                        <div id="csdt-fpm-step-2" style="display:none;">
+                            <div id="csdt-fpm-patch-info" style="font-size:13px;color:#94a3b8;margin-bottom:14px;"></div>
+                            <button type="button" id="csdt-fpm-patch-btn" class="button button-primary" style="font-size:13px;">✏️ Patch www.conf &amp; Reload php-fpm</button>
+                            <div id="csdt-fpm-patch-result" style="margin-top:14px;font-size:12px;"></div>
+                            <div style="margin-top:14px;display:flex;gap:8px;">
+                                <button type="button" id="csdt-fpm-step2-next" class="button" style="font-size:12px;display:none;">Next →</button>
+                                <button type="button" id="csdt-fpm-step2-skip" class="button" style="font-size:12px;">Skip (already done)</button>
+                            </div>
+                        </div>
+                        <div id="csdt-fpm-step-3" style="display:none;">
+                            <p style="font-size:13px;color:#94a3b8;margin:0 0 10px;">Add this location block inside your nginx <code style="background:#1e293b;padding:1px 5px;border-radius:3px;color:#86efac;">server {}</code> block, then reload nginx.</p>
+                            <pre id="csdt-fpm-nginx-snippet" style="background:#0a1628;border:1px solid #1e3a5f;border-radius:6px;padding:12px;font-size:.78em;color:#cbd5e1;overflow-x:auto;white-space:pre;margin:0 0 10px;"></pre>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                                <button type="button" id="csdt-fpm-copy-nginx" class="button" style="font-size:12px;">📋 Copy snippet</button>
+                                <span id="csdt-fpm-copy-nginx-status" style="font-size:12px;color:#86efac;"></span>
+                            </div>
+                            <p style="font-size:12px;color:#64748b;margin:12px 0 6px;">Then reload nginx:</p>
+                            <code id="csdt-fpm-nginx-reload-cmd" style="display:block;background:#0a1628;border:1px solid #1e293b;border-radius:4px;padding:6px 10px;font-size:.78em;color:#86efac;"></code>
+                            <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
+                                <button type="button" id="csdt-fpm-test-btn" class="button button-primary" style="font-size:12px;">✅ Test &amp; Finish</button>
+                                <span id="csdt-fpm-test-result" style="font-size:12px;color:#94a3b8;"></span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -16622,6 +16667,181 @@ PROMPT;
             'active' => $parse( 'active processes' ),
             'idle'   => $parse( 'idle processes' ),
             'total'  => $parse( 'total processes' ),
+        ] );
+    }
+
+    public static function ajax_fpm_setup_detect(): void {
+        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        // Locate www.conf
+        $conf_candidates = [
+            '/usr/local/etc/php-fpm.d/www.conf',
+            '/etc/php-fpm.d/www.conf',
+            '/etc/php/8.4/fpm/pool.d/www.conf',
+            '/etc/php/8.3/fpm/pool.d/www.conf',
+            '/etc/php/8.2/fpm/pool.d/www.conf',
+            '/etc/php/8.1/fpm/pool.d/www.conf',
+            '/etc/php/8.0/fpm/pool.d/www.conf',
+            '/etc/php/7.4/fpm/pool.d/www.conf',
+        ];
+        $www_conf          = null;
+        $www_conf_writable = false;
+        $status_path_set   = false;
+        foreach ( $conf_candidates as $p ) {
+            if ( file_exists( $p ) && is_readable( $p ) ) {
+                $www_conf          = $p;
+                $www_conf_writable = is_writable( $p );
+                $content           = (string) file_get_contents( $p );
+                $status_path_set   = (bool) preg_match( '/^\s*pm\.status_path\s*=/m', $content );
+                break;
+            }
+        }
+
+        // Probe nginx candidates
+        $stored   = rtrim( get_option( 'csdt_fpm_probe_url', 'http://localhost:8082/' ), '/' );
+        $probes   = array_unique( [
+            $stored, 'http://localhost', 'http://localhost:80',
+            'http://localhost:8080', 'http://localhost:8082', 'http://127.0.0.1',
+        ] );
+        $nginx_url        = null;
+        $fpm_status_works = false;
+        foreach ( $probes as $base ) {
+            $base = rtrim( $base, '/' );
+            $r    = wp_remote_get( $base . '/fpm-status', [ 'timeout' => 2, 'sslverify' => false ] );
+            if ( ! is_wp_error( $r ) && (int) wp_remote_retrieve_response_code( $r ) === 200 ) {
+                $body = wp_remote_retrieve_body( $r );
+                if ( str_contains( $body, 'active processes' ) || str_contains( $body, 'pool:' ) ) {
+                    $nginx_url        = $base . '/';
+                    $fpm_status_works = true;
+                    break;
+                }
+            }
+            if ( $nginx_url === null ) {
+                $r2 = wp_remote_get( $base . '/', [ 'timeout' => 2, 'sslverify' => false ] );
+                if ( ! is_wp_error( $r2 ) && (int) wp_remote_retrieve_response_code( $r2 ) > 0 ) {
+                    $nginx_url = $base . '/';
+                }
+            }
+        }
+
+        // Try to read the fastcgi_pass upstream from nginx config (same container only)
+        $fastcgi_pass = 'php:9000'; // default guess
+        foreach ( [ '/etc/nginx/sites-enabled', '/etc/nginx/conf.d', '/etc/nginx' ] as $dir ) {
+            if ( ! is_dir( $dir ) ) continue;
+            foreach ( (array) glob( $dir . '/*.conf' ) as $cf ) {
+                $nc = (string) @file_get_contents( $cf );
+                if ( preg_match( '/fastcgi_pass\s+([^\s;]+)/i', $nc, $m ) ) {
+                    $fastcgi_pass = $m[1];
+                    break 2;
+                }
+            }
+        }
+
+        wp_send_json_success( [
+            'www_conf'         => $www_conf,
+            'www_conf_writable'=> $www_conf_writable,
+            'status_path_set'  => $status_path_set,
+            'nginx_url'        => $nginx_url,
+            'fpm_status_works' => $fpm_status_works,
+            'fastcgi_pass'     => $fastcgi_pass,
+        ] );
+    }
+
+    public static function ajax_fpm_setup_patch(): void {
+        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $www_conf  = sanitize_text_field( (string) ( $_POST['www_conf'] ?? '' ) );
+        $nginx_url = esc_url_raw( (string) ( $_POST['nginx_url'] ?? '' ) );
+
+        $safe_paths = [
+            '/usr/local/etc/php-fpm.d/www.conf',
+            '/etc/php-fpm.d/www.conf',
+            '/etc/php/8.4/fpm/pool.d/www.conf',
+            '/etc/php/8.3/fpm/pool.d/www.conf',
+            '/etc/php/8.2/fpm/pool.d/www.conf',
+            '/etc/php/8.1/fpm/pool.d/www.conf',
+            '/etc/php/8.0/fpm/pool.d/www.conf',
+            '/etc/php/7.4/fpm/pool.d/www.conf',
+        ];
+        if ( ! in_array( $www_conf, $safe_paths, true ) ) {
+            wp_send_json_error( [ 'message' => 'Invalid config path.' ] );
+        }
+        if ( ! file_exists( $www_conf ) || ! is_writable( $www_conf ) ) {
+            wp_send_json_error( [ 'message' => 'www.conf not writable: ' . $www_conf ] );
+        }
+
+        $content = (string) file_get_contents( $www_conf );
+        $patched = false;
+        if ( ! preg_match( '/^\s*pm\.status_path\s*=/m', $content ) ) {
+            // Insert after pm.max_spare_servers if present, else append
+            if ( preg_match( '/^(pm\.max_spare_servers\s*=.*)/m', $content ) ) {
+                $content = preg_replace(
+                    '/^(pm\.max_spare_servers\s*=.*)/m',
+                    "$1\npm.status_path = /fpm-status",
+                    $content,
+                    1
+                );
+            } else {
+                $content .= "\npm.status_path = /fpm-status\n";
+            }
+            if ( file_put_contents( $www_conf, $content ) === false ) {
+                wp_send_json_error( [ 'message' => 'Could not write to ' . $www_conf ] );
+            }
+            $patched = true;
+        }
+
+        if ( $nginx_url ) {
+            update_option( 'csdt_fpm_probe_url', rtrim( $nginx_url, '/' ) . '/', false );
+        }
+
+        // Reload php-fpm master — try PID file, then /proc scan
+        $reloaded     = false;
+        $reload_msg   = '';
+        $reload_error = '';
+
+        foreach ( [ '/var/run/php-fpm.pid', '/run/php-fpm.pid', '/run/php/php-fpm.pid' ] as $pid_file ) {
+            if ( file_exists( $pid_file ) ) {
+                $pid = (int) trim( (string) file_get_contents( $pid_file ) );
+                if ( $pid > 1 && function_exists( 'posix_kill' ) && posix_kill( $pid, SIGUSR2 ) ) {
+                    $reloaded   = true;
+                    $reload_msg = 'Sent SIGUSR2 to php-fpm master (PID ' . $pid . ')';
+                    break;
+                }
+            }
+        }
+
+        if ( ! $reloaded && is_dir( '/proc' ) && function_exists( 'posix_kill' ) ) {
+            $fpm_pids = [];
+            foreach ( (array) glob( '/proc/[0-9]*', GLOB_ONLYDIR ) as $d ) {
+                $comm = (string) @file_get_contents( $d . '/comm' );
+                if ( str_contains( trim( $comm ), 'php-fpm' ) ) {
+                    $fpm_pids[] = (int) basename( $d );
+                }
+            }
+            if ( $fpm_pids ) {
+                sort( $fpm_pids );
+                if ( posix_kill( $fpm_pids[0], SIGUSR2 ) ) {
+                    $reloaded   = true;
+                    $reload_msg = 'Sent SIGUSR2 to php-fpm master (PID ' . $fpm_pids[0] . ')';
+                }
+            }
+        }
+
+        if ( ! $reloaded ) {
+            $reload_error = 'Auto-reload failed — run manually: kill -USR2 $(pgrep -o php-fpm)';
+        }
+
+        wp_send_json_success( [
+            'patched'      => $patched,
+            'reloaded'     => $reloaded,
+            'reload_msg'   => $reload_msg,
+            'reload_error' => $reload_error,
         ] );
     }
 

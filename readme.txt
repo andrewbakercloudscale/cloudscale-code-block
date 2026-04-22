@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.230
+Stable tag: 1.9.239
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -84,6 +84,11 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 5. SQL Query Tool with quick queries and paginated results
 
 == Changelog ==
+
+= 1.9.239 =
+* feat: PHP-FPM "Setup Status Page" wizard — auto-detects www.conf, patches pm.status_path, reloads php-fpm, generates nginx snippet with copy button; one-click for everything except pasting the nginx block
+* fix: PHP-FPM worker Refresh button no longer silently does nothing — cs-debug.js early-exit guard was blocking FPM code when AI Debug elements weren't present
+* feat: AI audit findings now show a "Fix It →" button inline for findings that have a matching Quick Fix modal (currently: DB prefix, fail2ban)
 
 = 1.9.208 =
 * fix: CSP panel now has a white bordered card (indigo header) clearly separated from AI Cyber Audit section; AI Cyber Audit gets its own emerald section header above the scan cards

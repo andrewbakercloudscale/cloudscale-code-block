@@ -8,6 +8,13 @@
 
     var POLL_INTERVAL = 3000; // ms between status polls
 
+    // Maps AI audit finding text patterns → Quick Fix modals in the Quick Fixes panel.
+    // When a finding title/detail matches, a "Fix It →" button is injected into the card.
+    var QUICK_FIX_MAP = [
+        { pattern: /database.*prefix|table.*prefix|wp_.*prefix|prefix.*(wp_|default)/i, label: 'Fix Prefix\u2026', modal: 'csdt-db-prefix-modal' },
+        { pattern: /fail2ban|brute.?force.*log|log.*brute.?force/i,                     label: 'Configure\u2026',   modal: 'csdt-fail2ban-modal' },
+    ];
+
     // ── Helpers ───────────────────────────────────────────────────────
 
     function post(action, params) {
@@ -143,8 +150,14 @@
                 });
             } else {
                 items.forEach(function (issue) {
+                    var haystack = (issue.title || '') + ' ' + (issue.detail || '');
+                    var qf = null;
+                    QUICK_FIX_MAP.forEach(function (m) { if (!qf && m.pattern.test(haystack)) qf = m; });
                     html += '<div class="cs-audit-issue">';
-                    html += '<div class="cs-audit-issue-title">' + escHtml(issue.title) + '</div>';
+                    html += '<div class="cs-audit-issue-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+                    html += '<span>' + escHtml(issue.title) + '</span>';
+                    if (qf) html += '<button type="button" class="button button-small cs-audit-qf-btn" data-modal="' + escHtml(qf.modal) + '" style="font-size:11px;padding:1px 8px;height:auto;line-height:1.6">' + escHtml(qf.label) + ' \u2192</button>';
+                    html += '</div>';
                     if (issue.detail) html += '<div class="cs-audit-issue-detail">' + escHtml(issue.detail) + '</div>';
                     if (issue.fix)    html += '<div class="cs-audit-issue-fix">' + escHtml(issue.fix) + '</div>';
                     html += '</div>';
@@ -194,6 +207,14 @@
         if (pdfBtn) {
             pdfBtn.addEventListener('click', function () { exportSecurityPDF(data, scanType); });
         }
+
+        container.querySelectorAll('.cs-audit-qf-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var modalId = btn.getAttribute('data-modal');
+                var modal = document.getElementById(modalId);
+                if (modal) modal.style.display = 'flex';
+            });
+        });
     }
 
     // ── Progress bar ──────────────────────────────────────────────────

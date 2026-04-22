@@ -9,8 +9,6 @@
     var analyzeStatus = document.getElementById( 'csdt-debug-analyze-status' );
     var resultDiv     = document.getElementById( 'csdt-debug-result' );
 
-    if ( ! analyzeBtn || ! inputArea ) { return; }
-
     var cfg = window.csdtDebug || {};
 
     function esc( s ) {
@@ -29,6 +27,8 @@
         return fetch( cfg.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: fd } )
             .then( function ( r ) { return r.json(); } );
     }
+
+    if ( analyzeBtn && inputArea ) {
 
     function isErrorLine( line ) {
         var t = line.toLowerCase();
@@ -172,6 +172,8 @@
         loadSource( 'php_error' );
     }
 
+    } // end if ( analyzeBtn && inputArea )
+
     // PHP-FPM Saturation Monitor — workers refresh
     var fpmWorkersRefresh = document.getElementById( 'csdt-fpm-workers-refresh' );
     var fpmWorkersStatus  = document.getElementById( 'csdt-fpm-workers-status' );
@@ -206,6 +208,230 @@
         fpmWorkersRefresh.addEventListener( 'click', refreshFpmWorkers );
         refreshFpmWorkers();
     }
+
+    // PHP-FPM Setup Wizard
+    (function () {
+        var modal      = document.getElementById( 'csdt-fpm-setup-modal' );
+        var openBtn    = document.getElementById( 'csdt-fpm-setup-btn' );
+        var closeBtn   = document.getElementById( 'csdt-fpm-setup-close' );
+        if ( ! modal || ! openBtn ) { return; }
+
+        var detectBtn  = document.getElementById( 'csdt-fpm-detect-btn' );
+        var detectRes  = document.getElementById( 'csdt-fpm-detect-result' );
+        var step1El    = document.getElementById( 'csdt-fpm-step-1' );
+        var step2El    = document.getElementById( 'csdt-fpm-step-2' );
+        var step3El    = document.getElementById( 'csdt-fpm-step-3' );
+        var patchInfo  = document.getElementById( 'csdt-fpm-patch-info' );
+        var patchBtn   = document.getElementById( 'csdt-fpm-patch-btn' );
+        var patchRes   = document.getElementById( 'csdt-fpm-patch-result' );
+        var step2Next  = document.getElementById( 'csdt-fpm-step2-next' );
+        var step2Skip  = document.getElementById( 'csdt-fpm-step2-skip' );
+        var nginxSnip  = document.getElementById( 'csdt-fpm-nginx-snippet' );
+        var nginxCmd   = document.getElementById( 'csdt-fpm-nginx-reload-cmd' );
+        var copyNginx  = document.getElementById( 'csdt-fpm-copy-nginx' );
+        var copyStatus = document.getElementById( 'csdt-fpm-copy-nginx-status' );
+        var testBtn    = document.getElementById( 'csdt-fpm-test-btn' );
+        var testRes    = document.getElementById( 'csdt-fpm-test-result' );
+
+        var detected = {};
+
+        function setStep( n ) {
+            [ step1El, step2El, step3El ].forEach( function ( el, i ) {
+                if ( el ) { el.style.display = ( i + 1 === n ) ? '' : 'none'; }
+            } );
+            document.querySelectorAll( '.csdt-fpm-step' ).forEach( function ( el ) {
+                var s = parseInt( el.dataset.step, 10 );
+                el.style.borderBottomColor = s === n ? '#3b82f6' : s < n ? '#22c55e' : '#1e293b';
+                el.style.color = s === n ? '#60a5fa' : s < n ? '#86efac' : '#475569';
+            } );
+        }
+
+        function statusRow( ok, label, value ) {
+            var colour = ok ? '#86efac' : '#f87171';
+            var icon   = ok ? '✓' : '✗';
+            return '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #1e293b;font-size:12px;">'
+                 + '<span style="color:' + colour + ';font-weight:700;width:14px;">' + icon + '</span>'
+                 + '<span style="color:#94a3b8;flex:1;">' + esc( label ) + '</span>'
+                 + '<span style="color:#e2e8f0;font-family:monospace;">' + esc( value ) + '</span>'
+                 + '</div>';
+        }
+
+        function buildNginxSnippet( fastcgiPass ) {
+            return 'location ~ ^/fpm-status$ {\n'
+                 + '    access_log off;\n'
+                 + '    allow 127.0.0.1;\n'
+                 + '    deny all;\n'
+                 + '    include fastcgi_params;\n'
+                 + '    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n'
+                 + '    fastcgi_pass ' + ( fastcgiPass || 'php:9000' ) + ';\n'
+                 + '}';
+        }
+
+        openBtn.addEventListener( 'click', function () {
+            modal.style.display = 'flex';
+            setStep( 1 );
+            if ( step2El ) step2El.style.display = 'none';
+            if ( step3El ) step3El.style.display = 'none';
+            if ( detectRes ) detectRes.innerHTML = '';
+        } );
+
+        if ( closeBtn ) {
+            closeBtn.addEventListener( 'click', function () { modal.style.display = 'none'; } );
+        }
+        modal.addEventListener( 'click', function ( e ) {
+            if ( e.target === modal ) { modal.style.display = 'none'; }
+        } );
+
+        if ( detectBtn ) {
+            detectBtn.addEventListener( 'click', function () {
+                detectBtn.disabled = true;
+                if ( detectRes ) { detectRes.innerHTML = '<span style="color:#94a3b8;">⏳ Scanning…</span>'; }
+                post( 'csdt_fpm_setup_detect', {}, cfg.fpmNonce )
+                    .then( function ( res ) {
+                        detectBtn.disabled = false;
+                        if ( ! res.success ) {
+                            if ( detectRes ) { detectRes.innerHTML = '<span style="color:#f87171;">Detection failed.</span>'; }
+                            return;
+                        }
+                        var d = res.data;
+                        detected = d;
+                        var html = '';
+                        html += statusRow( !! d.www_conf,          'www.conf found',      d.www_conf || 'Not found' );
+                        html += statusRow( d.www_conf_writable,    'www.conf writable',   d.www_conf_writable ? 'Yes' : 'No' );
+                        html += statusRow( d.status_path_set,      'pm.status_path set',  d.status_path_set ? 'Yes' : 'No' );
+                        html += statusRow( !! d.nginx_url,         'nginx URL detected',  d.nginx_url || 'Not found' );
+                        html += statusRow( d.fpm_status_works,     '/fpm-status works',   d.fpm_status_works ? 'Yes — already live!' : 'No' );
+                        if ( detectRes ) { detectRes.innerHTML = html; }
+
+                        if ( d.fpm_status_works ) {
+                            if ( detectRes ) {
+                                detectRes.innerHTML += '<div style="margin-top:12px;padding:10px;background:#052e16;border:1px solid #22c55e;border-radius:6px;color:#86efac;font-size:12px;">✅ /fpm-status is already working! Closing in 3s…</div>';
+                            }
+                            setTimeout( function () {
+                                modal.style.display = 'none';
+                                refreshFpmWorkers();
+                            }, 3000 );
+                            return;
+                        }
+
+                        setTimeout( function () { setStep( 2 ); }, 800 );
+                    } )
+                    .catch( function () {
+                        detectBtn.disabled = false;
+                        if ( detectRes ) { detectRes.innerHTML = '<span style="color:#f87171;">Request failed.</span>'; }
+                    } );
+            } );
+        }
+
+        function goToStep3() {
+            var snip = buildNginxSnippet( detected.fastcgi_pass );
+            if ( nginxSnip ) { nginxSnip.textContent = snip; }
+            var nginxUrl = detected.nginx_url || '';
+            var containerName = ( document.getElementById( 'csdt-fpm-wp-container' ) || {} ).value || 'pi_wordpress';
+            if ( nginxCmd ) {
+                nginxCmd.textContent = 'docker exec ' + containerName + ' nginx -s reload';
+            }
+            setStep( 3 );
+        }
+
+        if ( step2El ) {
+            step2El.addEventListener( 'csdt:show', function () {
+                if ( patchInfo ) {
+                    patchInfo.innerHTML = detected.www_conf
+                        ? '<span style="color:#94a3b8;">Found: <code style="color:#86efac;">' + esc( detected.www_conf ) + '</code>'
+                          + ( detected.www_conf_writable ? '' : ' <span style="color:#f87171;">(not writable — may fail)</span>' ) + '</span>'
+                        : '<span style="color:#f87171;">www.conf not found at standard paths. You may need to patch manually.</span>';
+                }
+            } );
+        }
+
+        function showStep2() {
+            if ( step2El ) {
+                setStep( 2 );
+                step2El.dispatchEvent( new Event( 'csdt:show' ) );
+            }
+        }
+
+        // Override setStep to fire show event
+        var _origSetStep = setStep;
+        setStep = function ( n ) {
+            _origSetStep( n );
+            if ( n === 2 && step2El ) { step2El.dispatchEvent( new Event( 'csdt:show' ) ); }
+        };
+
+        if ( patchBtn ) {
+            patchBtn.addEventListener( 'click', function () {
+                patchBtn.disabled = true;
+                if ( patchRes ) { patchRes.innerHTML = '<span style="color:#94a3b8;">⏳ Patching…</span>'; }
+                post( 'csdt_fpm_setup_patch', {
+                    www_conf:  detected.www_conf || '',
+                    nginx_url: detected.nginx_url || '',
+                }, cfg.fpmNonce )
+                    .then( function ( res ) {
+                        patchBtn.disabled = false;
+                        if ( ! res.success ) {
+                            if ( patchRes ) {
+                                patchRes.innerHTML = '<span style="color:#f87171;">✗ ' + esc( ( res.data && res.data.message ) || 'Failed' ) + '</span>';
+                            }
+                            return;
+                        }
+                        var d = res.data;
+                        var html = '';
+                        html += '<div style="font-size:12px;">';
+                        html += '<div style="color:' + ( d.patched ? '#86efac' : '#94a3b8' ) + ';">'
+                              + ( d.patched ? '✓ www.conf patched' : '✓ pm.status_path already present' ) + '</div>';
+                        html += '<div style="color:' + ( d.reloaded ? '#86efac' : '#fbbf24' ) + ';margin-top:4px;">'
+                              + ( d.reloaded ? '✓ ' + esc( d.reload_msg ) : '⚠ ' + esc( d.reload_error ) ) + '</div>';
+                        html += '</div>';
+                        if ( patchRes ) { patchRes.innerHTML = html; }
+                        if ( step2Next ) { step2Next.style.display = ''; }
+                    } )
+                    .catch( function () {
+                        patchBtn.disabled = false;
+                        if ( patchRes ) { patchRes.innerHTML = '<span style="color:#f87171;">Request failed.</span>'; }
+                    } );
+            } );
+        }
+
+        if ( step2Next ) { step2Next.addEventListener( 'click', goToStep3 ); }
+        if ( step2Skip ) { step2Skip.addEventListener( 'click', goToStep3 ); }
+
+        if ( copyNginx ) {
+            copyNginx.addEventListener( 'click', function () {
+                var text = nginxSnip ? ( nginxSnip.textContent || '' ) : '';
+                navigator.clipboard.writeText( text ).then( function () {
+                    if ( copyStatus ) {
+                        copyStatus.textContent = 'Copied!';
+                        setTimeout( function () { copyStatus.textContent = ''; }, 2000 );
+                    }
+                } );
+            } );
+        }
+
+        if ( testBtn ) {
+            testBtn.addEventListener( 'click', function () {
+                testBtn.disabled = true;
+                if ( testRes ) { testRes.textContent = '⏳ Testing…'; }
+                post( 'csdt_fpm_worker_status', {}, cfg.fpmNonce )
+                    .then( function ( res ) {
+                        testBtn.disabled = false;
+                        if ( res.success ) {
+                            if ( testRes ) { testRes.textContent = ''; }
+                            modal.style.display = 'none';
+                            refreshFpmWorkers();
+                        } else {
+                            if ( testRes ) {
+                                testRes.textContent = '✗ ' + ( ( res.data && res.data.message ) || 'Still not working — check nginx reload.' );
+                            }
+                        }
+                    } )
+                    .catch( function () {
+                        testBtn.disabled = false;
+                        if ( testRes ) { testRes.textContent = 'Request failed.'; }
+                    } );
+            } );
+        }
+    }());
 
     // PHP-FPM Saturation Monitor save + copy
     var fpmSaveBtn      = document.getElementById( 'csdt-fpm-save' );
