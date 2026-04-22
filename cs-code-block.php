@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.204
+ * Version: 1.9.206
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.204';
+    const VERSION      = '1.9.206';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -349,6 +349,7 @@ class CloudScale_DevTools {
         add_action( 'csdt_php_error_monitor',                   [ __CLASS__, 'monitor_php_errors' ] );
         add_action( 'wp_ajax_csdt_php_error_monitor_save',      [ __CLASS__, 'ajax_php_error_monitor_save' ] );
         add_action( 'wp_ajax_csdt_fpm_monitor_save',             [ __CLASS__, 'ajax_fpm_monitor_save' ] );
+        add_action( 'wp_ajax_csdt_fpm_worker_status',            [ __CLASS__, 'ajax_fpm_worker_status' ] );
         add_action( 'wp_ajax_nopriv_csdt_fpm_report',            [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'wp_ajax_csdt_fpm_report',                   [ __CLASS__, 'ajax_fpm_report' ] );
         add_action( 'csdt_threat_monitor',                      [ __CLASS__, 'monitor_threats' ] );
@@ -1999,8 +2000,18 @@ class CloudScale_DevTools {
                 <div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:20px 24px;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
                         <div>
-                            <strong style="color:#e2e8f0;">🖥️ <?php esc_html_e( 'PHP-FPM Saturation Monitor', 'cloudscale-devtools' ); ?></strong>
-                            <span style="display:inline-flex;align-items:center;margin-left:8px;padding:1px 8px;background:#1e3a5f;border-radius:10px;font-size:.72em;color:#60a5fa;">HOST CRON</span>
+                            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;">
+                                <strong style="color:#e2e8f0;">🖥️ <?php esc_html_e( 'PHP-FPM Saturation Monitor', 'cloudscale-devtools' ); ?></strong>
+                                <span style="display:inline-flex;align-items:center;padding:1px 8px;background:#1e3a5f;border-radius:10px;font-size:.72em;color:#60a5fa;">HOST CRON</span>
+                                <?php self::render_explain_btn( 'fpm_monitor', 'PHP-FPM Saturation Monitor', [
+                                    [ 'name' => 'What is PHP-FPM saturation?', 'rec' => 'Info', 'html' => 'PHP-FPM (FastCGI Process Manager) maintains a pool of worker processes that handle requests. When all workers are busy (e.g. a traffic spike, a slow DB query holding workers open, or a runaway loop), new requests queue up and the site appears frozen or times out. This is called saturation.' ],
+                                    [ 'name' => 'Why a host cron, not WP-Cron?', 'rec' => 'Critical', 'html' => 'WP-Cron runs inside PHP-FPM. If PHP-FPM is fully saturated, WP-Cron can\'t execute — so a WordPress-based monitor would be silenced exactly when you need it most. This monitor runs as a shell script on the host OS (outside Docker), so it fires even when every PHP worker is consumed.' ],
+                                    [ 'name' => 'How the detection works', 'rec' => 'Info', 'html' => 'Every minute the script probes the HTTP URL. If the probe times out or fails N consecutive times (the threshold), saturation is declared. It then sends an ntfy.sh push notification and email alert, optionally restarts the WordPress container, and POSTs an event to this panel via the callback URL.' ],
+                                    [ 'name' => 'Current Workers display', 'rec' => 'Info', 'html' => 'Shows live active / idle / total worker counts from the PHP-FPM status page (<code>pm.status_path</code>). Requires <code>pm.status_path = /fpm-status</code> in your <code>www.conf</code> and a matching nginx location block. Click Refresh at any time to re-poll.' ],
+                                    [ 'name' => 'Auto-restart', 'rec' => 'Optional', 'html' => 'When enabled, the script issues a <code>docker restart {container}</code> command after declaring saturation. A restart cooldown prevents thrashing. Use with care on production — a restart drops all in-flight requests.' ],
+                                    [ 'name' => 'Setup', 'rec' => 'Info', 'html' => 'Copy the crontab line and config.env snippet from the Host Cron Setup section below. The callback URL and token wire the script back to this panel so saturation events appear in the audit trail automatically.' ],
+                                ], 'Monitors PHP-FPM worker exhaustion from the host OS. Alerts via ntfy + email, can auto-restart the container, and logs events back to this panel.' ); ?>
+                            </div>
                             <span style="display:block;font-size:.82em;color:#64748b;margin-top:2px;"><?php esc_html_e( 'Detects when all PHP-FPM workers are exhausted. Runs on the host (not WP-Cron), so it fires even when PHP is fully saturated. Can automatically restart the WordPress container and notify via ntfy.', 'cloudscale-devtools' ); ?></span>
                         </div>
                         <div style="display:flex;align-items:center;gap:10px;">
@@ -2011,6 +2022,25 @@ class CloudScale_DevTools {
                             <button type="button" id="csdt-fpm-save" class="cs-btn-sm cs-btn-primary"><?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?></button>
                             <span id="csdt-fpm-status" style="font-size:.82em;color:#94a3b8;"></span>
                         </div>
+                    </div>
+
+                    <!-- Workers live status -->
+                    <div style="background:#0a1628;border:1px solid #1e293b;border-radius:6px;padding:10px 14px;margin-bottom:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                        <span style="font-size:.8em;color:#64748b;font-weight:600;"><?php esc_html_e( 'Current workers', 'cloudscale-devtools' ); ?></span>
+                        <span id="csdt-fpm-workers-active" style="font-size:.82em;color:#e2e8f0;">
+                            <span style="color:#64748b;"><?php esc_html_e( 'Active:', 'cloudscale-devtools' ); ?></span>
+                            <span id="csdt-fpm-w-active" style="color:#f87171;font-weight:700;">—</span>
+                        </span>
+                        <span style="font-size:.82em;color:#e2e8f0;">
+                            <span style="color:#64748b;"><?php esc_html_e( 'Idle:', 'cloudscale-devtools' ); ?></span>
+                            <span id="csdt-fpm-w-idle" style="color:#86efac;font-weight:700;">—</span>
+                        </span>
+                        <span style="font-size:.82em;color:#e2e8f0;">
+                            <span style="color:#64748b;"><?php esc_html_e( 'Total:', 'cloudscale-devtools' ); ?></span>
+                            <span id="csdt-fpm-w-total" style="color:#94a3b8;font-weight:700;">—</span>
+                        </span>
+                        <button type="button" id="csdt-fpm-workers-refresh" class="cs-btn-sm cs-btn-secondary" style="padding:2px 10px;font-size:.78em;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                        <span id="csdt-fpm-workers-status" style="font-size:.78em;color:#64748b;"></span>
                     </div>
 
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">
@@ -9880,10 +9910,14 @@ class CloudScale_DevTools {
                 'connect-src' => [ 'https://www.google-analytics.com', 'https://analytics.google.com', 'https://stats.g.doubleclick.net', 'https://region1.google-analytics.com' ],
             ],
             'google_adsense'      => [
-                'script-src'  => [ 'https://pagead2.googlesyndication.com', 'https://partner.googleadservices.com', 'https://tpc.googlesyndication.com' ],
+                'script-src'  => [ 'https://pagead2.googlesyndication.com', 'https://partner.googleadservices.com', 'https://tpc.googlesyndication.com', 'https://fundingchoicesmessages.google.com' ],
                 'frame-src'   => [ 'https://googleads.g.doubleclick.net', 'https://tpc.googlesyndication.com' ],
                 'img-src'     => [ 'https://pagead2.googlesyndication.com' ],
-                'connect-src' => [ 'https://pagead2.googlesyndication.com' ],
+                'connect-src' => [ 'https://pagead2.googlesyndication.com', 'https://ep1.adtrafficquality.google' ],
+            ],
+            'google_fonts'        => [
+                'style-src'   => [ 'https://fonts.googleapis.com' ],
+                'font-src'    => [ 'https://fonts.gstatic.com' ],
             ],
             'google_tag_manager'  => [
                 'script-src'  => [ 'https://www.googletagmanager.com' ],
@@ -9964,6 +9998,7 @@ class CloudScale_DevTools {
             'google_analytics'    => 'Google Analytics (GA4 / gtag.js)',
             'google_adsense'      => 'Google AdSense',
             'google_tag_manager'  => 'Google Tag Manager',
+            'google_fonts'        => 'Google Fonts',
             'cloudflare_insights' => 'Cloudflare Web Analytics',
             'facebook_pixel'      => 'Facebook Pixel',
             'recaptcha'           => 'Google reCAPTCHA',
@@ -10089,8 +10124,9 @@ class CloudScale_DevTools {
             };
             var serviceMap = {
                 google_analytics:    { 'script-src':['https://www.googletagmanager.com','https://www.google-analytics.com'], 'img-src':['https://www.google-analytics.com','https://www.googletagmanager.com'], 'connect-src':['https://www.google-analytics.com','https://analytics.google.com','https://stats.g.doubleclick.net','https://region1.google-analytics.com'] },
-                google_adsense:      { 'script-src':['https://pagead2.googlesyndication.com','https://partner.googleadservices.com','https://tpc.googlesyndication.com'], 'frame-src':['https://googleads.g.doubleclick.net','https://tpc.googlesyndication.com'], 'img-src':['https://pagead2.googlesyndication.com'], 'connect-src':['https://pagead2.googlesyndication.com'] },
+                google_adsense:      { 'script-src':['https://pagead2.googlesyndication.com','https://partner.googleadservices.com','https://tpc.googlesyndication.com','https://fundingchoicesmessages.google.com'], 'frame-src':['https://googleads.g.doubleclick.net','https://tpc.googlesyndication.com'], 'img-src':['https://pagead2.googlesyndication.com'], 'connect-src':['https://pagead2.googlesyndication.com','https://ep1.adtrafficquality.google'] },
                 google_tag_manager:  { 'script-src':['https://www.googletagmanager.com'], 'img-src':['https://www.googletagmanager.com'] },
+                google_fonts:        { 'style-src':['https://fonts.googleapis.com'], 'font-src':['https://fonts.gstatic.com'] },
                 cloudflare_insights: { 'script-src':['https://static.cloudflareinsights.com'], 'connect-src':['https://cloudflareinsights.com'] },
                 facebook_pixel:      { 'script-src':['https://connect.facebook.net'], 'img-src':['https://www.facebook.com'], 'connect-src':['https://www.facebook.com'] },
                 recaptcha:           { 'script-src':['https://www.google.com','https://www.gstatic.com'], 'frame-src':['https://www.google.com'] },
@@ -10563,7 +10599,7 @@ class CloudScale_DevTools {
         $custom   = isset( $_POST['custom'] )   ? sanitize_textarea_field( wp_unslash( $_POST['custom'] ) )                  : '';
 
         if ( ! is_array( $services ) ) { $services = []; }
-        $allowed_services = [ 'google_analytics', 'google_adsense', 'google_tag_manager', 'cloudflare_insights', 'facebook_pixel', 'recaptcha', 'youtube', 'vimeo' ];
+        $allowed_services = [ 'google_analytics', 'google_adsense', 'google_tag_manager', 'google_fonts', 'cloudflare_insights', 'facebook_pixel', 'recaptcha', 'youtube', 'vimeo' ];
         $services = array_values( array_intersect( $services, $allowed_services ) );
 
         // Snapshot current settings before overwriting so rollback is always possible.
@@ -16113,6 +16149,35 @@ PROMPT;
         update_option( 'csdt_fpm_auto_restart',      $auto_restart,                                                                   false );
         update_option( 'csdt_fpm_restart_cooldown',  (string) $restart_cooldown,                                                      false );
         wp_send_json_success();
+    }
+
+    public static function ajax_fpm_worker_status(): void {
+        check_ajax_referer( 'csdt_fpm_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+        $probe_url  = rtrim( get_option( 'csdt_fpm_probe_url', 'http://localhost:8082/' ), '/' );
+        $status_url = $probe_url . '/fpm-status';
+        $response   = wp_remote_get( $status_url, [ 'timeout' => 5, 'sslverify' => false ] );
+        if ( is_wp_error( $response ) ) {
+            wp_send_json_error( [ 'message' => 'Could not reach ' . $status_url . ': ' . $response->get_error_message() . '. Ensure pm.status_path = /fpm-status in www.conf and a matching nginx location.' ] );
+        }
+        $body = wp_remote_retrieve_body( $response );
+        $code = wp_remote_retrieve_response_code( $response );
+        if ( (int) $code !== 200 || empty( $body ) ) {
+            wp_send_json_error( [ 'message' => 'FPM status returned HTTP ' . $code . '. Enable pm.status_path = /fpm-status in www.conf and add a nginx location block for /fpm-status.' ] );
+        }
+        $parse = static function ( string $key ) use ( $body ): ?int {
+            if ( preg_match( '/^' . preg_quote( $key, '/' ) . ':\s*(\d+)/m', $body, $m ) ) {
+                return (int) $m[1];
+            }
+            return null;
+        };
+        wp_send_json_success( [
+            'active' => $parse( 'active processes' ),
+            'idle'   => $parse( 'idle processes' ),
+            'total'  => $parse( 'total processes' ),
+        ] );
     }
 
     public static function register_fpm_report_route(): void {

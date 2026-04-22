@@ -85,6 +85,10 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
+= 1.9.206 =
+* feat: CSP panel — Google Fonts checkbox added; AdSense checkbox now includes fundingchoicesmessages.google.com (consent management) and ep1.adtrafficquality.google (IVT detection)
+* feat: PHP-FPM Saturation Monitor — Explain button with 6 sections; live worker count (active/idle/total) with auto-load and Refresh button via /fpm-status probe
+
 = 1.9.204 =
 * feat: Deep scan — CRITICAL finding when multiple Content-Security-Policy headers detected (browser intersection breaks JS for all visitors and Googlebot)
 * feat: Cloudflare cache auto-purge on post/page publish or update (replaces deactivated CF plugin's main feature); uses existing csdt_devtools_cf_zone_id / csdt_devtools_cf_api_token options

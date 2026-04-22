@@ -172,6 +172,41 @@
         loadSource( 'php_error' );
     }
 
+    // PHP-FPM Saturation Monitor — workers refresh
+    var fpmWorkersRefresh = document.getElementById( 'csdt-fpm-workers-refresh' );
+    var fpmWorkersStatus  = document.getElementById( 'csdt-fpm-workers-status' );
+
+    function refreshFpmWorkers() {
+        if ( fpmWorkersRefresh ) { fpmWorkersRefresh.disabled = true; }
+        if ( fpmWorkersStatus ) { fpmWorkersStatus.textContent = '\u23F3'; }
+        post( 'csdt_fpm_worker_status', {}, cfg.fpmNonce )
+            .then( function ( res ) {
+                if ( fpmWorkersRefresh ) { fpmWorkersRefresh.disabled = false; }
+                if ( ! res.success ) {
+                    if ( fpmWorkersStatus ) { fpmWorkersStatus.textContent = esc( ( res.data && res.data.message ) || 'Error' ); }
+                    return;
+                }
+                var d = res.data || {};
+                var set = function ( id, val ) {
+                    var el = document.getElementById( id );
+                    if ( el ) { el.textContent = val !== null && val !== undefined ? String( val ) : '\u2014'; }
+                };
+                set( 'csdt-fpm-w-active', d.active );
+                set( 'csdt-fpm-w-idle',   d.idle );
+                set( 'csdt-fpm-w-total',  d.total );
+                if ( fpmWorkersStatus ) { fpmWorkersStatus.textContent = ''; }
+            } )
+            .catch( function () {
+                if ( fpmWorkersRefresh ) { fpmWorkersRefresh.disabled = false; }
+                if ( fpmWorkersStatus ) { fpmWorkersStatus.textContent = 'Request failed.'; }
+            } );
+    }
+
+    if ( fpmWorkersRefresh ) {
+        fpmWorkersRefresh.addEventListener( 'click', refreshFpmWorkers );
+        refreshFpmWorkers();
+    }
+
     // PHP-FPM Saturation Monitor save + copy
     var fpmSaveBtn      = document.getElementById( 'csdt-fpm-save' );
     var fpmEnabledChk   = document.getElementById( 'csdt-fpm-enabled' );
