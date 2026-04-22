@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.209
+ * Version: 1.9.210
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.209';
+    const VERSION      = '1.9.210';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -1848,7 +1848,7 @@ class CloudScale_DevTools {
         $key_url   = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         ?>
         <div class="cs-panel" id="cs-panel-debug">
-            <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1a2e 0%,#16213e 100%);border-left:3px solid #7c3aed;">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#3b0764 0%,#6d28d9 100%);border-left:3px solid #a78bfa;">
                 <span>🧠 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Paste an error or load from your logs — AI identifies the root cause and gives step-by-step fixes', 'cloudscale-devtools' ); ?></span>
             </div>
@@ -2158,7 +2158,7 @@ class CloudScale_DevTools {
         $custom_paths   = get_option( 'csdt_custom_log_paths', [] );
         ?>
         <div class="cs-panel" id="cs-panel-logs">
-            <div class="cs-section-header" style="background:linear-gradient(90deg,#1a2035 0%,#1e2d40 100%);border-left:3px solid #4a9eff;">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#1e3a8a 0%,#1d4ed8 100%);border-left:3px solid #60a5fa;">
                 <span>📋 <?php esc_html_e( 'Server Logs', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Read-only view of PHP error log, WordPress debug log, and web server logs', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'server-logs', 'Server Logs', [
@@ -3049,7 +3049,7 @@ class CloudScale_DevTools {
         $ta_accounts    = self::get_active_test_accounts();
         ?>
         <div class="cs-panel" id="cs-panel-test-accounts">
-            <div class="cs-section-header" style="background:linear-gradient(135deg,#0f172a,#1e3a5f)">
+            <div class="cs-section-header" style="background:linear-gradient(135deg,#1e3a8a,#1d4ed8)">
                 <span>🧪 <?php esc_html_e( 'TEST ACCOUNT MANAGER', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Temporary single-use accounts for Playwright / CI pipelines', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'test-accounts', 'Test Account Manager', [
@@ -11023,7 +11023,7 @@ class CloudScale_DevTools {
         $security_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         ?>
         <div class="cs-panel" id="cs-panel-site-audit">
-            <div class="cs-section-header" style="background:linear-gradient(90deg,#0f172a 0%,#1e2d40 100%);border-left:3px solid #10b981;">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#064e3b 0%,#047857 100%);border-left:3px solid #34d399;">
                 <span>🔍 <?php esc_html_e( 'AI Site Auditor', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'One-click scan — SEO, performance, content, and database health, all in under 60 seconds', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'site-auditor', 'AI Site Auditor', [
@@ -11074,7 +11074,7 @@ class CloudScale_DevTools {
         $security_url = admin_url( 'tools.php?page=' . self::TOOLS_SLUG . '&tab=security' );
         ?>
         <div class="cs-panel" id="cs-panel-optimizer">
-            <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f35 0%,#1e2d40 100%);border-left:3px solid #6366f1;">
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#1e1b4b 0%,#4338ca 100%);border-left:3px solid #818cf8;">
                 <span>🔧 <?php esc_html_e( 'Plugin Optimizer', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Find plugins CloudScale replaces, reduce bloat, and diagnose errors with AI', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'plugin-optimizer', 'Plugin Optimizer', [
@@ -11428,7 +11428,7 @@ class CloudScale_DevTools {
                 <hr class="cs-sec-divider">
 
                 <!-- Quick Fixes -->
-                <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #f59e0b;margin-bottom:0;">
+                <div class="cs-section-header" style="background:linear-gradient(90deg,#78350f 0%,#b45309 100%);border-left:3px solid #fcd34d;margin-bottom:0;">
                     <span>⚡ <?php esc_html_e( 'Quick Fixes', 'cloudscale-devtools' ); ?></span>
                     <span class="cs-header-hint"><?php esc_html_e( 'One-click hardening actions for common WordPress security settings', 'cloudscale-devtools' ); ?></span>
                     <?php self::render_explain_btn( 'quick-fixes', 'Quick Fixes', [
@@ -11601,7 +11601,7 @@ bantime  = 86400</pre>
                 $tm_baseline      = get_option( 'csdt_file_integrity_baseline',       [] );
                 ?>
                 <div class="cs-panel" id="cs-panel-threat-monitor">
-                    <div class="cs-section-header" style="background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #dc2626;">
+                    <div class="cs-section-header" style="background:linear-gradient(90deg,#7f1d1d 0%,#b91c1c 100%);border-left:3px solid #f87171;">
                         <span>🔎 <?php esc_html_e( 'Threat Monitor', 'cloudscale-devtools' ); ?></span>
                         <span class="cs-header-hint"><?php esc_html_e( 'File integrity · New admin alert · Probe detection — alerts once per incident, not per event', 'cloudscale-devtools' ); ?></span>
                         <?php self::render_explain_btn( 'threat-monitor', 'Threat Monitor', [
@@ -11696,6 +11696,8 @@ bantime  = 86400</pre>
 
                 <?php self::render_csp_panel(); ?>
 
+                <div style="margin:32px 0 0;border-top:2px solid #e2e8f0;"></div>
+
                 <div class="cs-section-header" style="margin-top:24px;background:linear-gradient(90deg,#022c22 0%,#065f46 100%);border-left:3px solid #34d399;border-radius:6px 6px 0 0;">
                     <span>🕵️ <?php esc_html_e( 'AI Cyber Audit', 'cloudscale-devtools' ); ?></span>
                     <span class="cs-header-hint"><?php esc_html_e( 'AI-powered WordPress security scanning — standard or deep dive', 'cloudscale-devtools' ); ?></span>
@@ -11761,7 +11763,7 @@ bantime  = 86400</pre>
             </div>
 
             <!-- Scan History -->
-            <div class="cs-section-header" style="margin-top:24px;background:linear-gradient(90deg,#1a1f2e 0%,#1e2535 100%);border-left:3px solid #6366f1;">
+            <div class="cs-section-header" style="margin-top:24px;background:linear-gradient(90deg,#1e1b4b 0%,#4338ca 100%);border-left:3px solid #818cf8;">
                 <span>📈 <?php esc_html_e( 'Scan History', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Last 50 scans — track your security score over time', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'scan-history', 'Scan History', [
