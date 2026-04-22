@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Developer toolkit with syntax-highlighted code blocks, SQL query tool, code migrator, site monitor, and login security (passkeys, TOTP, email 2FA, hide login URL).
- * Version: 1.9.250
+ * Version: 1.9.252
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -38,7 +38,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.250';
+    const VERSION      = '1.9.252';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2070,8 +2070,8 @@ class CloudScale_DevTools {
                             <span id="csdt-fpm-w-total" style="color:#94a3b8;font-weight:700;">—</span>
                         </span>
                         <button type="button" id="csdt-fpm-workers-refresh" class="cs-btn-sm cs-btn-secondary" style="padding:5px 12px;font-size:.78em;line-height:1.4;">↻ <?php esc_html_e( 'Refresh', 'cloudscale-devtools' ); ?></button>
+                        <button type="button" id="csdt-fpm-detail-toggle" class="cs-btn-sm cs-btn-secondary" style="padding:5px 12px;font-size:.78em;line-height:1.4;">▼ <?php esc_html_e( 'Workers', 'cloudscale-devtools' ); ?></button>
                         <button type="button" id="csdt-fpm-setup-btn" class="cs-btn-sm cs-btn-secondary" style="padding:5px 12px;font-size:.78em;line-height:1.4;background:#1e3a5f;color:#60a5fa;border-color:#2563eb;">⚙ <?php esc_html_e( 'Setup Status Page', 'cloudscale-devtools' ); ?></button>
-                        <button type="button" id="csdt-fpm-detail-toggle" class="cs-btn-sm cs-btn-secondary" style="padding:5px 12px;font-size:.78em;line-height:1.4;margin-left:auto;">▼ <?php esc_html_e( 'Workers', 'cloudscale-devtools' ); ?></button>
                         <span id="csdt-fpm-workers-status" style="font-size:.78em;color:#64748b;"></span>
                     </div>
 
@@ -2094,9 +2094,11 @@ class CloudScale_DevTools {
                                 <tbody id="csdt-fpm-detail-tbody">
                                     <tr><td colspan="8" style="padding:8px;color:#475569;">Loading…</td></tr>
                                 </tbody>
+                                <tfoot id="csdt-fpm-detail-tfoot"></tfoot>
                             </table>
                         </div>
-                        <div id="csdt-fpm-pool-info" style="margin-top:8px;font-size:.74em;color:#94a3b8;"></div>
+                        <p style="margin:4px 0 8px;font-size:.72em;color:#475569;">CPU% = last completed request. Workers currently handling a request show 0.0 until that request finishes.</p>
+                        <div id="csdt-fpm-pool-info" style="margin-top:4px;font-size:.74em;color:#94a3b8;"></div>
                     </div>
 
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;">

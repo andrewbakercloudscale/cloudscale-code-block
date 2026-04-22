@@ -205,8 +205,114 @@
     }
 
     if ( fpmWorkersRefresh ) {
-        fpmWorkersRefresh.addEventListener( 'click', refreshFpmWorkers );
+        fpmWorkersRefresh.addEventListener( 'click', function () {
+            refreshFpmWorkers();
+            if ( fpmDetailOpen ) { loadFpmDetail(); }
+        } );
         refreshFpmWorkers();
+    }
+
+    // Per-worker detail table
+    var fpmDetailToggle = document.getElementById( 'csdt-fpm-detail-toggle' );
+    var fpmDetailPanel  = document.getElementById( 'csdt-fpm-detail-panel' );
+    var fpmDetailTbody  = document.getElementById( 'csdt-fpm-detail-tbody' );
+    var fpmDetailTfoot  = document.getElementById( 'csdt-fpm-detail-tfoot' );
+    var fpmPoolInfo     = document.getElementById( 'csdt-fpm-pool-info' );
+    var fpmDetailOpen   = false;
+
+    function fmtBytes( b ) {
+        b = parseInt( b, 10 ) || 0;
+        if ( b === 0 ) return '—';
+        if ( b < 1024 * 1024 ) return ( b / 1024 ).toFixed( 0 ) + ' KB';
+        return ( b / 1024 / 1024 ).toFixed( 1 ) + ' MB';
+    }
+
+    function fmtSince( secs ) {
+        secs = parseInt( secs, 10 ) || 0;
+        if ( secs < 60 )   return secs + 's';
+        if ( secs < 3600 ) return Math.floor( secs / 60 ) + 'm ' + ( secs % 60 ) + 's';
+        return Math.floor( secs / 3600 ) + 'h ' + Math.floor( ( secs % 3600 ) / 60 ) + 'm';
+    }
+
+    function stateColour( state ) {
+        state = ( state || '' ).toLowerCase();
+        if ( state === 'idle' )                     return '#86efac';
+        if ( state === 'running' )                  return '#f87171';
+        if ( state.indexOf( 'reading' ) !== -1 )    return '#fbbf24';
+        if ( state.indexOf( 'sending' ) !== -1 )    return '#60a5fa';
+        return '#94a3b8';
+    }
+
+    function loadFpmDetail() {
+        if ( fpmDetailTbody ) { fpmDetailTbody.innerHTML = '<tr><td colspan="8" style="padding:8px;color:#475569;">Loading\u2026</td></tr>'; }
+        post( 'csdt_fpm_worker_detail', {}, cfg.fpmNonce )
+            .then( function ( res ) {
+                if ( ! res.success || ! fpmDetailTbody ) { return; }
+                var d = res.data;
+                var workers = d.workers || [];
+
+                if ( fpmPoolInfo ) {
+                    fpmPoolInfo.textContent = 'Pool: ' + ( d.pool || '—' )
+                        + '  ·  PM: ' + ( d.pm || '—' )
+                        + '  ·  Total accepted: ' + ( d.accepted || 0 ).toLocaleString();
+                }
+
+                // Active/running workers first, then idle by PID
+                workers.sort( function ( a, b ) {
+                    var aIdle = ( a.state || '' ).toLowerCase() === 'idle';
+                    var bIdle = ( b.state || '' ).toLowerCase() === 'idle';
+                    if ( aIdle !== bIdle ) { return aIdle ? 1 : -1; }
+                    return ( a.pid || 0 ) - ( b.pid || 0 );
+                } );
+
+                if ( ! workers.length ) {
+                    fpmDetailTbody.innerHTML = '<tr><td colspan="8" style="padding:8px;color:#475569;">No worker data returned.</td></tr>';
+                    return;
+                }
+
+                fpmDetailTbody.innerHTML = workers.map( function ( w ) {
+                    var stateClr = stateColour( w.state );
+                    var uriText  = w.uri || '—';
+                    if ( uriText.length > 80 ) { uriText = uriText.slice( 0, 77 ) + '\u2026'; }
+                    var rowBg    = w.state && w.state.toLowerCase() !== 'idle' ? 'background:#12213a;' : '';
+                    var cpuVal   = parseFloat( w.cpu || 0 );
+                    var cpuDisp  = cpuVal === 0 ? '—' : cpuVal.toFixed( 1 );
+                    var cpuClr   = cpuVal > 50 ? '#fbbf24' : '#e2e8f0';
+                    return '<tr style="border-top:1px solid #1e293b;' + rowBg + '">'
+                        + '<td style="padding:4px 8px;font-family:monospace;color:#e2e8f0;">' + esc( String( w.pid ) ) + '</td>'
+                        + '<td style="padding:4px 8px;font-weight:600;color:' + stateClr + ';white-space:nowrap;">' + esc( w.state || '—' ) + '</td>'
+                        + '<td style="padding:4px 8px;text-align:right;color:#e2e8f0;">' + esc( String( w.reqs ) ) + '</td>'
+                        + '<td style="padding:4px 8px;white-space:nowrap;color:#e2e8f0;">' + esc( fmtSince( w.since ) ) + '</td>'
+                        + '<td style="padding:4px 8px;font-family:monospace;font-size:.9em;max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc( ( w.method ? w.method + ' ' : '' ) + ( w.uri || '' ) ) + '">'
+                        + ( w.method ? '<span style="color:#94a3b8;">' + esc( w.method ) + '</span> ' : '' )
+                        + '<span style="color:#e2e8f0;">' + esc( uriText ) + '</span></td>'
+                        + '<td style="padding:4px 8px;font-family:monospace;font-size:.9em;color:#e2e8f0;white-space:nowrap;" title="' + esc( w.script || '' ) + '">' + esc( w.script || '—' ) + '</td>'
+                        + '<td style="padding:4px 8px;text-align:right;color:' + cpuClr + ';">' + esc( cpuDisp ) + '</td>'
+                        + '<td style="padding:4px 8px;text-align:right;white-space:nowrap;color:#e2e8f0;">' + esc( fmtBytes( w.mem ) ) + '</td>'
+                        + '</tr>';
+                } ).join( '' );
+
+                // Memory total in tfoot
+                if ( fpmDetailTfoot ) {
+                    var totalBytes = workers.reduce( function ( s, w ) { return s + ( parseInt( w.mem, 10 ) || 0 ); }, 0 );
+                    fpmDetailTfoot.innerHTML = '<tr style="border-top:2px solid #334155;">'
+                        + '<td colspan="7" style="padding:4px 8px;text-align:right;color:#94a3b8;font-size:.85em;">Total memory</td>'
+                        + '<td style="padding:4px 8px;text-align:right;white-space:nowrap;color:#e2e8f0;font-weight:700;">' + esc( fmtBytes( totalBytes ) ) + '</td>'
+                        + '</tr>';
+                }
+            } )
+            .catch( function () {
+                if ( fpmDetailTbody ) { fpmDetailTbody.innerHTML = '<tr><td colspan="8" style="padding:8px;color:#f87171;">Request failed.</td></tr>'; }
+            } );
+    }
+
+    if ( fpmDetailToggle && fpmDetailPanel ) {
+        fpmDetailToggle.addEventListener( 'click', function () {
+            fpmDetailOpen = ! fpmDetailOpen;
+            fpmDetailPanel.style.display = fpmDetailOpen ? '' : 'none';
+            fpmDetailToggle.textContent  = ( fpmDetailOpen ? '\u25B2' : '\u25BC' ) + ' Workers';
+            if ( fpmDetailOpen ) { loadFpmDetail(); }
+        } );
     }
 
     // PHP-FPM Setup Wizard
