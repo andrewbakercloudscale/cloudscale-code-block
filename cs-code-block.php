@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.399
+ * Version: 1.9.400
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.399';
+    const VERSION      = '1.9.400';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -4231,13 +4231,13 @@ class CloudScale_DevTools {
                                 <?php esc_html_e( 'Endpoint path suffix', 'cloudscale-devtools' ); ?>
                                 <span style="font-weight:400;color:#6b7280;">(<?php esc_html_e( 'optional — makes the URL unguessable to prevent DDoS targeting', 'cloudscale-devtools' ); ?>)</span>
                             </p>
-                            <div style="display:flex;align-items:center;gap:8px;max-width:480px;">
-                                <span style="color:#9ca3af;font-size:.88em;white-space:nowrap;"><?php echo esc_html( rest_url( 'csdt/v1/ready/' ) ); ?></span>
+                            <div style="display:flex;align-items:center;gap:8px;max-width:520px;">
+                                <span style="color:#9ca3af;font-size:.88em;white-space:nowrap;"><?php echo esc_html( rest_url( 'csdt/cf-callback/' ) ); ?></span>
                                 <input id="csdt-uptime-ready-slug" type="text" class="cs-input" style="width:160px;font-family:monospace;"
-                                       placeholder="e.g. abc123xyz"
+                                       placeholder="e.g. ajb007"
                                        value="<?php echo esc_attr( get_option( 'csdt_readiness_slug', '' ) ); ?>">
                             </div>
-                            <p style="margin:8px 0 0;font-size:.82em;color:#9ca3af;"><?php esc_html_e( 'Leave blank to use the plain /ready endpoint. Set a random string (letters/numbers) to restrict access to the slugged URL only.', 'cloudscale-devtools' ); ?></p>
+                            <p style="margin:8px 0 0;font-size:.82em;color:#9ca3af;"><?php esc_html_e( 'Set a random string to make the URL unguessable. Defaults to /ready when blank.', 'cloudscale-devtools' ); ?></p>
                         </div>
                         <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:16px;">
                             <p style="margin:0 0 10px;font-weight:700;color:#0f172a;font-size:.9em;">ntfy.sh Alert URL <span style="font-weight:400;color:#6b7280;">(optional — sent directly from the Worker when your site is down)</span></p>

@@ -239,8 +239,8 @@
     if (uptimeSlugInput && uptimeUrlDisplay) {
         uptimeSlugInput.addEventListener('input', function () {
             var slug = uptimeSlugInput.value.trim();
-            var base = uptimeUrlDisplay.textContent.replace(/\/ready(\/.*)?$/, '/ready');
-            uptimeUrlDisplay.textContent = slug ? base + '/' + slug : base;
+            var base = uptimeUrlDisplay.textContent.replace(/\/cf-callback\/.*$/, '/cf-callback/');
+            uptimeUrlDisplay.textContent = base + ( slug || 'ready' );
         });
         uptimeSlugInput.addEventListener('change', function () {
             var ntfy = uptimeNtfyInput ? uptimeNtfyInput.value.trim() : '';

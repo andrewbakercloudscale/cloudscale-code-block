@@ -15,7 +15,8 @@ class CSDT_Uptime {
 
     private static function readiness_url(): string {
         $slug = sanitize_key( (string) get_option( 'csdt_readiness_slug', '' ) );
-        return $slug ? rest_url( 'csdt/v1/ready/' . $slug ) : rest_url( 'csdt/v1/ready' );
+        // Primary path: csdt/cf-callback/{slug} — allows WAF wildcard exclusion on /wp-json/csdt/cf-callback/*
+        return rest_url( 'csdt/cf-callback/' . ( $slug ?: 'ready' ) );
     }
 
     public static function register_rest_routes(): void {
@@ -24,15 +25,19 @@ class CSDT_Uptime {
             'callback'            => [ __CLASS__, 'rest_readiness_probe' ],
             'permission_callback' => '__return_true',
         ];
+        // Primary route — WAF-excluded namespace
+        register_rest_route( 'csdt/cf-callback', '/(?P<slug>[a-zA-Z0-9_-]+)', $args );
+        // Legacy routes kept for backward compat with already-deployed workers
         register_rest_route( 'csdt/v1', '/ready', $args );
         register_rest_route( 'csdt/v1', '/ready/(?P<slug>[a-zA-Z0-9_-]+)', $args );
     }
 
     public static function rest_readiness_probe( \WP_REST_Request $request ): \WP_REST_Response {
-        // Slug guard — if a path slug is configured, only the slugged URL is valid
+        // Slug guard — URL slug must match stored slug (or 'ready' when none is set)
         $stored_slug = sanitize_key( (string) get_option( 'csdt_readiness_slug', '' ) );
         $url_slug    = sanitize_key( (string) ( $request->get_param( 'slug' ) ?? '' ) );
-        if ( $stored_slug !== '' && $url_slug !== $stored_slug ) {
+        $expected    = $stored_slug ?: 'ready';
+        if ( $url_slug !== $expected ) {
             return new \WP_REST_Response( null, 404 );
         }
 
