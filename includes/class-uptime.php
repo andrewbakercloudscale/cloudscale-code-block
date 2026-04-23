@@ -347,32 +347,60 @@ class CSDT_Uptime {
         check_ajax_referer( CloudScale_DevTools::OPTIMIZER_NONCE, 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) wp_send_json_error( 'Unauthorized', 403 );
 
-        $url   = self::readiness_url();
-        $token = (string) get_option( 'csdt_uptime_token', '' );
+        $token      = (string) get_option( 'csdt_uptime_token', '' );
+        $worker_url = (string) get_option( 'csdt_uptime_worker_url', '' );
+
         if ( $token === '' ) {
             wp_send_json_error( [ 'message' => 'No token set — click Generate Token first.' ] );
             return;
         }
 
+        // If we have the worker URL, trigger CF Worker (full E2E: CF → readiness → ping back)
+        if ( $worker_url !== '' ) {
+            $start = microtime( true );
+            $resp  = wp_remote_post( $worker_url, [
+                'timeout' => 20,
+                'headers' => [ 'Authorization' => 'Bearer ' . $token ],
+            ] );
+            $ms = (int) round( ( microtime( true ) - $start ) * 1000 );
+
+            if ( is_wp_error( $resp ) ) {
+                wp_send_json_error( [ 'message' => 'Could not reach CF Worker: ' . $resp->get_error_message() . '. Try redeploying the Worker to refresh its URL.' ] );
+                return;
+            }
+            $code = wp_remote_retrieve_response_code( $resp );
+            if ( $code === 401 ) {
+                wp_send_json_error( [ 'message' => 'CF Worker rejected the token. Redeploy the Worker to sync the token.' ] );
+                return;
+            }
+            $body = json_decode( wp_remote_retrieve_body( $resp ), true );
+            wp_send_json_success( [
+                'via'         => 'cf_worker',
+                'ok'          => ! empty( $body['ok'] ),
+                'status_code' => $body['status_code'] ?? $code,
+                'ms'          => $body['response_ms']  ?? $ms,
+                'worker_url'  => $worker_url,
+            ] );
+            return;
+        }
+
+        // Fallback: call readiness endpoint directly from WP server
+        $url   = self::readiness_url();
         $start = microtime( true );
         $resp  = wp_remote_get( $url, [
             'timeout' => 15,
-            'headers' => [
-                'Authorization' => 'Bearer ' . $token,
-                'Cache-Control' => 'no-store',
-            ],
-            'sslverify' => true,
+            'headers' => [ 'Authorization' => 'Bearer ' . $token, 'Cache-Control' => 'no-store' ],
         ] );
         $ms = (int) round( ( microtime( true ) - $start ) * 1000 );
 
         if ( is_wp_error( $resp ) ) {
-            wp_send_json_error( [ 'message' => 'Request failed: ' . $resp->get_error_message(), 'ms' => $ms ] );
+            wp_send_json_error( [ 'message' => 'Request failed: ' . $resp->get_error_message() ] );
             return;
         }
-
         $code = wp_remote_retrieve_response_code( $resp );
         $body = json_decode( wp_remote_retrieve_body( $resp ), true );
         wp_send_json_success( [
+            'via'         => 'direct',
             'status_code' => $code,
             'ok'          => $code === 200,
             'ms'          => $ms,
@@ -479,6 +507,21 @@ class CSDT_Uptime {
 
         update_option( 'csdt_uptime_enabled', '1', false );
 
+        // Step 4: Get workers.dev subdomain so we can trigger the worker via HTTP for the Test button
+        $subdomain_resp = wp_remote_get(
+            "https://api.cloudflare.com/client/v4/accounts/{$account_id}/workers/subdomain",
+            [ 'headers' => [ 'Authorization' => 'Bearer ' . $cf_token ], 'timeout' => 10 ]
+        );
+        $worker_trigger_url = '';
+        if ( ! is_wp_error( $subdomain_resp ) ) {
+            $sub_data  = json_decode( wp_remote_retrieve_body( $subdomain_resp ), true );
+            $subdomain = $sub_data['result']['subdomain'] ?? '';
+            if ( $subdomain ) {
+                $worker_trigger_url = "https://cloudscale-uptime.{$subdomain}.workers.dev";
+                update_option( 'csdt_uptime_worker_url', $worker_trigger_url, false );
+            }
+        }
+
         wp_send_json_success( [
             'message'    => 'Worker deployed! Pings will arrive every 60 seconds.',
             'worker_url' => "https://dash.cloudflare.com/{$account_id}/workers/view/cloudscale-uptime",
@@ -577,41 +620,60 @@ class CSDT_Uptime {
     private static function uptime_worker_js(): string {
         return <<<'JS'
 // CloudScale Uptime Monitor — readiness probe
+// HTTP POST / with Authorization: Bearer <PING_TOKEN> triggers a manual probe (used by WP Admin Test button)
+async function runProbe(env, ctx) {
+  const start = Date.now();
+  let statusCode = 0, responseMs = 0, isUp = false;
+  try {
+    const res = await fetch(env.READY_URL, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + env.PING_TOKEN,
+        'User-Agent': 'CloudScale-Uptime/1.0',
+        'Cache-Control': 'no-store',
+      },
+      signal: AbortSignal.timeout(15000),
+    });
+    statusCode = res.status;
+    responseMs = Date.now() - start;
+    isUp = statusCode === 200;
+  } catch(e) { responseMs = Date.now() - start; }
+
+  if (!isUp && env.NTFY_URL) {
+    ctx.waitUntil(fetch(env.NTFY_URL, {
+      method: 'POST',
+      headers: {'Title': 'Site Down: ' + env.SITE_URL, 'Priority': 'urgent', 'Tags': 'rotating_light'},
+      body: 'Readiness probe: ' + (statusCode ? 'HTTP ' + statusCode : 'timeout') + ' — ' + responseMs + 'ms',
+    }).catch(() => {}));
+  }
+
+  ctx.waitUntil(fetch(env.PING_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'action=csdt_uptime_ping&token=' + encodeURIComponent(env.PING_TOKEN) + '&status_code=' + statusCode + '&response_ms=' + responseMs,
+    signal: AbortSignal.timeout(10000),
+  }).catch(() => {}));
+
+  return { statusCode, responseMs, isUp };
+}
+
 export default {
   async scheduled(event, env, ctx) {
-    const start = Date.now();
-    let statusCode = 0, responseMs = 0, isUp = false;
-    try {
-      // Probe the readiness endpoint — checks DB, PHP-FPM saturation, and WP boot.
-      // Returns 200 when healthy, 503 when degraded, connection error when server is down.
-      const res = await fetch(env.READY_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': 'Bearer ' + env.PING_TOKEN,
-          'User-Agent': 'CloudScale-Uptime/1.0',
-          'Cache-Control': 'no-store',
-        },
-        signal: AbortSignal.timeout(15000),
-      });
-      statusCode = res.status;
-      responseMs = Date.now() - start;
-      isUp = statusCode === 200;
-    } catch(e) { responseMs = Date.now() - start; }
+    ctx.waitUntil(runProbe(env, ctx));
+  },
 
-    if (!isUp && env.NTFY_URL) {
-      ctx.waitUntil(fetch(env.NTFY_URL, {
-        method: 'POST',
-        headers: {'Title': 'Site Down: ' + env.SITE_URL, 'Priority': 'urgent', 'Tags': 'rotating_light'},
-        body: 'Readiness probe: ' + (statusCode ? 'HTTP ' + statusCode : 'timeout') + ' — ' + responseMs + 'ms',
-      }).catch(() => {}));
+  async fetch(request, env, ctx) {
+    if (request.method !== 'POST') {
+      return new Response('Method Not Allowed', { status: 405 });
     }
-
-    ctx.waitUntil(fetch(env.PING_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: 'action=csdt_uptime_ping&token=' + encodeURIComponent(env.PING_TOKEN) + '&status_code=' + statusCode + '&response_ms=' + responseMs,
-      signal: AbortSignal.timeout(10000),
-    }).catch(() => {}));
+    const auth = request.headers.get('Authorization') || '';
+    if (auth !== 'Bearer ' + env.PING_TOKEN) {
+      return new Response('Unauthorized', { status: 401 });
+    }
+    const result = await runProbe(env, ctx);
+    return new Response(JSON.stringify({ ok: result.isUp, status_code: result.statusCode, response_ms: result.responseMs, triggered: true }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   },
 };
 JS;

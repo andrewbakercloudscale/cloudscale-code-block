@@ -345,6 +345,9 @@
                 var col = ok ? '#166534' : '#7f1d1d';
                 var bg  = ok ? '#f0fdf4' : '#fef2f2';
                 var brd = ok ? '#16a34a' : '#dc2626';
+                var via = d.via === 'cf_worker'
+                    ? '<span style="font-size:.8em;background:rgba(0,0,0,.08);padding:1px 6px;border-radius:3px;margin-left:6px;">via CF Worker</span>'
+                    : '<span style="font-size:.8em;background:rgba(0,0,0,.08);padding:1px 6px;border-radius:3px;margin-left:6px;">direct (redeploy to enable CF route)</span>';
                 var checksHtml = '';
                 if (d.checks) {
                     checksHtml = '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">';
@@ -357,7 +360,7 @@
                 }
                 uptimeDeployRes.innerHTML = '<div style="background:' + bg + ';border-left:3px solid ' + brd + ';padding:10px 14px;border-radius:0 6px 6px 0;font-size:.87em;color:' + col + ';">' +
                     (ok ? '✅ Endpoint healthy' : '🔴 Endpoint returned HTTP ' + d.status_code) +
-                    ' — <strong>' + d.ms + 'ms</strong>' +
+                    ' — <strong>' + d.ms + 'ms</strong>' + via +
                     checksHtml + '</div>';
                 loadUptimeHistory();
             }).catch(function () {
