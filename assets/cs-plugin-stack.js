@@ -459,13 +459,12 @@
         }
         html += '</div></div>';
 
-        // Response-time chart (raw — last 60 pings)
+        // Response-time chart (raw — last 60 pings, show once enough data exists)
         var raw = d.raw || [];
-        if (raw.length > 0) {
+        if (raw.length >= 5) {
             var recent = raw.slice(-60);
             var maxMs  = Math.max.apply(null, recent.map(function(r){ return r.ms; })) || 1;
-            var pingWord = recent.length === 1 ? 'ping' : 'pings';
-            html += '<p style="font-size:.82em;font-weight:700;color:#374151;margin:0 0 6px;">Response time — last ' + recent.length + ' ' + pingWord + '</p>';
+            html += '<p style="font-size:.82em;font-weight:700;color:#374151;margin:0 0 6px;">Response time — last ' + recent.length + ' pings</p>';
             html += '<div style="display:flex;align-items:flex-end;gap:1px;height:48px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:4px 6px;overflow:hidden;">';
             recent.forEach(function (r) {
                 var h   = Math.max(4, Math.round((r.ms / maxMs) * 40));
@@ -474,6 +473,8 @@
             });
             html += '</div>';
             html += '<p style="font-size:.75em;color:#9ca3af;margin:4px 0 0;">Green = up · Red = down · Height = response time</p>';
+        } else if (raw.length > 0) {
+            html += '<p style="font-size:.78em;color:#9ca3af;margin:0;">Chart appears after 5 pings (' + (5 - raw.length) + ' more needed).</p>';
         }
 
         uptimeStatusInner.innerHTML = html;
