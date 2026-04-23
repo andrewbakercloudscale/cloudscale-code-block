@@ -195,6 +195,22 @@ class CSDT_Uptime {
 
     // ── Uptime Monitor ───────────────────────────────────────────────────────
 
+    private static function record_ping( int $status_code, int $response_ms ): void {
+        $is_up = $status_code >= 200 && $status_code < 500;
+        $now   = time();
+        update_option( 'csdt_uptime_last_ping', [
+            'time'   => $now,
+            'up'     => $is_up,
+            'ms'     => $response_ms,
+            'status' => $status_code,
+        ], false );
+        $raw   = get_option( 'csdt_uptime_raw', [] );
+        $raw[] = [ 't' => $now, 'up' => $is_up ? 1 : 0, 'ms' => $response_ms, 's' => $status_code ];
+        if ( count( $raw ) > 180 ) { $raw = array_slice( $raw, -180 ); }
+        update_option( 'csdt_uptime_raw', $raw, false );
+        self::uptime_aggregate_hourly( $now, $is_up, $response_ms );
+    }
+
     public static function ajax_uptime_ping(): void {
         $token        = sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) );
         $stored_token = (string) get_option( 'csdt_uptime_token', '' );
@@ -212,21 +228,7 @@ class CSDT_Uptime {
         $prev_ping = get_option( 'csdt_uptime_last_ping', null );
         $was_up    = $prev_ping ? (bool) $prev_ping['up'] : true;
 
-        update_option( 'csdt_uptime_last_ping', [
-            'time'   => $now,
-            'up'     => $is_up,
-            'ms'     => $response_ms,
-            'status' => $status_code,
-        ], false );
-
-        // Raw ring buffer — keep last 180 pings (3 hours)
-        $raw   = get_option( 'csdt_uptime_raw', [] );
-        $raw[] = [ 't' => $now, 'up' => $is_up ? 1 : 0, 'ms' => $response_ms, 's' => $status_code ];
-        if ( count( $raw ) > 180 ) { $raw = array_slice( $raw, -180 ); }
-        update_option( 'csdt_uptime_raw', $raw, false );
-
-        // Hourly buckets — keep last 168 (7 days)
-        self::uptime_aggregate_hourly( $now, $is_up, $response_ms );
+        self::record_ping( $status_code, $response_ms );
 
         // Downtime alert (5-min cooldown)
         if ( ! $is_up ) {
@@ -386,12 +388,15 @@ class CSDT_Uptime {
                 wp_send_json_error( [ 'message' => 'CF Worker rejected the token. Redeploy the Worker to sync the token.' ] );
                 return;
             }
-            $body = json_decode( wp_remote_retrieve_body( $resp ), true );
+            $body       = json_decode( wp_remote_retrieve_body( $resp ), true );
+            $probe_code = (int) ( $body['status_code'] ?? $code );
+            $probe_ms   = (int) ( $body['response_ms']  ?? $ms );
+            self::record_ping( $probe_code, $probe_ms );
             wp_send_json_success( [
                 'via'         => 'cf_worker',
                 'ok'          => ! empty( $body['ok'] ),
-                'status_code' => $body['status_code'] ?? $code,
-                'ms'          => $body['response_ms']  ?? $ms,
+                'status_code' => $probe_code,
+                'ms'          => $probe_ms,
                 'worker_url'  => $worker_url,
             ] );
             return;
@@ -412,6 +417,7 @@ class CSDT_Uptime {
         }
         $code = wp_remote_retrieve_response_code( $resp );
         $body = json_decode( wp_remote_retrieve_body( $resp ), true );
+        self::record_ping( (int) $code, $ms );
         wp_send_json_success( [
             'via'         => 'direct',
             'status_code' => $code,
