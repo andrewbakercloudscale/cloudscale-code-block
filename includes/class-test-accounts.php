@@ -451,6 +451,15 @@ class CSDT_Test_Accounts {
         wp_send_json_success( [ 'secret' => $secret ] );
     }
 
+    public static function ajax_toggle_block_basic_auth(): void {
+        if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Forbidden', 403 ); }
+        check_ajax_referer( 'csdt_devtools_login_nonce', 'nonce' );
+
+        $enabled = ( $_POST['enabled'] ?? '0' ) === '1' ? '1' : '0';
+        update_option( 'csdt_block_basic_auth', $enabled );
+        wp_send_json_success( [ 'enabled' => $enabled ] );
+    }
+
     public static function filter_app_pw_for_user( $available, $user ): bool {
         if ( get_user_meta( $user->ID, 'csdt_test_account', true ) === '1' ) {
             return true;

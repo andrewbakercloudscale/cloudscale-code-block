@@ -10,15 +10,24 @@
     var secret     = cfg.secret     || '';
     var secretShown = false;
 
-    function post(action, data, cb) {
+    function post(action, data, cb, errCb) {
         var body = new FormData();
         body.append('action', action);
         body.append('nonce',  nonce);
         Object.keys(data).forEach(function (k) { body.append(k, data[k]); });
         fetch(ajaxUrl, { method: 'POST', body: body })
-            .then(function (r) { return r.json(); })
+            .then(function (r) {
+                return r.text().then(function(txt) {
+                    try { return JSON.parse(txt); } catch(e) {
+                        throw new Error('Non-JSON response (HTTP ' + r.status + '): ' + txt.slice(0, 100));
+                    }
+                });
+            })
             .then(cb)
-            .catch(function (e) { console.error('[csdt-test-accounts]', e); });
+            .catch(function (e) {
+                console.error('[csdt-test-accounts]', e);
+                if (errCb) { errCb(e); }
+            });
     }
 
     function el(id) { return document.getElementById(id); }
@@ -57,13 +66,15 @@
             var killDisabled = u.session_count === 0 ? ' disabled' : '';
             var loginStr     = u.last_login ? timeAgo(u.last_login) : '';
             var loginHtml    = loginStr ? '<span style="font-size:11px;color:#9ca3af;">Last login: ' + escHtml(loginStr) + '</span>' : '';
-            return '<div class="cs-pwr-user-row" style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:4px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;flex-wrap:wrap;">' +
+            return '<div class="cs-pwr-user-row" style="padding:8px 12px;margin-bottom:4px;background:#f9fafb;border-radius:6px;border:1px solid #e5e7eb;">' +
+                '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">' +
                 '<code style="font-size:12px;min-width:120px;">' + escHtml(u.name) + '</code>' +
                 '<span style="font-size:12px;color:#6b7280;">' + escHtml(ucFirst(u.wp_role || 'administrator')) + '</span>' +
                 '<span style="font-size:12px;color:#9ca3af;font-family:monospace;">' + escHtml(u.username) + '</span>' +
                 '<span class="cs-pwr-sess-count" style="font-size:12px;color:' + sessColor + ';">' + escHtml(sessLabel) + '</span>' +
                 loginHtml +
-                '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0;">' +
+                '</div>' +
+                '<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;">' +
                 '<button type="button" class="cs-btn-secondary cs-btn-sm cs-pwr-kill-sessions" data-name="' + escHtml(u.name) + '"' + killDisabled + '>Kill Sessions</button>' +
                 '<button type="button" class="cs-btn-secondary cs-btn-sm cs-pwr-delete" data-name="' + escHtml(u.name) + '" style="color:#dc2626;border-color:#fca5a5;">Delete User</button>' +
                 '</div>' +

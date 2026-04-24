@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.464
+ * Version: 1.9.495
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.465';
+    const VERSION      = '1.9.495';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -279,7 +279,10 @@ class CloudScale_DevTools {
         add_filter( 'xmlrpc_enabled', '__return_false' );
 
         // One-click security hardening — option-driven filters applied at every boot
-        if ( get_option( 'csdt_devtools_disable_app_passwords', '0' ) === '1' ) {
+        if ( get_option( 'csdt_block_basic_auth', '0' ) === '1' ) {
+            // Hard block — no app passwords / Basic Auth for anyone, including test accounts
+            add_filter( 'wp_is_application_passwords_available', '__return_false' );
+        } elseif ( get_option( 'csdt_devtools_disable_app_passwords', '0' ) === '1' ) {
             if ( get_option( 'csdt_test_accounts_enabled', '0' ) === '1' ) {
                 // Test-account mode: block per-user (not site-wide) so test accounts still authenticate
                 add_filter( 'wp_is_application_passwords_available_for_user', [ 'CSDT_Test_Accounts', 'filter_app_pw_for_user' ], 10, 2 );
@@ -408,6 +411,7 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_playwright_role_delete',       [ 'CSDT_Test_Accounts', 'ajax_delete_playwright_role' ] );
         add_action( 'wp_ajax_csdt_kill_test_sessions',           [ 'CSDT_Test_Accounts', 'ajax_kill_test_sessions' ] );
         add_action( 'wp_ajax_csdt_regen_test_secret',            [ 'CSDT_Test_Accounts', 'ajax_regen_test_secret' ] );
+        add_action( 'wp_ajax_csdt_toggle_block_basic_auth',      [ 'CSDT_Test_Accounts', 'ajax_toggle_block_basic_auth' ] );
         add_action( 'rest_api_init',                             [ 'CSDT_Test_Accounts', 'register_rest_routes' ] );
         self::cron_action( 'csdt_scheduled_scan',                [ 'CSDT_Site_Audit', 'run_scheduled_scan' ] );
         self::cron_action( 'csdt_ssh_monitor',                  [ 'CSDT_Monitor', 'monitor_ssh_failures' ] );
@@ -1519,7 +1523,7 @@ class CloudScale_DevTools {
             <!-- Banner -->
             <div id="cs-banner">
                 <div>
-                    <div id="cs-banner-title">🔐 CloudScale Cyber and Devtools</div>
+                    <div id="cs-banner-title"><span style="flex-shrink:0">🔐</span><span>CloudScale Cyber and Devtools</span></div>
                     <div id="cs-banner-sub"><?php esc_html_e( 'AI security scanner, 2FA, SMTP mailer, SQL tools &amp; developer toolkit', 'cloudscale-devtools' ); ?> &middot; v<?php echo esc_html( self::VERSION ); ?></div>
                 </div>
                 <div id="cs-banner-right">
@@ -2947,7 +2951,7 @@ class CloudScale_DevTools {
                 <span class="cs-header-hint"><?php esc_html_e( 'Temporarily lock accounts after repeated failed logins', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'brute-force', 'Brute-Force Protection', [
                     [ 'name' => 'How it works',        'rec' => 'Info',        'html' => 'After <em>N</em> consecutive failed login attempts for the same username, the account is locked for the configured duration. The lock is <strong>per-username, not per-IP</strong> — it also stops distributed attacks spread across many IPs. The counter resets automatically after the lockout period expires.' ],
-                    [ 'name' => 'Failed attempts',     'rec' => 'Recommended', 'html' => '<ul><li><code>3</code> — tighter security, but risks locking out users who mistype their password</li><li><code>5</code> — default, good balance</li><li><code>10</code> — more forgiving for sites with non-technical users</li></ul>To unlock an account immediately, delete the transient key <code>csdt_devtools_lockout_{username}</code> from the database.' ],
+                    [ 'name' => 'Failed attempts',     'rec' => 'Recommended', 'html' => '<ul><li><code>3</code> — tighter security, but risks locking out users who mistype their password</li><li><code>5</code> — default, good balance</li><li><code>10</code> — more forgiving for sites with non-technical users</li></ul><strong>Unlock one account via SSH:</strong><br><code>wp transient delete csdt_devtools_bf_lock_$(php -r "echo md5(strtolower(\'USERNAME\'));") --path=/var/www/html</code><br><br><strong>Unlock all accounts:</strong><br><code>wp eval \'global $wpdb; $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"%csdt_devtools_bf_lock%\"");\' --path=/var/www/html</code>' ],
                     [ 'name' => 'Lockout period',      'rec' => 'Recommended', 'html' => 'Default is <code>10</code> minutes. The lock lifts automatically — no admin action needed.<br><br><ul><li><strong>10 min</strong> — default, enough to stop most automated attacks</li><li><strong>30–60 min</strong> — slows targeted attacks further, slight UX delay for legitimate forgotten-password users</li></ul>' ],
                     [ 'name' => 'Account enumeration', 'rec' => 'Critical',    'html' => '<p>By default, WordPress gives away whether a username exists. Try logging in with a made-up username and you see <em>"The username xyz is not registered on this site."</em> — try a real one and you see <em>"The password you entered is incorrect."</em> An attacker can automate this to build a full list of your site\'s usernames in minutes, then target those accounts with focused password attacks.</p><p>When this option is enabled, <strong>both errors return the same message: "Invalid username or password."</strong> The attacker learns nothing — a wrong username looks exactly like a wrong password. This is the same pattern used by banks and any serious web application.</p><p>There is no downside to enabling this. Legitimate users who forget their username can use the <em>Lost your password?</em> link to recover via their email address.</p>' ],
                 ] ); ?>
@@ -3000,11 +3004,7 @@ class CloudScale_DevTools {
                 <?php endif; ?>
                 <div style="margin-top:8px;font-size:12px;color:#64748b;line-height:1.6;">
                     <strong><?php esc_html_e( 'Account lock, not IP lock:', 'cloudscale-devtools' ); ?></strong>
-                    <?php esc_html_e( 'Lockout is per-username. Distributed attacks using many IPs against the same account are still caught.', 'cloudscale-devtools' ); ?><br>
-                    <strong><?php esc_html_e( 'Unlock via SSH:', 'cloudscale-devtools' ); ?></strong>
-                    <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;">wp transient delete csdt_devtools_bf_lock_$(php -r "echo md5(strtolower('USERNAME'));") --path=/var/www/html</code>
-                    <?php esc_html_e( 'or to unlock all:', 'cloudscale-devtools' ); ?>
-                    <code style="font-size:11px;background:#f1f5f9;padding:1px 5px;border-radius:3px;">wp eval 'global $wpdb; $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE \"%csdt_devtools_bf_lock%\"");' --path=/var/www/html</code>
+                    <?php esc_html_e( 'Lockout is per-username. Distributed attacks using many IPs against the same account are still caught.', 'cloudscale-devtools' ); ?>
                 </div>
 
                 <div id="cs-bf-log-wrap" class="cs-bf-log-wrap">
@@ -3432,10 +3432,11 @@ class CloudScale_DevTools {
                 <span>🧪 <?php esc_html_e( 'TEST ACCOUNT MANAGER', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'Persistent test users for Playwright / CI — bypasses 2FA via server-side cookies', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'test-accounts', 'Test Account Manager', [
-                    [ 'name' => 'How it works',          'rec' => 'Overview',    'html' => 'Create a persistent WordPress user for Playwright. Each test run calls the Session URL to get short-lived auth cookies — this happens server-side and never triggers wp-login.php or 2FA hooks. When the test run finishes, call the Logout URL to destroy the session.' ],
-                    [ 'name' => 'Session URL',           'rec' => 'Required',    'html' => '<code>POST {session_url}</code><br>Body: <code>{ "secret": "...", "role": "your_name", "ttl": 1200 }</code><br>Returns auth cookies to inject into Playwright context. TTL max is 3600 seconds.' ],
-                    [ 'name' => 'Logout URL',            'rec' => 'Recommended', 'html' => '<code>POST {logout_url}</code><br>Body: <code>{ "secret": "...", "role": "your_name" }</code> (or add <code>"session_token": "..."</code> to kill only that session). Call this in afterAll to clean up.' ],
-                    [ 'name' => 'Security',              'rec' => 'Info',        'html' => 'Both the URL path token (32 random chars) and the shared secret are required to obtain a session. After 5 bad secret attempts the API locks for 10 minutes and sends an ntfy alert. Never commit the secret to git.' ],
+                    [ 'name' => 'How it works',      'rec' => 'Overview',    'html' => 'Create a persistent WordPress user for Playwright. Each test run calls the Session URL to get short-lived auth cookies — this happens server-side and never triggers wp-login.php or 2FA hooks. When the test run finishes, call the Logout URL to destroy the session.' ],
+                    [ 'name' => 'Session URL',       'rec' => 'Required',    'html' => '<code>POST {session_url}</code><br>Body: <code>{ "secret": "...", "role": "your_name", "ttl": 1200 }</code><br>Returns auth cookies to inject into Playwright context. TTL max is 3600 seconds.' ],
+                    [ 'name' => 'Logout URL',        'rec' => 'Recommended', 'html' => '<code>POST {logout_url}</code><br>Body: <code>{ "secret": "...", "role": "your_name" }</code> (or add <code>"session_token": "..."</code> to kill only that session). Call this in afterAll to clean up.' ],
+                    [ 'name' => 'Security',          'rec' => 'Info',        'html' => 'Both the URL path token (32 random chars) and the shared secret are required to obtain a session. After 5 bad secret attempts the API locks for 10 minutes and sends an ntfy alert. Never commit the secret to git.' ],
+                    [ 'name' => 'Block Basic Auth',  'rec' => 'Recommended', 'html' => 'WordPress Application Passwords allow REST API authentication via HTTP Basic Auth (<code>Authorization: Basic base64(user:app_password)</code>). This completely bypasses 2FA — an attacker who steals an app password gets full REST API access with no second factor.<br><br>The <strong>Block Basic Auth</strong> toggle disables app passwords site-wide so no user can create or use one. Your test accounts are unaffected — they authenticate via server-side session cookies, not Basic Auth.<br><br>To roll back: uncheck the toggle. Nothing is deleted.' ],
                 ] ); ?>
             </div>
             <div class="cs-panel-body">
@@ -3505,6 +3506,61 @@ class CloudScale_DevTools {
                             </div>
                         </div>
                     </div>
+
+                    <!-- Block Basic Auth toggle -->
+                    <div class="cs-sec-row" style="margin-top:8px;">
+                        <span class="cs-sec-label"><?php esc_html_e( 'Block Basic Auth:', 'cloudscale-devtools' ); ?></span>
+                        <div class="cs-sec-control">
+                            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                                <label class="cs-toggle-label" style="margin:0;">
+                                    <input type="checkbox" id="cs-block-basic-auth-toggle" <?php checked( get_option( 'csdt_block_basic_auth', '0' ), '1' ); ?>>
+                                    <span class="cs-toggle-switch"></span>
+                                    <span class="cs-toggle-text"><?php esc_html_e( 'Disable REST API app passwords / Basic Auth for all users', 'cloudscale-devtools' ); ?></span>
+                                </label>
+                                <button type="button" id="cs-block-basic-auth-save" class="cs-btn-secondary cs-btn-sm"><?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?></button>
+                                <span id="cs-block-basic-auth-hint" style="font-size:12px;color:#6b7280;"></span>
+                            </div>
+                            <span class="cs-hint" style="margin-top:4px;"><?php esc_html_e( 'Session-based test auth is unaffected. Roll back by unchecking and saving.', 'cloudscale-devtools' ); ?></span>
+                        </div>
+                    </div>
+                    <script>
+                    (function() {
+                        var btn = document.getElementById('cs-block-basic-auth-save');
+                        if (!btn) { return; }
+                        btn.addEventListener('click', function() {
+                            var toggle  = document.getElementById('cs-block-basic-auth-toggle');
+                            var hint    = document.getElementById('cs-block-basic-auth-hint');
+                            var enabled = toggle && toggle.checked ? '1' : '0';
+                            var ajaxUrl = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
+                            var nonce   = (typeof csdtTestAccounts !== 'undefined' ? csdtTestAccounts.nonce : '<?php echo esc_js( wp_create_nonce( 'csdt_devtools_login_nonce' ) ); ?>');
+                            btn.disabled = true;
+                            btn.textContent = '...';
+                            var fd = new FormData();
+                            fd.append('action',  'csdt_toggle_block_basic_auth');
+                            fd.append('nonce',   nonce);
+                            fd.append('enabled', enabled);
+                            fetch(ajaxUrl, { method: 'POST', body: fd })
+                                .then(function(r) { return r.text().then(function(t) { return { status: r.status, txt: t }; }); })
+                                .then(function(res) {
+                                    btn.disabled = false;
+                                    btn.textContent = '<?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?>';
+                                    var resp = null;
+                                    try { resp = JSON.parse(res.txt); } catch(e) {}
+                                    if (resp && resp.success) {
+                                        if (hint) { hint.textContent = '✓ Saved'; hint.style.color = '#166534'; setTimeout(function(){ hint.textContent = ''; }, 2000); }
+                                    } else {
+                                        var msg = resp ? (resp.data || 'Unknown error') : 'Server error (HTTP ' + res.status + ')';
+                                        if (hint) { hint.textContent = '✗ ' + msg; hint.style.color = '#dc2626'; }
+                                    }
+                                })
+                                .catch(function(e) {
+                                    btn.disabled = false;
+                                    btn.textContent = '<?php esc_html_e( 'Save', 'cloudscale-devtools' ); ?>';
+                                    if (hint) { hint.textContent = '✗ ' + (e && e.message ? e.message : 'network error'); hint.style.color = '#dc2626'; }
+                                });
+                        });
+                    }());
+                    </script>
 
                     <hr class="cs-sec-divider" style="margin:8px 0;">
 
@@ -4222,15 +4278,21 @@ class CloudScale_DevTools {
                     <div id="csdt-uptime-setup-wrap">
                         <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:12px;">
                             <p style="margin:0 0 12px;font-weight:700;color:#0f172a;font-size:.9em;">Cloudflare credentials <span style="font-weight:400;color:#6b7280;">(<?php esc_html_e( 'required — API Token needs Workers:Edit and Workers KV Storage:Edit permissions', 'cloudscale-devtools' ); ?>)</span></p>
-                            <div style="display:flex;flex-direction:column;gap:8px;max-width:420px;">
-                                <input id="csdt-cf-zone-id" type="text" class="cs-input"
-                                       placeholder="<?php esc_attr_e( 'Cloudflare Zone ID', 'cloudscale-devtools' ); ?>"
-                                       value="<?php $z = get_option( 'csdt_devtools_cf_zone_id', '' ); echo esc_attr( $z ? str_repeat( '•', 16 ) . substr( $z, -4 ) : '' ); ?>"
-                                       autocomplete="off">
-                                <input id="csdt-cf-api-token" type="password" class="cs-input"
-                                       placeholder="<?php esc_attr_e( 'Cloudflare API Token', 'cloudscale-devtools' ); ?>"
-                                       value="<?php echo esc_attr( get_option( 'csdt_devtools_cf_api_token', '' ) ? str_repeat( '•', 20 ) : '' ); ?>"
-                                       autocomplete="new-password">
+                            <div style="display:flex;flex-direction:column;gap:10px;max-width:420px;">
+                                <div>
+                                    <label for="csdt-cf-zone-id" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Zone ID</label>
+                                    <input id="csdt-cf-zone-id" type="text" class="cs-input" style="width:100%;"
+                                           placeholder="<?php esc_attr_e( 'Cloudflare Zone ID', 'cloudscale-devtools' ); ?>"
+                                           value="<?php $z = get_option( 'csdt_devtools_cf_zone_id', '' ); echo esc_attr( $z ? str_repeat( '•', 16 ) . substr( $z, -4 ) : '' ); ?>"
+                                           autocomplete="off">
+                                </div>
+                                <div>
+                                    <label for="csdt-cf-api-token" style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">API Token</label>
+                                    <input id="csdt-cf-api-token" type="password" class="cs-input" style="width:100%;"
+                                           placeholder="<?php esc_attr_e( 'Cloudflare API Token', 'cloudscale-devtools' ); ?>"
+                                           value="<?php echo esc_attr( get_option( 'csdt_devtools_cf_api_token', '' ) ? str_repeat( '•', 20 ) : '' ); ?>"
+                                           autocomplete="new-password">
+                                </div>
                             </div>
                         </div>
                         <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;margin-bottom:16px;">
