@@ -557,6 +557,8 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
 
         // Build the list of methods this user actually has available.
         $available = self::login_2fa_available_methods( $user );
+        // Subset that the user has explicitly configured (vs email which is always a fallback).
+        $setup = self::login_2fa_setup_methods( $user );
 
         // If multiple methods are registered, show a picker rather than auto-routing.
         $initial_method = count( $available ) === 1 ? $available[0] : 'picker';
@@ -567,6 +569,7 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
             'user_id'   => $user->ID,
             'method'    => $initial_method,
             'available' => $available,
+            'setup'     => $setup,
             'created'   => time(),
             'remember'  => ! empty( $_POST['rememberme'] ), // phpcs:ignore WordPress.Security.NonceVerification.Missing
         ];
@@ -621,6 +624,7 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
         $user_id   = (int) $pending['user_id'];
         $method    = $pending['method'];
         $available = isset( $pending['available'] ) && is_array( $pending['available'] ) ? $pending['available'] : [ $method ];
+        $setup     = isset( $pending['setup'] )     && is_array( $pending['setup'] )     ? $pending['setup']     : $available;
         $error     = '';
 
         // ── Method picker ────────────────────────────────────────────────────
@@ -657,7 +661,7 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
                     exit;
                 }
             }
-            self::login_2fa_render_picker( $token, $available );
+            self::login_2fa_render_picker( $token, $available, $setup );
             exit;
         }
 
@@ -890,18 +894,40 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
     }
 
     /**
+     * Returns the subset of methods the user has explicitly configured.
+     * Used to show the "Setup" badge in the picker — passkey and TOTP are
+     * only here when actively registered; email only if explicitly enabled.
+     *
+     * @param  \WP_User $user
+     * @return string[]
+     */
+    private static function login_2fa_setup_methods( \WP_User $user ): array {
+        $setup = [];
+        if ( ! empty( CSDT_DevTools_Passkey::get_passkeys( $user->ID ) ) ) {
+            $setup[] = 'passkey';
+        }
+        if ( get_user_meta( $user->ID, 'csdt_devtools_totp_enabled', true ) === '1' ) {
+            $setup[] = 'totp';
+        }
+        if ( get_user_meta( $user->ID, 'csdt_devtools_2fa_email_enabled', true ) === '1' ) {
+            $setup[] = 'email';
+        }
+        return $setup;
+    }
+
+    /**
      * Renders the method-selection screen when a user has multiple 2FA options.
      *
      * @param  string   $token     2FA transient token.
      * @param  string[] $available Methods available for this user.
      * @return void
      */
-    private static function login_2fa_render_picker( string $token, array $available ): void {
+    private static function login_2fa_render_picker( string $token, array $available, array $setup = [] ): void {
         login_header( __( 'Two-Factor Authentication', 'cloudscale-devtools' ), '', null );
         $labels = [
-            'passkey' => [ 'icon' => '🔑', 'label' => __( 'Use a Passkey',             'cloudscale-devtools' ), 'hint' => __( 'Biometric or device PIN',        'cloudscale-devtools' ) ],
-            'totp'    => [ 'icon' => '📱', 'label' => __( 'Use Google Authenticator',   'cloudscale-devtools' ), 'hint' => __( 'Code from your authenticator app', 'cloudscale-devtools' ) ],
-            'email'   => [ 'icon' => '📧', 'label' => __( 'Send me an email code',      'cloudscale-devtools' ), 'hint' => __( 'One-time code sent to your email', 'cloudscale-devtools' ) ],
+            'passkey' => [ 'icon' => '🔑', 'label' => __( 'Use a Passkey',           'cloudscale-devtools' ), 'hint' => __( 'Biometric or device PIN',        'cloudscale-devtools' ) ],
+            'totp'    => [ 'icon' => '📱', 'label' => __( 'Google Authenticator',     'cloudscale-devtools' ), 'hint' => __( 'Code from your authenticator app', 'cloudscale-devtools' ) ],
+            'email'   => [ 'icon' => '📧', 'label' => __( 'Send me an email code',    'cloudscale-devtools' ), 'hint' => __( 'One-time code sent to your email', 'cloudscale-devtools' ) ],
         ];
         ?>
         <p style="text-align:center;font-size:48px;margin:0 0 8px">🔐</p>
@@ -910,7 +936,8 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
         </p>
         <?php foreach ( $available as $m ) :
             if ( ! isset( $labels[ $m ] ) ) continue;
-            $l = $labels[ $m ];
+            $l         = $labels[ $m ];
+            $is_setup  = in_array( $m, $setup, true );
         ?>
         <form method="post" action="" style="margin-bottom:10px">
             <input type="hidden" name="action"                       value="csdt_devtools_2fa">
@@ -922,8 +949,17 @@ h1{font-size:22px;font-weight:700;color:#f1f5f9;margin-bottom:8px;line-height:1.
                 font-size:13px;color:#1a2332;transition:background .15s;
             " onmouseover="this.style.background='#f0f4f8'" onmouseout="this.style.background='#fff'">
                 <span style="font-size:22px;line-height:1"><?php echo $l['icon']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped — emoji literal ?></span>
-                <span>
-                    <strong style="display:block"><?php echo esc_html( $l['label'] ); ?></strong>
+                <span style="flex:1">
+                    <span style="display:flex;align-items:center;gap:6px">
+                        <strong><?php echo esc_html( $l['label'] ); ?></strong>
+                        <?php if ( $is_setup ) : ?>
+                        <span style="
+                            font-size:10px;font-weight:600;letter-spacing:.04em;
+                            background:#dcfce7;color:#15803d;
+                            padding:1px 6px;border-radius:4px;line-height:1.6;
+                        "><?php esc_html_e( 'Setup', 'cloudscale-devtools' ); ?></span>
+                        <?php endif; ?>
+                    </span>
                     <span style="color:#6b7280;font-size:11px"><?php echo esc_html( $l['hint'] ); ?></span>
                 </span>
             </button>
