@@ -1965,63 +1965,11 @@ class CloudScale_DevTools {
         </div>
 
         <div class="cs-panel" id="cs-panel-debug">
-            <div class="cs-section-header" style="background:linear-gradient(90deg,#3b0764 0%,#6d28d9 100%);border-left:3px solid #a78bfa;">
-                <span>🧠 <?php esc_html_e( 'AI Debugging Assistant', 'cloudscale-devtools' ); ?></span>
-                <span class="cs-header-hint"><?php esc_html_e( 'Paste an error or load from your logs — AI identifies the root cause and gives step-by-step fixes', 'cloudscale-devtools' ); ?></span>
-                <?php self::render_explain_btn( 'ai-debug', 'AI Debugging Assistant', [
-                    [ 'name' => 'What it does',       'rec' => 'Info',        'html' => 'Sends your pasted error or log excerpt to an AI model (Anthropic Claude or Google Gemini). The AI identifies the root cause, explains why it happens, and gives you numbered fix steps — no Stack Overflow required.' ],
-                    [ 'name' => 'Load from log',      'rec' => 'Recommended', 'html' => 'Click <strong>PHP Errors</strong>, <strong>WP Debug</strong>, or <strong>Web Server</strong> to pull the most recent error lines from your server logs directly into the text area. Configure log paths under the Server Logs panel first if nothing loads.' ],
-                    [ 'name' => 'API key required',   'rec' => 'Critical',    'html' => 'You must add an Anthropic or Gemini API key under <strong>Security Scan → Settings</strong> before the Analyze button becomes active. Keys are stored encrypted in wp_options and never transmitted to third parties other than the chosen AI provider.' ],
-                    [ 'name' => 'Privacy',            'rec' => 'Info',        'html' => 'The text you submit is sent directly to the AI provider (Anthropic or Gemini). Do not paste passwords, API keys, or personally identifiable data into the text area. Error stack traces are generally safe.' ],
-                ] ); ?>
+            <div class="cs-section-header" style="background:linear-gradient(90deg,#1e3a5f 0%,#1d4ed8 100%);border-left:3px solid #60a5fa;">
+                <span>🔔 <?php esc_html_e( 'Error Monitoring', 'cloudscale-devtools' ); ?></span>
+                <span class="cs-header-hint"><?php esc_html_e( 'PHP error alerting and PHP-FPM saturation monitoring', 'cloudscale-devtools' ); ?></span>
             </div>
             <div style="padding:24px;">
-                <?php if ( ! $has_key ) : ?>
-                    <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:16px 20px;margin-bottom:24px;">
-                        <strong><?php esc_html_e( 'No AI key configured.', 'cloudscale-devtools' ); ?></strong>
-                        <?php
-                        printf(
-                            wp_kses(
-                                /* translators: %s: link to security scan settings */
-                                __( 'Add an Anthropic or Gemini API key under <a href="%s">Security Scan → Settings</a> to enable analysis.', 'cloudscale-devtools' ),
-                                [ 'a' => [ 'href' => [] ] ]
-                            ),
-                            esc_url( $key_url )
-                        );
-                        ?>
-                    </div>
-                <?php endif; ?>
-
-                <div style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 60%,#e0e7ff 100%);border-radius:10px;padding:24px 28px;margin-bottom:28px;color:#1e3a5f;border:1px solid #bfdbfe;">
-                    <p style="margin:0 0 10px;font-size:1.1em;font-weight:700;color:#4f46e5;"><?php esc_html_e( 'Your site broke. Find out why in seconds.', 'cloudscale-devtools' ); ?></p>
-                    <p style="margin:0;opacity:.85;font-size:.95em;line-height:1.6;"><?php esc_html_e( 'Paste a PHP error, stack trace, or problem description. Or click Load Errors to pull recent error lines directly from your server logs. The AI identifies the exact root cause, explains the mechanism, and gives you numbered steps to fix it — no Stack Overflow required.', 'cloudscale-devtools' ); ?></p>
-                </div>
-
-                <div style="margin-bottom:16px;display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
-                    <span style="font-size:.8em;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.07em;"><?php esc_html_e( 'Load from log:', 'cloudscale-devtools' ); ?></span>
-                    <button type="button" class="cs-debug-load-btn cs-btn-sm" data-source="php_error"><?php esc_html_e( 'PHP Errors', 'cloudscale-devtools' ); ?></button>
-                    <button type="button" class="cs-debug-load-btn cs-btn-sm" data-source="wp_debug"><?php esc_html_e( 'WP Debug', 'cloudscale-devtools' ); ?></button>
-                    <button type="button" class="cs-debug-load-btn cs-btn-sm" data-source="web_error"><?php esc_html_e( 'Web Server', 'cloudscale-devtools' ); ?></button>
-                    <span id="csdt-debug-load-status" style="font-size:.85em;color:#94a3b8;"></span>
-                </div>
-
-                <div id="csdt-debug-log-lines" style="display:none;margin-bottom:16px;max-height:220px;overflow-y:auto;border:1px solid #d1d5db;border-radius:6px;background:#f8fafc;"></div>
-
-                <div style="margin-bottom:16px;">
-                    <textarea id="csdt-debug-input" rows="7" style="width:100%;box-sizing:border-box;background:#f8fafc;color:#1e293b;border:1px solid #d1d5db;border-radius:6px;padding:12px;font-family:monospace;font-size:.85em;resize:vertical;" placeholder="<?php esc_attr_e( 'Paste an error message, stack trace, wp-cron failure, SMTP error, JavaScript console error, or describe what is broken...', 'cloudscale-devtools' ); ?>"></textarea>
-                </div>
-
-                <div style="margin-bottom:24px;display:flex;align-items:center;gap:12px;">
-                    <button type="button" id="csdt-debug-analyze" class="cs-btn-primary"<?php echo $has_key ? '' : ' disabled'; ?>>
-                        🧠 <?php esc_html_e( 'Analyze with AI', 'cloudscale-devtools' ); ?>
-                    </button>
-                    <span id="csdt-debug-analyze-status" style="font-size:.85em;color:#94a3b8;"></span>
-                </div>
-
-                <div id="csdt-debug-result" style="display:none;"></div>
-
-                <hr style="border:none;border-top:1px solid #e2e8f0;margin:28px 0;">
-
                 <!-- PHP Error Alerting settings -->
                 <?php
                 $mon_enabled   = get_option( 'csdt_php_error_monitor_enabled', '1' ) === '1';
