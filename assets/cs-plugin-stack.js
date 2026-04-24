@@ -441,16 +441,24 @@
         // Response-time chart (raw — last 60 pings, show once enough data exists)
         var raw = d.raw || [];
         if (raw.length >= 5) {
-            var recent = raw.slice(-60);
-            var maxMs  = Math.max.apply(null, recent.map(function(r){ return r.ms; })) || 1;
+            var recent   = raw.slice(-60);
+            var maxMs    = Math.max.apply(null, recent.map(function(r){ return r.ms; })) || 1;
+            var fmtMs    = function(v){ return v >= 1000 ? (v/1000).toFixed(1)+'s' : v+'ms'; };
+            var midMs    = Math.round(maxMs / 2);
             html += '<p style="font-size:.82em;font-weight:700;color:#374151;margin:0 0 6px;">Response time — last ' + recent.length + ' pings</p>';
-            html += '<div style="display:flex;align-items:flex-end;gap:1px;height:48px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:4px 6px;overflow:hidden;">';
+            html += '<div style="display:flex;align-items:flex-start;gap:4px;">';
+            html += '<div style="height:56px;display:flex;flex-direction:column;justify-content:space-between;padding:4px 0;font-size:10px;color:#9ca3af;text-align:right;line-height:1;min-width:34px;flex-shrink:0;">'
+                  + '<span>' + fmtMs(maxMs) + '</span>'
+                  + '<span>' + fmtMs(midMs) + '</span>'
+                  + '<span>0</span>'
+                  + '</div>';
+            html += '<div style="flex:1;display:flex;align-items:flex-end;gap:1px;height:56px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:4px 6px;overflow:hidden;">';
             recent.forEach(function (r) {
-                var h   = Math.max(4, Math.round((r.ms / maxMs) * 40));
+                var h   = Math.max(2, Math.round((r.ms / maxMs) * 48));
                 var col = r.up ? '#34d399' : '#f87171';
                 html += '<div style="width:6px;flex-shrink:0;height:' + h + 'px;background:' + col + ';border-radius:1px;" title="' + (r.up ? 'UP' : 'DOWN') + ' ' + r.ms + 'ms"></div>';
             });
-            html += '</div>';
+            html += '</div></div>';
             html += '<p style="font-size:.75em;color:#9ca3af;margin:4px 0 0;">Green = up · Red = down · Height = response time</p>';
         } else if (raw.length > 0) {
             html += '<p style="font-size:.78em;color:#9ca3af;margin:0;">Chart appears after 5 pings (' + (5 - raw.length) + ' more needed).</p>';
