@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.450
+ * Version: 1.9.454
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.450';
+    const VERSION      = '1.9.454';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -4206,7 +4206,7 @@ class CloudScale_DevTools {
                 <span>⏱ <?php esc_html_e( 'Uptime Monitor', 'cloudscale-devtools' ); ?></span>
                 <span class="cs-header-hint"><?php esc_html_e( 'WordPress pushes a heartbeat to a Cloudflare Worker every 3 minutes. No heartbeat for 8 minutes = site down alert.', 'cloudscale-devtools' ); ?></span>
                 <?php self::render_explain_btn( 'uptime-monitor', 'Uptime Monitor', [
-                    [ 'name' => 'Setup — step by step', 'rec' => 'Required',    'html' => '<ol style="margin:0;padding-left:1.4em;line-height:1.8;"><li><strong>Cloudflare credentials</strong> — Enter your Cloudflare Zone ID and an API Token with <code>Workers:Edit</code> and <code>Workers KV Storage:Edit</code> permissions, then click <em>Save Settings</em>.</li><li><strong>ntfy.sh Alert URL</strong> (optional) — Enter your ntfy.sh topic URL to receive push notifications when the site goes down or recovers.</li><li><strong>Deploy Worker</strong> — Click <em>Deploy Worker to Cloudflare</em>. This creates a KV namespace, uploads the Worker, and schedules the <code>* * * * *</code> cron trigger.</li><li><strong>Host cron</strong> — Run <code>deploy-cf-worker.sh</code> on your server to install a host cron that hits WordPress via localhost every minute (bypasses Cloudflare cache). The cron line is also shown in the Host cron section below.</li><li><strong>Test</strong> — Click <em>Test Endpoint</em> to send a heartbeat to the Worker immediately and confirm the connection.</li></ol>' ],
+                    [ 'name' => 'Setup — step by step', 'rec' => 'Required',    'html' => '<ol style="margin:0;padding-left:1.4em;line-height:1.8;"><li><strong>Cloudflare credentials</strong> — Enter your Cloudflare Zone ID and an API Token with <code>Workers:Edit</code> and <code>Workers KV Storage:Edit</code> permissions, then click <em>Save Settings</em>.</li><li><strong>ntfy.sh Alert URL</strong> (optional) — Enter your ntfy.sh topic URL to receive push notifications when the site goes down or recovers.</li><li><strong>Deploy Worker</strong> — Click <em>Deploy Worker to Cloudflare</em>. This creates a KV namespace, uploads the Worker, and schedules the <code>* * * * *</code> cron trigger.</li><li><strong>Host cron</strong> — Run <code>deploy-cf-worker.sh</code> on your server to install a host cron that triggers WP-Cron locally (bypasses Cloudflare cache). WP-Cron pushes a heartbeat to the Worker every 3 minutes. The cron line is shown in the Host cron section below.</li><li><strong>Test</strong> — Click <em>Test Endpoint</em> to send a heartbeat to the Worker immediately and confirm the connection.</li></ol>' ],
                     [ 'name' => 'How it works',          'rec' => 'Overview',    'html' => 'A Pi host cron hits <code>http://127.0.0.1:PORT/wp-cron.php</code> (localhost, bypasses Cloudflare cache) every minute. PHP-FPM processes the request, WP-Cron runs, and WordPress pushes a small heartbeat POST to the Cloudflare Worker every 3 minutes. The Worker stores the timestamp in CF KV and its own cron checks every minute: no heartbeat for 8+ minutes = site down, ntfy fires. Recovery alert is sent when heartbeats resume. Localhost is required because Cloudflare caches the public wp-cron.php URL and returns a cached 200 without PHP ever executing.' ],
                     [ 'name' => 'Down vs recovery',      'rec' => 'Overview',    'html' => 'Down alerts fire after ~8 minutes of missed heartbeats. Repeat alerts are throttled to once every 30 minutes while the site remains down. Recovery fires as soon as one heartbeat arrives after a down period, with the total outage duration included in the message.' ],
                     [ 'name' => 'Test Alert (pause 5 min)', 'rec' => 'Testing',  'html' => 'Click <em>Test Alert (pause 5 min)</em> to pause heartbeats for 5 minutes. After about 8 minutes of silence the Cloudflare Worker will treat the site as down and fire your ntfy down alert. When the 5-minute pause ends, heartbeats resume automatically and you should receive a recovery alert. A live countdown is shown while paused. Click <em>Cancel Pause</em> at any time to resume heartbeats immediately (you will still get a recovery alert once the next heartbeat is sent).' ],
@@ -4225,7 +4225,8 @@ class CloudScale_DevTools {
                             <div style="display:flex;flex-direction:column;gap:8px;max-width:420px;">
                                 <input id="csdt-cf-zone-id" type="text" class="cs-input"
                                        placeholder="<?php esc_attr_e( 'Cloudflare Zone ID', 'cloudscale-devtools' ); ?>"
-                                       value="<?php echo esc_attr( get_option( 'csdt_devtools_cf_zone_id', '' ) ); ?>">
+                                       value="<?php $z = get_option( 'csdt_devtools_cf_zone_id', '' ); echo esc_attr( $z ? str_repeat( '•', 16 ) . substr( $z, -4 ) : '' ); ?>"
+                                       autocomplete="off">
                                 <input id="csdt-cf-api-token" type="password" class="cs-input"
                                        placeholder="<?php esc_attr_e( 'Cloudflare API Token', 'cloudscale-devtools' ); ?>"
                                        value="<?php echo esc_attr( get_option( 'csdt_devtools_cf_api_token', '' ) ? str_repeat( '•', 20 ) : '' ); ?>"
