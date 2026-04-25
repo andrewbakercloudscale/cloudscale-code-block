@@ -4,7 +4,7 @@ Tags: security, code block, syntax highlighting, AI security scan, WordPress har
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.9.506
+Stable tag: 1.9.507
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,7 +85,7 @@ highlight.js with auto-detection — 190+ languages including Bash, Python, Java
 
 == Changelog ==
 
-= 1.9.506 =
+= 1.9.507 =
 * fix: CSP nonce-mode now includes the nonce in style-src so CDN stylesheets (e.g. highlight.js themes) are allowed by the browser; previously syntax highlighting colours were missing on sites with the CSP nonce setting enabled
 
 = 1.9.501 =

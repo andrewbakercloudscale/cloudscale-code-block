@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.507] - 2026-04-25
+
+### Fixed
+- CS Monitor: help panel (`?` button) no longer auto-opens on iOS Safari — panel is explicitly force-hidden on every page load; a 600ms guard on the click handler blocks ghost taps that fire at page-load coordinates before the user has intentionally interacted
+
 ## [1.9.506] - 2026-04-25
 
 ### Fixed

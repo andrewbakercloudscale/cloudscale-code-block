@@ -157,10 +157,9 @@
 
         if (!panel) return;
 
-        // Move the help panel to document.body so it's outside the fixed panel
-        // hierarchy — avoids iOS Safari touch-blocking and overflow:hidden clipping.
+        // Move help panel to body to avoid iOS overflow:hidden clipping; force-hide on every load.
         var helpPanel = document.getElementById('cs-perf-help');
-        if (helpPanel) document.body.appendChild(helpPanel);
+        if (helpPanel) { helpPanel.style.display = 'none'; document.body.appendChild(helpPanel); }
 
         computeN1Patterns();
         computeIssues();
@@ -3153,8 +3152,6 @@
     function bindEvents() {
         document.getElementById('cs-perf-header').addEventListener('click', function (e) {
             if (toggleBtn.contains(e.target) || (exportBtn && exportBtn.contains(e.target))) return;
-            var helpBtn = document.getElementById('cs-perf-help-btn');
-            if (helpBtn && helpBtn.contains(e.target)) return;
             togglePanel();
         });
         toggleBtn.addEventListener('click', function (e) { e.stopPropagation(); togglePanel(); });
@@ -3200,11 +3197,13 @@
         if (copyBtn) copyBtn.addEventListener('click', function (e) { e.stopPropagation(); copyCurrentTab(); });
 
         var helpBtn   = document.getElementById('cs-perf-help-btn');
-        var helpPanel = document.getElementById('cs-perf-help');
         var helpClose = document.getElementById('cs-perf-help-close');
+        // Ignore clicks within 600ms of page load — guards against iOS Safari ghost taps.
+        var helpReady = Date.now() + 600;
         if (helpBtn && helpPanel) {
             helpBtn.addEventListener('click', function (e) {
                 e.stopPropagation();
+                if (Date.now() < helpReady) return;
                 helpPanel.style.display = helpPanel.style.display === 'none' ? '' : 'none';
             });
             if (helpClose) helpClose.addEventListener('click', function (e) {
@@ -3321,10 +3320,8 @@
                 e.preventDefault(); togglePanel();
             }
             if (e.key === 'Escape') {
-                // Close help panel first if open
-                var helpPanelEl = document.getElementById('cs-perf-help');
-                if (helpPanelEl && helpPanelEl.style.display !== 'none') {
-                    helpPanelEl.style.display = 'none';
+                if (helpPanel && helpPanel.style.display !== 'none') {
+                    helpPanel.style.display = 'none';
                     return;
                 }
                 // Collapse any open EXPLAIN result divs and detail rows
