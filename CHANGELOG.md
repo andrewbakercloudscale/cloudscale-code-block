@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.9.511] - 2026-04-25
+
+### Added
+- CS Monitor: JS error handler now replaces bare `Script error.` with an explanatory hint pointing to DevTools console and the `crossorigin="anonymous"` fix — makes cross-origin errors self-diagnosable without leaving the admin panel
+
+## [1.9.510] - 2026-04-25
+
+### Fixed
+- Code Block: `crossorigin="anonymous"` added to the highlight.js CDN `<script>` tag so `window.onerror` receives full error details (filename, line, column) from cross-origin scripts instead of a masked `Script error.`
+
 ## [1.9.509] - 2026-04-25
 
 ### Fixed
