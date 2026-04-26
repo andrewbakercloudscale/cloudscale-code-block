@@ -724,24 +724,27 @@ class CSDT_Thumbnails {
         update_post_meta( $post_id, '_csdt_social_formats_thumb_id', $thumb_id );
         update_post_meta( $post_id, '_csdt_social_formats_gen_time', time() );
 
+        // Purge Cloudflare cache for the post URL so crawlers get fresh og:image.
+        $post_url = get_permalink( $post_id );
+        if ( $post_url ) {
+            self::cf_purge_urls( [ $post_url ] );
+        }
+
         // Store for admin notice on next page load.
         $user_id = get_current_user_id();
         set_transient( "cs_sfmt_{$user_id}_{$post_id}", $results, 120 );
     }
 
-    // ─── Hook: Cloudflare cache purge on post publish/update ────────────
-    public static function on_post_status_change( string $new_status, string $old_status, \WP_Post $post ): void {
-        if ( $new_status !== 'publish' ) return;
-        if ( ! in_array( $post->post_type, [ 'post', 'page' ], true ) ) return;
+    // ─── Shared: purge one or more URLs from Cloudflare cache ───────────
 
+    private static function cf_purge_urls( array $urls ): bool {
         $zone_id = (string) get_option( 'csdt_devtools_cf_zone_id', '' );
-        if ( ! $zone_id ) return;
+        if ( ! $zone_id || empty( $urls ) ) return false;
 
-        // Prefer scoped API Token (Bearer); fall back to Global API Key (email+key).
         $token    = (string) get_option( 'csdt_devtools_cf_api_token', '' );
         $cf_key   = (string) get_option( 'cloudflare_api_key', '' );
         $cf_email = (string) get_option( 'cloudflare_api_email', '' );
-        if ( ! $token && ( ! $cf_key || ! $cf_email ) ) return;
+        if ( ! $token && ( ! $cf_key || ! $cf_email ) ) return false;
 
         $headers = [ 'Content-Type' => 'application/json' ];
         if ( $token ) {
@@ -751,15 +754,25 @@ class CSDT_Thumbnails {
             $headers['X-Auth-Email'] = $cf_email;
         }
 
-        $urls = array_values( array_filter( [ get_permalink( $post->ID ), home_url( '/' ) ] ) );
-        wp_remote_post(
+        $response = wp_remote_post(
             "https://api.cloudflare.com/client/v4/zones/{$zone_id}/purge_cache",
             [
                 'timeout' => 8,
                 'headers' => $headers,
-                'body'    => wp_json_encode( [ 'files' => $urls ] ),
+                'body'    => wp_json_encode( [ 'files' => array_values( $urls ) ] ),
             ]
         );
+
+        if ( is_wp_error( $response ) ) return false;
+        $data = json_decode( wp_remote_retrieve_body( $response ), true );
+        return ! empty( $data['success'] );
+    }
+
+    // ─── Hook: Cloudflare cache purge on post publish/update ────────────
+    public static function on_post_status_change( string $new_status, string $old_status, \WP_Post $post ): void {
+        if ( $new_status !== 'publish' ) return;
+        if ( ! in_array( $post->post_type, [ 'post', 'page' ], true ) ) return;
+        self::cf_purge_urls( array_filter( [ get_permalink( $post->ID ), home_url( '/' ) ] ) );
     }
 
     // ─── Admin notice: shown after auto-generation ───────────────────────
@@ -818,7 +831,12 @@ class CSDT_Thumbnails {
         }
         // Mark as up-to-date so the save hook won't re-run for this thumbnail.
         update_post_meta( $post_id, '_csdt_social_formats_thumb_id', (int) get_post_thumbnail_id( $post_id ) );
-        wp_send_json_success( $results );
+
+        // Purge Cloudflare cache so WhatsApp/social crawlers get the fresh og:image immediately.
+        $post_url  = get_permalink( $post_id );
+        $cf_purged = $post_url ? self::cf_purge_urls( [ $post_url ] ) : false;
+
+        wp_send_json_success( array_merge( $results, [ 'cf_purged' => $cf_purged ] ) );
     }
 
     // ─── AJAX: diagnose social formats for a post ────────────────────────
