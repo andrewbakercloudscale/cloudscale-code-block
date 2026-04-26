@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.537
+ * Version: 1.9.539
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -1262,6 +1262,15 @@ class CloudScale_DevTools {
         wp_localize_script( 'csdt-sql-editor', 'csdtDevtoolsSqlEditor', [
             'nonce' => wp_create_nonce( CloudScale_DevTools::SQL_NONCE ),
         ] );
+
+        // Tab router — client-side switching without full page reloads
+        wp_enqueue_script(
+            'csdt-tab-router',
+            plugins_url( 'assets/cs-tab-router.js', __FILE__ ),
+            [],
+            self::VERSION,
+            true
+        );
 
         // Login security JS (only loaded on the login tab)
         $active_tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'home'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
