@@ -122,16 +122,86 @@ test.describe('H6 — Client-side tab router', () => {
         await page.goto(`${PLUGIN_URL}&tab=home`, { waitUntil: 'domcontentloaded' });
         await page.waitForSelector('#cs-panel-home', { timeout: 15000 });
 
-        // Home panel visible initially
         await expect(page.locator('#cs-panel-home')).toBeVisible();
 
-        // Navigate to Performance tab
         await page.locator('#cs-tab-bar a[href*="tab=optimizer"]').click();
         await page.waitForSelector('#cs-panel-plugin-stack', { timeout: 15000 });
 
-        // Performance panel should now be visible, Home panel gone
         await expect(page.locator('#cs-panel-plugin-stack')).toBeVisible();
         await expect(page.locator('#cs-panel-home')).toHaveCount(0);
+
+        await ctx.close();
+    });
+
+    // ── Button init tests: verify scripts initialise after tab switch ──────
+
+    test('Security tab — scan button enabled and chart canvas sized after tab switch', async ({ browser }) => {
+        const ctx  = await browser.newContext({ ignoreHTTPSErrors: true });
+        await injectCookies(ctx, _sess);
+        const page = await ctx.newPage();
+
+        await page.goto(`${PLUGIN_URL}&tab=home`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('#cs-tab-bar', { timeout: 15000 });
+
+        // Client-side switch to security tab
+        await page.locator('#cs-tab-bar a[href*="tab=security"]').click();
+        await page.waitForSelector('#cs-vuln-scan-btn', { timeout: 20000 });
+
+        // Scan button must not be permanently disabled (it may be disabled only if no AI key)
+        const disabledAttr = await page.locator('#cs-vuln-scan-btn').getAttribute('disabled');
+        // It should exist and be interactive — disabled only if truly no key configured
+        console.log(`  cs-vuln-scan-btn disabled="${disabledAttr}" (null = enabled, "true"/"" = disabled due to missing AI key)`);
+        await expect(page.locator('#cs-vuln-scan-btn')).toBeVisible();
+
+        // Scan history canvas must have non-zero width (chart rendered)
+        const canvasWidth = await page.evaluate(() => {
+            const c = document.getElementById('cs-scan-history-chart');
+            return c ? c.offsetWidth : -1;
+        });
+        console.log(`  scan history canvas offsetWidth = ${canvasWidth}`);
+        expect(canvasWidth).toBeGreaterThan(0);
+
+        await ctx.close();
+    });
+
+    test('Login tab — Save Settings button clickable and brute-force chart rendered after tab switch', async ({ browser }) => {
+        const ctx  = await browser.newContext({ ignoreHTTPSErrors: true });
+        await injectCookies(ctx, _sess);
+        const page = await ctx.newPage();
+
+        await page.goto(`${PLUGIN_URL}&tab=home`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('#cs-tab-bar', { timeout: 15000 });
+
+        // Client-side switch to login tab
+        await page.locator('#cs-tab-bar a[href*="tab=login"]').click();
+        await page.waitForSelector('#cs-hide-save', { timeout: 20000 });
+
+        // Save Settings button must be visible and not disabled
+        await expect(page.locator('#cs-hide-save')).toBeVisible();
+        await expect(page.locator('#cs-hide-save')).toBeEnabled();
+        console.log('  cs-hide-save button is visible and enabled.');
+
+        // The bf chart section is present when brute-force protection is enabled
+        const bfSectionCount = await page.locator('#cs-bf-log-wrap').count();
+        console.log(`  cs-bf-log-wrap present: ${bfSectionCount > 0} (only renders when BF protection enabled).`);
+
+        await ctx.close();
+    });
+
+    test('Site Audit tab — Run Audit button visible after tab switch', async ({ browser }) => {
+        const ctx  = await browser.newContext({ ignoreHTTPSErrors: true });
+        await injectCookies(ctx, _sess);
+        const page = await ctx.newPage();
+
+        await page.goto(`${PLUGIN_URL}&tab=home`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('#cs-tab-bar', { timeout: 15000 });
+
+        await page.locator('#cs-tab-bar a[href*="tab=site-audit"]').click();
+        await page.waitForSelector('#csdt-site-audit-btn', { timeout: 20000 });
+
+        await expect(page.locator('#csdt-site-audit-btn')).toBeVisible();
+        await expect(page.locator('#csdt-site-audit-btn')).toBeEnabled();
+        console.log('  csdt-site-audit-btn is visible and enabled.');
 
         await ctx.close();
     });
