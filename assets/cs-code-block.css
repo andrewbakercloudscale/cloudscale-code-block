@@ -315,14 +315,14 @@
     line-height: 1.6;
 }
 
-/* Comment tokens — hljs theme default is too dark on the dark background */
+/* Comment tokens — boosted for legibility on the dark background (~7:1 contrast) */
 .cs-code-wrapper .hljs-comment,
 .cs-code-wrapper .hljs-quote {
-    color: #6a9955 !important;
+    color: #a0c690 !important;
     font-style: italic;
 }
 
 .cs-code-wrapper[data-active-theme="light"] .hljs-comment,
 .cs-code-wrapper[data-active-theme="light"] .hljs-quote {
-    color: #5a7a3a !important;
+    color: #4a7a34 !important;
 }

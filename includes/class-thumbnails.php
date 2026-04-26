@@ -39,6 +39,7 @@ class CSDT_Thumbnails {
     public static function render_thumbnails_panel(): void {
         $cf_zone  = get_option( 'csdt_devtools_cf_zone_id', '' );
         $cf_token = get_option( 'csdt_devtools_cf_api_token', '' );
+        $cf_zone_masked  = $cf_zone  ? str_repeat( '•', 28 ) . substr( $cf_zone,  -4 ) : '';
         $cf_token_masked = $cf_token ? str_repeat( '•', 12 ) . substr( $cf_token, -4 ) : '';
         ?>
         <div class="cs-panel" id="cs-panel-thumbs-checker">
@@ -172,13 +173,23 @@ class CSDT_Thumbnails {
                     <div class="cs-field-row" style="flex-wrap:wrap;gap:12px">
                         <div class="cs-field" style="min-width:240px">
                             <label class="cs-label" for="cs-cf-zone-id"><?php esc_html_e( 'Zone ID', 'cloudscale-devtools' ); ?></label>
-                            <input type="text" id="cs-cf-zone-id" class="cs-input" value="<?php echo esc_attr( $cf_zone ); ?>"
-                                   placeholder="<?php esc_attr_e( '32-character hex string', 'cloudscale-devtools' ); ?>">
+                            <div style="display:flex;gap:6px;align-items:center">
+                                <input type="text" id="cs-cf-zone-id" class="cs-input"
+                                       value="<?php echo esc_attr( $cf_zone_masked ?: '' ); ?>"
+                                       data-real="<?php echo esc_attr( $cf_zone ); ?>"
+                                       data-masked="<?php echo $cf_zone ? '1' : '0'; ?>"
+                                       <?php if ( $cf_zone ) : ?>readonly<?php endif; ?>
+                                       placeholder="<?php esc_attr_e( '32-character hex string', 'cloudscale-devtools' ); ?>">
+                                <button type="button" id="cs-cf-zone-eye" title="<?php esc_attr_e( 'Show / hide Zone ID', 'cloudscale-devtools' ); ?>" style="flex-shrink:0;background:none;border:1px solid #ccc;border-radius:4px;padding:5px 9px;cursor:pointer;font-size:13px;line-height:1">&#x1F441;</button>
+                            </div>
                         </div>
                         <div class="cs-field" style="min-width:280px">
                             <label class="cs-label" for="cs-cf-api-token"><?php esc_html_e( 'API Token (Cache Purge permission)', 'cloudscale-devtools' ); ?></label>
-                            <input type="password" id="cs-cf-api-token" class="cs-input" value=""
-                                   placeholder="<?php echo esc_attr( $cf_token_masked ?: __( 'Paste token here', 'cloudscale-devtools' ) ); ?>">
+                            <div style="display:flex;gap:6px;align-items:center">
+                                <input type="password" id="cs-cf-api-token" class="cs-input" value=""
+                                       placeholder="<?php echo esc_attr( $cf_token_masked ?: __( 'Paste token here', 'cloudscale-devtools' ) ); ?>">
+                                <button type="button" id="cs-cf-token-eye" title="<?php esc_attr_e( 'Show / hide token', 'cloudscale-devtools' ); ?>" style="flex-shrink:0;background:none;border:1px solid #ccc;border-radius:4px;padding:5px 9px;cursor:pointer;font-size:13px;line-height:1">&#x1F441;</button>
+                            </div>
                             <span class="cs-hint"><?php esc_html_e( 'Leave blank to keep the saved token. Clear and save to remove.', 'cloudscale-devtools' ); ?></span>
                         </div>
                     </div>

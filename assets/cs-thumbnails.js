@@ -782,12 +782,44 @@
     const cfZoneId      = document.getElementById( 'cs-cf-zone-id' );
     const cfApiToken    = document.getElementById( 'cs-cf-api-token' );
     const cfSaved       = document.getElementById( 'cs-cf-saved' );
+    const cfZoneEye     = document.getElementById( 'cs-cf-zone-eye' );
+    const cfTokenEye    = document.getElementById( 'cs-cf-token-eye' );
+
+    if ( cfZoneEye && cfZoneId ) {
+        cfZoneEye.addEventListener( 'click', () => {
+            if ( cfZoneId.dataset.masked === '1' ) {
+                cfZoneId.value          = cfZoneId.dataset.real || '';
+                cfZoneId.dataset.masked = '0';
+                cfZoneId.removeAttribute( 'readonly' );
+                cfZoneEye.textContent   = '🙈'; // 🙈
+            } else {
+                const real = cfZoneId.dataset.real || cfZoneId.value.trim();
+                cfZoneId.dataset.real   = real;
+                cfZoneId.value          = real ? '•'.repeat( 28 ) + real.slice( -4 ) : '';
+                cfZoneId.dataset.masked = '1';
+                cfZoneId.setAttribute( 'readonly', '' );
+                cfZoneEye.textContent   = '👁'; // 👁
+            }
+        } );
+    }
+
+    if ( cfTokenEye && cfApiToken ) {
+        cfTokenEye.addEventListener( 'click', () => {
+            const isHidden        = cfApiToken.type === 'password';
+            cfApiToken.type       = isHidden ? 'text' : 'password';
+            cfTokenEye.textContent = isHidden ? '🙈' : '👁'; // 🙈 / 👁
+        } );
+    }
 
     if ( cfSaveBtn ) {
         cfSaveBtn.addEventListener( 'click', () => {
             cfSaveBtn.disabled = true;
+            // If zone ID is masked, send the stored real value; otherwise send what the user typed.
+            const zoneVal = cfZoneId?.dataset.masked === '1'
+                ? ( cfZoneId.dataset.real || '' )
+                : ( cfZoneId?.value.trim() || '' );
             post( 'csdt_devtools_cf_save', {
-                zone_id:   cfZoneId?.value.trim() || '',
+                zone_id:   zoneVal,
                 api_token: cfApiToken?.value || '',
             } ).then( res => {
                 cfSaveBtn.disabled = false;
