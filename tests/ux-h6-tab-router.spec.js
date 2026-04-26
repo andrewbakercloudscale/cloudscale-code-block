@@ -205,4 +205,49 @@ test.describe('H6 — Client-side tab router', () => {
 
         await ctx.close();
     });
+
+    test('Security tab — Scan Headers Now button has click listener after tab switch', async ({ browser }) => {
+        const ctx  = await browser.newContext({ ignoreHTTPSErrors: true });
+        await injectCookies(ctx, _sess);
+        const page = await ctx.newPage();
+
+        await page.goto(`${PLUGIN_URL}&tab=home`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('#cs-tab-bar', { timeout: 15000 });
+
+        // Switch to security tab from home
+        await page.locator('#cs-tab-bar a[href*="tab=security"]').click();
+        await page.waitForSelector('#cs-csp-scan-btn', { timeout: 20000 });
+
+        await expect(page.locator('#cs-csp-scan-btn')).toBeVisible();
+        await expect(page.locator('#cs-csp-scan-btn')).toBeEnabled();
+
+        // Click it — button should disable (proving the listener fired)
+        await page.locator('#cs-csp-scan-btn').click();
+        await expect(page.locator('#cs-csp-scan-btn')).toBeDisabled({ timeout: 3000 });
+        console.log('  cs-csp-scan-btn fired (became disabled after click).');
+
+        await ctx.close();
+    });
+
+    test('Security tab — CSP Save button and sec-headers Save button enabled after tab switch', async ({ browser }) => {
+        const ctx  = await browser.newContext({ ignoreHTTPSErrors: true });
+        await injectCookies(ctx, _sess);
+        const page = await ctx.newPage();
+
+        await page.goto(`${PLUGIN_URL}&tab=home`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('#cs-tab-bar', { timeout: 15000 });
+
+        await page.locator('#cs-tab-bar a[href*="tab=security"]').click();
+        await page.waitForSelector('#cs-csp-save-btn', { timeout: 20000 });
+
+        await expect(page.locator('#cs-csp-save-btn')).toBeVisible();
+        await expect(page.locator('#cs-csp-save-btn')).toBeEnabled();
+        console.log('  cs-csp-save-btn is visible and enabled.');
+
+        await expect(page.locator('#csdt-sec-headers-save')).toBeVisible();
+        await expect(page.locator('#csdt-sec-headers-save')).toBeEnabled();
+        console.log('  csdt-sec-headers-save is visible and enabled.');
+
+        await ctx.close();
+    });
 });
