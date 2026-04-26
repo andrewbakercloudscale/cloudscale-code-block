@@ -240,23 +240,27 @@ class CSDT_Site_Audit {
                 'fix_label' => 'Close Comments',
             ],
             [
-                'id'        => 'wpconfig_perms',
-                'title'     => 'wp-config.php is writable by the web server process',
-                'detail'    => 'wp-config.php should be read-only (0400 or 0440) so no PHP process running as the web server user can overwrite database credentials or secret keys.',
-                'fixed'     => ( function () {
+                'id'          => 'wpconfig_perms',
+                'title'       => 'wp-config.php is writable by the web server process',
+                'detail'      => 'wp-config.php should be read-only (0400 or 0440) so no PHP process running as the web server user can overwrite database credentials or secret keys.',
+                'fixed'       => ( function () {
                     $f = ABSPATH . 'wp-config.php';
                     if ( ! file_exists( $f ) ) { return true; }
                     $perms = substr( sprintf( '%o', fileperms( $f ) ), -4 );
                     return in_array( $perms, [ '0400', '0440', '0600', '0640' ], true );
                 } )(),
-                'fix_label' => 'Set to 0400',
+                'fix_label'   => 'Set to 0400',
+                'risk'        => 'moderate',
+                'confirm_msg' => 'This will chmod wp-config.php to 0400 (read-only). Make sure you have SSH access in case you need to restore write permissions.',
             ],
             [
-                'id'        => 'block_debug_log',
-                'title'     => 'debug.log exposed publicly',
-                'detail'    => 'debug.log is HTTP-accessible. On nginx, .htaccess rules are ignored — the only PHP-level fix is to move the file one directory above the web root. It stays readable via the Server Logs tab.',
-                'fixed'     => ! file_exists( WP_CONTENT_DIR . '/debug.log' ),
-                'fix_label' => 'Move Outside Web Root',
+                'id'          => 'block_debug_log',
+                'title'       => 'debug.log exposed publicly',
+                'detail'      => 'debug.log is HTTP-accessible. On nginx, .htaccess rules are ignored — the only PHP-level fix is to move the file one directory above the web root. It stays readable via the Server Logs tab.',
+                'fixed'       => ! file_exists( WP_CONTENT_DIR . '/debug.log' ),
+                'fix_label'   => 'Move Outside Web Root',
+                'risk'        => 'moderate',
+                'confirm_msg' => 'This will move debug.log one directory above the web root. It remains readable from the Server Logs tab.',
             ],
             [
                 'id'        => 'db_prefix_default',

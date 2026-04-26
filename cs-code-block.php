@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.535
+ * Version: 1.9.537
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -4205,16 +4205,25 @@ class CloudScale_DevTools {
                         <?php endif; ?>
                     </div>
                     <div style="font-size:12px;color:#50575e;margin-top:2px;"><?php echo esc_html( $fix['detail'] ); ?></div>
-                    <?php if ( ! $is_fixed ) : ?>
+                    <?php if ( ! $is_fixed ) :
+                        $risk        = $fix['risk']        ?? 'safe';
+                        $confirm_msg = $fix['confirm_msg'] ?? '';
+                        $btn_extra_style = $risk === 'moderate'    ? 'background:#d97706;border-color:#b45309;'
+                                         : ( $risk === 'destructive' ? 'background:#dc2626;border-color:#b91c1c;' : '' );
+                    ?>
                     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
                     <?php if ( ! empty( $fix['fix_modal'] ) ) : ?>
                         <button type="button" class="cs-btn-primary cs-btn-sm"
+                                style="<?php echo esc_attr( $btn_extra_style ); ?>"
                                 data-cs-modal-open="<?php echo esc_attr( $fix['fix_modal'] ); ?>">
                             <?php echo esc_html( $fix['fix_label'] ); ?>
                         </button>
                     <?php else : ?>
                         <button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn"
-                                data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>">
+                                style="<?php echo esc_attr( $btn_extra_style ); ?>"
+                                data-fix-id="<?php echo esc_attr( $fix['id'] ); ?>"
+                                data-risk="<?php echo esc_attr( $risk ); ?>"
+                                <?php if ( $confirm_msg ) : ?>data-confirm-msg="<?php echo esc_attr( $confirm_msg ); ?>"<?php endif; ?>>
                             <?php echo esc_html( $fix['fix_label'] ); ?>
                         </button>
                         <?php if ( ! empty( $fix['dismiss_label'] ) && ! empty( $fix['dismiss_id'] ) ) : ?>

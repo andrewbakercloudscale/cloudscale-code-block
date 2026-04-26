@@ -661,9 +661,12 @@
             if (!isFixed) {
                 html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">';
                 if (fix.fix_modal) {
-                    html += '<button type="button" class="cs-btn-primary cs-btn-sm" onclick="document.getElementById(\'' + escHtml(fix.fix_modal) + '\').style.display=\'flex\';">' + escHtml(fix.fix_label) + '</button>';
+                    var modalStyle = fix.risk === 'destructive' ? 'background:#dc2626;border-color:#b91c1c;' : '';
+                    html += '<button type="button" class="cs-btn-primary cs-btn-sm" style="' + modalStyle + '" onclick="document.getElementById(\'' + escHtml(fix.fix_modal) + '\').style.display=\'flex\';">' + escHtml(fix.fix_label) + '</button>';
                 } else {
-                    html += '<button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.id) + '">' + escHtml(fix.fix_label) + '</button>';
+                    var btnStyle = fix.risk === 'moderate' ? 'background:#d97706;border-color:#b45309;' : (fix.risk === 'destructive' ? 'background:#dc2626;border-color:#b91c1c;' : '');
+                    var confirmAttr = (fix.risk === 'moderate' && fix.confirm_msg) ? ' data-confirm-msg="' + escHtml(fix.confirm_msg) + '"' : '';
+                    html += '<button type="button" class="cs-btn-primary cs-btn-sm cs-quick-fix-btn" style="' + btnStyle + '" data-fix-id="' + escHtml(fix.id) + '" data-risk="' + escHtml(fix.risk || 'safe') + '"' + confirmAttr + '>' + escHtml(fix.fix_label) + '</button>';
                 }
                 if (fix.dismiss_label && fix.dismiss_id) {
                     html += '<button type="button" class="cs-btn-secondary cs-btn-sm cs-quick-fix-btn" data-fix-id="' + escHtml(fix.dismiss_id) + '" style="font-size:11px;">' + escHtml(fix.dismiss_label) + '</button>';
@@ -677,37 +680,64 @@
         wireQuickFixButtons();
     }
 
+    function applyQuickFix(btn, fixId) {
+        var orig = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Applying…';
+        post('csdt_devtools_quick_fix', { fix_action: 'apply', fix_id: fixId })
+            .then(function (res) {
+                if (res.success && res.data && res.data.fixes) {
+                    renderQuickFixes(res.data.fixes);
+                    if (res.data.warning) {
+                        var warn = document.createElement('div');
+                        warn.style.cssText = 'margin:8px 0;padding:10px 12px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:13px;color:#92400e';
+                        warn.textContent = '⚠ ' + res.data.warning;
+                        var qfWrap = document.getElementById('cs-quick-fixes-list');
+                        if (qfWrap) qfWrap.insertAdjacentElement('afterend', warn);
+                    }
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = orig;
+                    if (res.data && typeof res.data === 'string') {
+                        alert('Fix failed: ' + res.data);
+                    }
+                }
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.textContent = orig;
+            });
+    }
+
     function wireQuickFixButtons() {
         var btns = document.querySelectorAll('.cs-quick-fix-btn');
         btns.forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var fixId = btn.getAttribute('data-fix-id');
-                btn.disabled = true;
-                var orig = btn.textContent;
-                btn.textContent = 'Applying…';
-                post('csdt_devtools_quick_fix', { fix_action: 'apply', fix_id: fixId })
-                    .then(function (res) {
-                        if (res.success && res.data && res.data.fixes) {
-                            renderQuickFixes(res.data.fixes);
-                            if (res.data.warning) {
-                                var warn = document.createElement('div');
-                                warn.style.cssText = 'margin:8px 0;padding:10px 12px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:13px;color:#92400e';
-                                warn.textContent = '⚠ ' + res.data.warning;
-                                var qfWrap = document.getElementById('cs-quick-fixes-list');
-                                if (qfWrap) qfWrap.insertAdjacentElement('afterend', warn);
-                            }
-                        } else {
-                            btn.disabled = false;
-                            btn.textContent = orig;
-                            if (res.data && typeof res.data === 'string') {
-                                alert('Fix failed: ' + res.data);
-                            }
-                        }
-                    })
-                    .catch(function () {
-                        btn.disabled = false;
-                        btn.textContent = orig;
-                    });
+                var fixId      = btn.getAttribute('data-fix-id');
+                var risk       = btn.getAttribute('data-risk') || 'safe';
+                var confirmMsg = btn.getAttribute('data-confirm-msg') || '';
+
+                if (risk === 'moderate' && confirmMsg) {
+                    var wrap    = btn.parentNode;
+                    var origHtml = wrap.innerHTML;
+                    wrap.innerHTML =
+                        '<span style="font-size:12px;color:#92400e;font-weight:600;display:inline-flex;align-items:center;gap:4px;">&#x26A0;&#xFE0F; ' + confirmMsg + '</span>' +
+                        '<button type="button" data-qf-confirm style="background:#d97706;color:#fff;border:1px solid #b45309;font-size:12px;font-weight:600;padding:4px 12px;border-radius:4px;cursor:pointer;margin-left:8px;">Confirm</button>' +
+                        '<button type="button" data-qf-cancel style="background:#fff;color:#374151;border:1px solid #d1d5db;font-size:12px;padding:4px 10px;border-radius:4px;cursor:pointer;margin-left:4px;">Cancel</button>';
+                    wrap.querySelector('[data-qf-confirm]').onclick = function () {
+                        wrap.innerHTML = origHtml;
+                        wireQuickFixButtons();
+                        var newBtn = wrap.querySelector('.cs-quick-fix-btn[data-fix-id="' + fixId + '"]');
+                        if (newBtn) applyQuickFix(newBtn, fixId);
+                    };
+                    wrap.querySelector('[data-qf-cancel]').onclick = function () {
+                        wrap.innerHTML = origHtml;
+                        wireQuickFixButtons();
+                    };
+                    return;
+                }
+
+                applyQuickFix(btn, fixId);
             });
         });
     }
