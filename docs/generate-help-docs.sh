@@ -13,10 +13,17 @@ echo "--- Masking sensitive settings for screenshots..."
 # Capture only the last non-empty, non-PERF line as the slug value
 _orig_slug="$(run_wp "option get csdt_devtools_login_slug --path=${WP_PATH}" 2>/dev/null \
   | grep -v '^\[' | grep -v '^$' | tail -1 || true)"
-# Use a random slug so the masked value can't be guessed from docs screenshots
-_mask_slug="$(openssl rand -hex 4)"
+if [ -z "${_orig_slug}" ]; then
+    echo "ERROR: Could not capture original login slug — aborting to prevent data loss."
+    echo "       Check that csdt_devtools_login_slug is set and WP-CLI can read it."
+    exit 1
+fi
+# Use a longer random slug so the masked value can't be guessed from docs screenshots
+_mask_slug="$(openssl rand -hex 8)"
 run_wp "option update csdt_devtools_login_slug ${_mask_slug} --path=${WP_PATH}" 2>/dev/null || true
-echo "    Masked login slug to: ${_mask_slug}"
+# Flush object cache so Playwright sees the masked value, not a cached copy of the real slug.
+run_wp "cache flush --path=${WP_PATH}" 2>/dev/null || true
+echo "    Masked login slug (cache flushed)"
 
 # Register pre-cleanup hook — fires inside _helpdocs_cleanup (which overwrites any
 # trap set here, so we hook into the runner's cleanup instead of using our own trap).

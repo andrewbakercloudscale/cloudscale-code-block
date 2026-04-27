@@ -1270,7 +1270,7 @@
     display: flex;
     gap: 4px;
     align-items: flex-end;
-    flex: 0 0 46%;
+    flex: 0 0 65%;
     min-width: 200px;
     padding-right: 4px;
     overflow-x: auto;
@@ -1361,7 +1361,7 @@
     color: #333;
     vertical-align: middle;
 }
-.cs-bf-td-time { color: #888; width: 80px; }
+.cs-bf-td-time { color: #888; width: 160px; }
 .cs-bf-td-user { font-family: 'Consolas', monospace; font-size: 11px; }
 .cs-bf-td-ip   { color: #555; font-family: 'Consolas', monospace; font-size: 11px; }
 .cs-bf-empty,

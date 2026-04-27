@@ -397,9 +397,9 @@ helpLib.run({
           altText: 'WordPress Hide Login URL settings panel - move wp-login.php to a secret URL to block automated bot attacks',
           jsBeforeShot: () => {
             var s = document.getElementById('cs-login-slug');
-            if (s) s.value = 'your-secret-slug';
+            if (s) s.value = '••••••••••••';
             var u = document.getElementById('cs-current-login-url');
-            if (u) u.textContent = window.location.origin + '/your-secret-slug/';
+            if (u) { u.textContent = window.location.origin + '/[your-secret-url]/'; u.href = '#'; }
           } },
         { id: '2fa',        label: 'Two-Factor Auth',       file: 'panel-2fa.png',         tabSelector: 'a[href*="tab=login"]',    elementSelector: '#cs-panel-2fa',
           intro: 'Adds a second authentication step after the password so a stolen or leaked password alone is never enough to break in. Supports email OTP, authenticator apps (TOTP), and passkeys - all three methods included free.',
@@ -471,10 +471,10 @@ helpLib.run({
         { id: 'threat-monitor', label: 'Threat Monitor',    file: 'panel-threat-monitor.png', tabSelector: 'a[href*="tab=security"]', elementSelector: '#cs-panel-threat-monitor',
           intro: 'Runs three passive background checks every 5 minutes: file integrity monitoring (detects unexpected changes to WordPress core files), new administrator alerts (fires the instant an admin account is created or promoted), and web probe detection (counts requests to sensitive endpoints and alerts on sudden spikes).',
           altText: 'WordPress threat monitor showing file integrity checking, new admin alerts, and web probe detection' },
-        { id: 'code-block', label: 'Code Block',             file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-code-settings',
+        { id: 'code-block', label: 'Code Block',             file: 'panel-code-block.png',  tabSelector: 'a[href*="tab=debug"]', elementSelector: '#cs-panel-code-settings',
           intro: 'Syntax-highlighted code blocks powered by highlight.js, running entirely on your own server with zero CDN calls. Supports 190+ languages and 14 professional colour themes - completely free, with no impact on your Core Web Vitals score.',
           altText: 'WordPress syntax-highlighted code block settings with 190 languages, 14 themes, no CDN, completely free' },
-        { id: 'migrator',   label: 'Code Block Migrator',   file: 'panel-migrator.png',    tabSelector: 'a[href*="tab=migrate"]', elementSelector: '#cs-panel-migrator',
+        { id: 'migrator',   label: 'Code Block Migrator',   file: 'panel-migrator.png',    tabSelector: 'a[href*="tab=debug"]', elementSelector: '#cs-panel-migrator',
           intro: 'Converts all posts using legacy code block formats - WordPress core blocks, SyntaxHighlighter, Enlighter shortcodes - to CloudScale blocks in a single batch operation. Scan → preview the diff per post → migrate everything in one click, with no manual post editing.',
           altText: 'WordPress code block migrator for batch converting from Enlighter, SyntaxHighlighter, and other plugins' },
         { id: 'sql-tool',   label: 'SQL Query Tool',        file: 'panel-sql-tool.png',    tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-sql',
@@ -501,7 +501,7 @@ helpLib.run({
         { id: 'update-risk',label: 'Update Risk Scorer',     file: 'panel-update-risk.png',  tabSelector: 'a[href*="tab=optimizer"]', elementSelector: '#cs-panel-update-risk', jsClip: true,
           intro: 'Uses AI to read each pending plugin update\'s changelog from WordPress.org and classify it as Patch (safe to apply now), Minor (new features, review first), or Breaking (major changes, test on staging). Prevents the most common cause of site breakage: blindly applying all updates at once.',
           altText: 'WordPress AI update risk scorer rating pending plugin updates as Patch, Minor or Breaking before applying them' },
-        { id: 'uptime-monitor', label: 'Uptime Monitor',     file: 'panel-uptime-monitor.png', tabSelector: 'a[href*="tab=optimizer"]', elementSelector: '#cs-panel-uptime-monitor', jsClip: true,
+        { id: 'uptime-monitor', label: 'Uptime Monitor',     file: 'panel-uptime-monitor.png', tabSelector: 'a[href*="tab=debug"]', elementSelector: '#cs-panel-uptime-monitor', jsClip: true,
           intro: 'Deploys a Cloudflare Worker that probes a deep readiness endpoint every 60 seconds from the Cloudflare edge. Unlike basic uptime monitors that only check for a 200 response, this endpoint verifies database connectivity, PHP-FPM worker saturation, and WordPress boot. Alerts fire via push notification even if your server is completely offline.',
           altText: 'WordPress Cloudflare uptime monitor showing deep readiness probe with database and PHP-FPM health checks' },
         { id: 'cs-monitor', label: 'CS Monitor',             file: 'panel-cs-monitor.png',  tabSelector: 'a[href*="tab=debug"]',   elementSelector: '#cs-panel-cs-monitor',

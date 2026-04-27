@@ -596,22 +596,47 @@
         } );
     }
 
-    // ── Slug live preview ─────────────────────────────────────────────────
+    // ── Slug live preview + randomise + weak-slug warning ────────────────
 
-    const slugInput = document.getElementById( 'cs-login-slug' );
-    const urlLink   = document.getElementById( 'cs-current-login-url' );
-    const baseEl    = document.querySelector( '.cs-slug-base' );
+    const slugInput    = document.getElementById( 'cs-login-slug' );
+    const urlLink      = document.getElementById( 'cs-current-login-url' );
+    const baseEl       = document.querySelector( '.cs-slug-base' );
+    const randomBtn    = document.getElementById( 'cs-login-slug-random' );
+    const weakWarn     = document.getElementById( 'cs-slug-weak-warn' );
+
+    function isWeakSlug( v ) {
+        // Warn if slug is purely alpha (no digits/hyphens) and under 14 chars — likely a dictionary word.
+        return v.length > 0 && v.length < 14 && /^[a-z]+$/i.test( v );
+    }
+
+    function updateSlugPreview() {
+        if ( ! slugInput || ! urlLink || ! baseEl ) return;
+        const base = baseEl.textContent.replace( /\/$/, '' );
+        const slug = slugInput.value.trim();
+        const full = slug ? base + '/' + slug + '/' : urlLink.dataset.default || base + '/wp-login.php';
+        urlLink.textContent = full;
+        urlLink.href        = full;
+        if ( weakWarn ) weakWarn.style.display = isWeakSlug( slug ) ? '' : 'none';
+    }
 
     if ( slugInput && urlLink && baseEl ) {
-        slugInput.addEventListener( 'input', () => {
-            const base = baseEl.textContent.replace( /\/$/, '' );
-            const slug = slugInput.value.trim();
-            const full = slug ? base + '/' + slug + '/' : urlLink.dataset.default || base + '/wp-login.php';
-            urlLink.textContent = full;
-            urlLink.href        = full;
-        } );
+        slugInput.addEventListener( 'input', updateSlugPreview );
         // Store original URL for empty-slug reset
-        if ( urlLink ) urlLink.dataset.default = urlLink.href;
+        urlLink.dataset.default = urlLink.href;
+        // Run once on load to flag any existing weak slug
+        updateSlugPreview();
+    }
+
+    if ( randomBtn && slugInput ) {
+        randomBtn.addEventListener( 'click', () => {
+            const bytes  = new Uint8Array( 9 );
+            crypto.getRandomValues( bytes );
+            // base64url without padding — 12 URL-safe chars from 9 random bytes
+            const slug = btoa( String.fromCharCode( ...bytes ) )
+                .replace( /\+/g, '-' ).replace( /\//g, '_' ).replace( /=/g, '' );
+            slugInput.value = slug;
+            updateSlugPreview();
+        } );
     }
 
 } )();

@@ -264,14 +264,25 @@ class CSDT_Login {
         }
         $stats['last_ts'] = $now;
         $stats['last_ip'] = $ip;
-        if ( ! isset( $stats['hits'] ) || ! is_array( $stats['hits'] ) ) {
-            $stats['hits'] = [];
+        unset( $stats['hits'] ); // removed: replaced by ip_stats
+        if ( ! isset( $stats['ip_stats'] ) || ! is_array( $stats['ip_stats'] ) ) {
+            $stats['ip_stats'] = [];
         }
-        $stats['hits'][] = [ $now, $ip ];
-        $hit_cutoff      = $now - 14 * DAY_IN_SECONDS;
-        $stats['hits']   = array_values( array_filter( $stats['hits'], fn( $h ) => isset( $h[0] ) && $h[0] >= $hit_cutoff ) );
-        if ( count( $stats['hits'] ) > 500 ) {
-            $stats['hits'] = array_slice( $stats['hits'], -500 );
+        if ( ! isset( $stats['ip_stats'][ $ip ] ) || ! is_array( $stats['ip_stats'][ $ip ] ) ) {
+            $stats['ip_stats'][ $ip ] = [ 'last_ts' => 0, 'days' => [] ];
+        }
+        $stats['ip_stats'][ $ip ]['last_ts']          = $now;
+        $stats['ip_stats'][ $ip ]['days'][ $today ]   = ( $stats['ip_stats'][ $ip ]['days'][ $today ] ?? 0 ) + 1;
+        foreach ( $stats['ip_stats'] as $ip_key => &$ip_data ) {
+            foreach ( array_keys( $ip_data['days'] ) as $day_key ) {
+                if ( $day_key < $cutoff ) unset( $ip_data['days'][ $day_key ] );
+            }
+            if ( empty( $ip_data['days'] ) ) unset( $stats['ip_stats'][ $ip_key ] );
+        }
+        unset( $ip_data );
+        if ( count( $stats['ip_stats'] ) > 200 ) {
+            uasort( $stats['ip_stats'], fn( $a, $b ) => $b['last_ts'] - $a['last_ts'] );
+            $stats['ip_stats'] = array_slice( $stats['ip_stats'], 0, 200, true );
         }
         update_option( 'csdt_wplogin_blocked_stats', $stats, false );
     }

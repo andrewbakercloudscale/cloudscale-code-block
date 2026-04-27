@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.562
+ * Version: 1.9.567
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.562';
+    const VERSION      = '1.9.567';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -2987,8 +2987,10 @@ class CloudScale_DevTools {
                                    value="<?php echo esc_attr( $slug ); ?>"
                                    placeholder="my-secret-login"
                                    maxlength="60" autocomplete="off" spellcheck="false">
+                            <button type="button" id="cs-login-slug-random" title="<?php esc_attr_e( 'Generate a random, unguessable login path', 'cloudscale-devtools' ); ?>" style="margin-left:8px;padding:5px 10px;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;font-size:13px;white-space:nowrap;">🎲 <?php esc_html_e( 'Randomise', 'cloudscale-devtools' ); ?></button>
                         </div>
                         <span class="cs-hint"><?php esc_html_e( 'Letters, numbers, and hyphens only. Save this URL — you will need it to log in.', 'cloudscale-devtools' ); ?></span>
+                        <span id="cs-slug-weak-warn" style="display:none;margin-top:4px;font-size:12px;font-weight:600;color:#92400e;">⚠ <?php esc_html_e( 'This looks guessable. Use the Randomise button for a secure path.', 'cloudscale-devtools' ); ?></span>
                     </div>
                 </div>
 
@@ -3052,7 +3054,6 @@ class CloudScale_DevTools {
         $bf_lockout       = get_option( 'csdt_devtools_brute_force_lockout', '10' );
         $bf_enum_protect  = get_option( 'csdt_devtools_enum_protect', '1' );
         $wplogin_stats    = get_option( 'csdt_wplogin_blocked_stats', [] );
-        $wplogin_hits     = isset( $wplogin_stats['hits'] ) && is_array( $wplogin_stats['hits'] ) ? $wplogin_stats['hits'] : [];
         ?>
         <div class="cs-panel" id="cs-panel-brute-force">
             <div class="cs-section-header cs-section-header-red">
@@ -3143,7 +3144,9 @@ class CloudScale_DevTools {
                 $last_hit_ip  = $wplogin_stats['last_ip'] ?? '';
                 $day_max      = max( 1, max( array_values( $days ) ) );
                 $day_mid      = (int) round( $day_max / 2 );
-                $probe_recent = array_reverse( array_slice( $wplogin_hits, -20 ) );
+                $ip_stats_raw = isset( $wplogin_stats['ip_stats'] ) && is_array( $wplogin_stats['ip_stats'] ) ? $wplogin_stats['ip_stats'] : [];
+                uasort( $ip_stats_raw, fn( $a, $b ) => $b['last_ts'] - $a['last_ts'] );
+                $probe_recent = array_slice( $ip_stats_raw, 0, 20, true );
                 ?>
                 <div style="margin-top:22px;border-top:1px solid #e8edf5;padding-top:20px;">
                     <div class="cs-bf-log-header">
@@ -3184,10 +3187,10 @@ class CloudScale_DevTools {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                <?php foreach ( $probe_recent as $hit ) : ?>
+                                <?php foreach ( $probe_recent as $probe_ip => $probe_data ) : ?>
                                     <tr>
-                                        <td class="cs-bf-td cs-bf-td-time"><?php echo esc_html( human_time_diff( $hit[0] ) . ' ago' ); ?></td>
-                                        <td class="cs-bf-td cs-bf-td-ip"><?php echo esc_html( $hit[1] ); ?></td>
+                                        <td class="cs-bf-td cs-bf-td-time"><?php echo esc_html( human_time_diff( $probe_data['last_ts'] ) . ' ago' ); ?></td>
+                                        <td class="cs-bf-td cs-bf-td-ip"><?php echo esc_html( $probe_ip ); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>
