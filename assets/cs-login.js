@@ -596,47 +596,46 @@
         } );
     }
 
-    // ── Slug live preview + randomise + weak-slug warning ────────────────
+    // ── Slug live preview + weak-slug warning ────────────────────────────
 
-    const slugInput    = document.getElementById( 'cs-login-slug' );
-    const urlLink      = document.getElementById( 'cs-current-login-url' );
-    const baseEl       = document.querySelector( '.cs-slug-base' );
-    const randomBtn    = document.getElementById( 'cs-login-slug-random' );
-    const weakWarn     = document.getElementById( 'cs-slug-weak-warn' );
+    const slugInput = document.getElementById( 'cs-login-slug' );
+    const urlLink   = document.getElementById( 'cs-current-login-url' );
+    const baseEl    = document.querySelector( '.cs-slug-base' );
+    const weakWarn  = document.getElementById( 'cs-slug-weak-warn' );
 
     function isWeakSlug( v ) {
-        // Warn if slug is purely alpha (no digits/hyphens) and under 14 chars — likely a dictionary word.
         return v.length > 0 && v.length < 14 && /^[a-z]+$/i.test( v );
     }
 
     function updateSlugPreview() {
-        if ( ! slugInput || ! urlLink || ! baseEl ) return;
-        const base = baseEl.textContent.replace( /\/$/, '' );
-        const slug = slugInput.value.trim();
-        const full = slug ? base + '/' + slug + '/' : urlLink.dataset.default || base + '/wp-login.php';
-        urlLink.textContent = full;
-        urlLink.href        = full;
-        if ( weakWarn ) weakWarn.style.display = isWeakSlug( slug ) ? '' : 'none';
+        const inp  = document.getElementById( 'cs-login-slug' );
+        const link = document.getElementById( 'cs-current-login-url' );
+        const base = document.querySelector( '.cs-slug-base' );
+        const warn = document.getElementById( 'cs-slug-weak-warn' );
+        if ( ! inp || ! link || ! base ) return;
+        const slug = inp.value.trim();
+        const full = slug ? base.textContent.replace( /\/$/, '' ) + '/' + slug + '/' : link.dataset.default || base.textContent.replace( /\/$/, '' ) + '/wp-login.php';
+        link.textContent = full;
+        link.href        = full;
+        if ( warn ) warn.style.display = isWeakSlug( slug ) ? '' : 'none';
     }
 
     if ( slugInput && urlLink && baseEl ) {
         slugInput.addEventListener( 'input', updateSlugPreview );
-        // Store original URL for empty-slug reset
         urlLink.dataset.default = urlLink.href;
-        // Run once on load to flag any existing weak slug
         updateSlugPreview();
     }
 
-    if ( randomBtn && slugInput ) {
-        randomBtn.addEventListener( 'click', () => {
-            const bytes  = new Uint8Array( 9 );
-            crypto.getRandomValues( bytes );
-            // base64url without padding — 12 URL-safe chars from 9 random bytes
-            const slug = btoa( String.fromCharCode( ...bytes ) )
-                .replace( /\+/g, '-' ).replace( /\//g, '_' ).replace( /=/g, '' );
-            slugInput.value = slug;
-            updateSlugPreview();
-        } );
-    }
+    // ── Randomise button — event delegation so it works whether the login
+    //    panel was server-rendered or injected by the tab router. ──────────
+    document.addEventListener( 'click', function ( e ) {
+        if ( ! e.target.closest( '#cs-login-slug-random' ) ) return;
+        const inp = document.getElementById( 'cs-login-slug' );
+        if ( ! inp ) return;
+        const bytes = new Uint8Array( 8 );
+        crypto.getRandomValues( bytes );
+        inp.value = Array.from( bytes, function ( b ) { return b.toString( 16 ).padStart( 2, '0' ); } ).join( '' );
+        inp.dispatchEvent( new Event( 'input' ) );
+    } );
 
 } )();
