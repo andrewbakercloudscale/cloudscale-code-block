@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.557
+ * Version: 1.9.560
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -3052,7 +3052,7 @@ class CloudScale_DevTools {
         $bf_lockout       = get_option( 'csdt_devtools_brute_force_lockout', '10' );
         $bf_enum_protect  = get_option( 'csdt_devtools_enum_protect', '1' );
         $wplogin_stats    = get_option( 'csdt_wplogin_blocked_stats', [] );
-        $invalid_user_log = get_option( 'csdt_invalid_user_log', [] );
+        $wplogin_hits     = isset( $wplogin_stats['hits'] ) && is_array( $wplogin_stats['hits'] ) ? $wplogin_stats['hits'] : [];
         ?>
         <div class="cs-panel" id="cs-panel-brute-force">
             <div class="cs-section-header cs-section-header-red">
@@ -3172,33 +3172,35 @@ class CloudScale_DevTools {
                 </div>
 
                 <?php
-                // ── Invalid username attempts at hidden login URL ──────────────
-                // Last 20 entries, newest first
-                $inv_recent = array_reverse( array_slice( $invalid_user_log, -20 ) );
+                // ── Recent wp-login.php probe IPs ────────────────────────────
+                // Newest 20 hits from the per-hit log stored in csdt_wplogin_blocked_stats.
+                $probe_recent = array_reverse( array_slice( $wplogin_hits, -20 ) );
                 ?>
-                <?php if ( ! empty( $inv_recent ) ) : ?>
+                <?php if ( ! empty( $probe_recent ) ) : ?>
                 <div style="margin-top:22px;">
-                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">👤 <?php esc_html_e( 'Invalid Username Attempts at Login URL', 'cloudscale-devtools' ); ?>
-                        <span style="font-weight:400;font-size:11px;color:#64748b;margin-left:8px;"><?php echo count( $invalid_user_log ); ?> total</span>
+                    <div style="font-weight:600;font-size:13px;margin-bottom:8px;">📋 <?php esc_html_e( 'Recent wp-login.php Probe IPs', 'cloudscale-devtools' ); ?>
+                        <span style="font-weight:400;font-size:11px;color:#64748b;margin-left:8px;"><?php echo count( $wplogin_hits ); ?> <?php esc_html_e( 'total in last 14 days', 'cloudscale-devtools' ); ?></span>
                     </div>
                     <table style="width:100%;border-collapse:collapse;font-size:12px;">
                         <thead>
-                            <tr style="background:#f8fafc;">
-                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;"><?php esc_html_e( 'When', 'cloudscale-devtools' ); ?></th>
-                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;"><?php esc_html_e( 'Username tried', 'cloudscale-devtools' ); ?></th>
-                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #e2e8f0;color:#64748b;"><?php esc_html_e( 'IP address', 'cloudscale-devtools' ); ?></th>
+                            <tr style="background:#fef2f2;">
+                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #fee2e2;color:#64748b;"><?php esc_html_e( 'When', 'cloudscale-devtools' ); ?></th>
+                                <th style="text-align:left;padding:5px 10px;border-bottom:1px solid #fee2e2;color:#64748b;"><?php esc_html_e( 'IP address', 'cloudscale-devtools' ); ?></th>
                             </tr>
                         </thead>
                         <tbody>
-                        <?php foreach ( $inv_recent as $entry ) : ?>
-                            <tr style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:5px 10px;white-space:nowrap;color:#64748b;"><?php echo esc_html( human_time_diff( $entry[0] ) . ' ago' ); ?></td>
-                                <td style="padding:5px 10px;font-weight:600;color:#0f172a;"><?php echo esc_html( $entry[1] ); ?></td>
-                                <td style="padding:5px 10px;color:#475569;"><?php echo esc_html( $entry[2] ); ?></td>
+                        <?php foreach ( $probe_recent as $hit ) : ?>
+                            <tr style="border-bottom:1px solid #fef2f2;">
+                                <td style="padding:5px 10px;white-space:nowrap;color:#64748b;"><?php echo esc_html( human_time_diff( $hit[0] ) . ' ago' ); ?></td>
+                                <td style="padding:5px 10px;font-family:monospace;font-size:11px;color:#991b1b;"><?php echo esc_html( $hit[1] ); ?></td>
                             </tr>
                         <?php endforeach; ?>
                         </tbody>
                     </table>
+                </div>
+                <?php elseif ( $total_hits > 0 ) : ?>
+                <div style="margin-top:14px;font-size:12px;color:#64748b;">
+                    <?php esc_html_e( 'Per-IP log populates as new probes arrive (data recorded from this version onwards).', 'cloudscale-devtools' ); ?>
                 </div>
                 <?php endif; ?>
             </div>

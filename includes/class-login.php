@@ -292,6 +292,17 @@ class CSDT_Login {
         }
         $stats['last_ts'] = time();
         $stats['last_ip'] = $ip;
+        // Per-hit log [timestamp, ip] — drives the IP probe table in the BF panel.
+        if ( ! isset( $stats['hits'] ) || ! is_array( $stats['hits'] ) ) {
+            $stats['hits'] = [];
+        }
+        $stats['hits'][] = [ time(), $ip ];
+        // Prune to 14 days and cap at 500 entries.
+        $hit_cutoff   = time() - 14 * DAY_IN_SECONDS;
+        $stats['hits'] = array_values( array_filter( $stats['hits'], fn( $h ) => isset( $h[0] ) && $h[0] >= $hit_cutoff ) );
+        if ( count( $stats['hits'] ) > 500 ) {
+            $stats['hits'] = array_slice( $stats['hits'], -500 );
+        }
         update_option( 'csdt_wplogin_blocked_stats', $stats, false );
 
         // Block — redirect direct /wp-login.php access to home.
