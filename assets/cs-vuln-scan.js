@@ -747,19 +747,21 @@
             .then(function (res) {
                 if (res.success && res.data && res.data.fixes) {
                     renderQuickFixes(res.data.fixes);
-                    if (res.data.warning) {
-                        var warn = document.createElement('div');
-                        warn.style.cssText = 'margin:8px 0;padding:10px 12px;background:#fffbeb;border-left:3px solid #d97706;border-radius:4px;font-size:13px;color:#92400e';
-                        warn.textContent = '⚠ ' + res.data.warning;
-                        var qfWrap = document.getElementById('cs-quick-fixes-list');
-                        if (qfWrap) qfWrap.insertAdjacentElement('afterend', warn);
+                    if (res.data.warning || res.data.message) {
+                        var msg  = res.data.warning || res.data.message;
+                        var isWarn = !!res.data.warning;
+                        var note = document.createElement('div');
+                        note.style.cssText = 'margin:8px 14px;padding:10px 14px;background:' + (isWarn ? '#fffbeb' : '#f0fdf4') + ';border-left:3px solid ' + (isWarn ? '#d97706' : '#16a34a') + ';border-radius:4px;font-size:12px;color:' + (isWarn ? '#92400e' : '#14532d') + ';white-space:pre-wrap;';
+                        note.textContent = (isWarn ? '⚠ ' : '✓ ') + msg;
+                        var qfPanel = document.getElementById('cs-quick-fixes-panel');
+                        if (qfPanel) qfPanel.insertAdjacentElement('beforebegin', note);
+                        setTimeout(function () { if (note.parentNode) note.parentNode.removeChild(note); }, 8000);
                     }
                 } else {
                     btn.disabled = false;
                     btn.textContent = orig;
-                    if (res.data && typeof res.data === 'string') {
-                        alert('Fix failed: ' + res.data);
-                    }
+                    var errMsg = (res.data && typeof res.data === 'string') ? res.data : 'Fix failed — check your permissions.';
+                    alert(errMsg);
                 }
             })
             .catch(function () {

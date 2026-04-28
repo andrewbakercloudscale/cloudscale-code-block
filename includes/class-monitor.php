@@ -689,6 +689,18 @@ class CSDT_Monitor {
         ] );
     }
 
+    public static function ajax_lscache_purge(): void {
+        $token  = sanitize_text_field( (string) ( $_POST['token'] ?? '' ) );
+        $stored = get_option( 'csdt_opcache_token', '' );
+        $by_token = $stored && $token && hash_equals( $stored, $token );
+        if ( ! $by_token ) {
+            check_ajax_referer( CloudScale_DevTools::FPM_NONCE, 'nonce' );
+            if ( ! current_user_can( 'manage_options' ) ) { wp_send_json_error( 'Unauthorized', 403 ); }
+        }
+        do_action( 'litespeed_purge_all' );
+        wp_send_json_success( [ 'purged' => true ] );
+    }
+
     private static function get_opcache_stats(): array {
         if ( ! function_exists( 'opcache_get_status' ) ) {
             return [ 'available' => false ];

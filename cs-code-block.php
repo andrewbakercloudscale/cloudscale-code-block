@@ -3,7 +3,7 @@
  * Plugin Name: CloudScale Cyber and Devtools
  * Plugin URI: https://your-wordpress-site.example.com
  * Description: Free AI penetration testing, brute-force protection, 2FA, passkeys, AI site audit, AI debugging, performance monitor, SMTP, SQL tool, server logs, vulnerability scanner, and Cloudflare uptime monitor. No subscription, no cloud dependency.
- * Version: 1.9.567
+ * Version: 1.9.577
  * Author: Andrew Baker
  * Author URI: https://your-wordpress-site.example.com
  * License: GPL-2.0-or-later
@@ -54,7 +54,7 @@ if ( ! defined( 'SAVEQUERIES' ) && get_option( 'csdt_devtools_perf_monitor_enabl
  */
 class CloudScale_DevTools {
 
-    const VERSION      = '1.9.567';
+    const VERSION      = '1.9.577';
     const HLJS_VERSION = '11.11.1';
     const HLJS_CDN     = 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/';
     const TOOLS_SLUG   = 'cloudscale-devtools';
@@ -311,6 +311,7 @@ class CloudScale_DevTools {
         add_action( 'admin_init', [ __CLASS__, 'register_settings' ] );
         add_action( 'admin_init',       [ __CLASS__, 'redirect_legacy_slug' ] );
         add_action( 'init', [ __CLASS__, 'redirect_legacy_help_url' ], 1 );
+        add_action( 'init', [ __CLASS__, 'maybe_lscache_purge' ], 1 );
         add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin_assets' ] );
 
         // Migration AJAX
@@ -433,6 +434,8 @@ class CloudScale_DevTools {
         add_action( 'wp_ajax_csdt_opcache_stats',                 [ 'CSDT_Monitor', 'ajax_opcache_stats' ] );
         add_action( 'wp_ajax_csdt_opcache_flush',                 [ 'CSDT_Monitor', 'ajax_opcache_flush' ] );
         add_action( 'wp_ajax_nopriv_csdt_opcache_flush',          [ 'CSDT_Monitor', 'ajax_opcache_flush' ] );
+        add_action( 'wp_ajax_csdt_lscache_purge',                 [ 'CSDT_Monitor', 'ajax_lscache_purge' ] );
+        add_action( 'wp_ajax_nopriv_csdt_lscache_purge',          [ 'CSDT_Monitor', 'ajax_lscache_purge' ] );
         add_action( 'wp_ajax_csdt_sql_http_fix',                  [ __CLASS__, 'ajax_sql_http_fix' ] );
         // FPM report uses the REST endpoint csdt/v1/fpm-report (CSDT_Monitor::rest_fpm_report).
         self::cron_action( 'csdt_threat_monitor',               [ 'CSDT_Threat_Monitor', 'monitor_threats' ] );
@@ -794,14 +797,12 @@ class CloudScale_DevTools {
     }
 
     private static function get_dashboard_widget_css(): string {
-        return '#csdt_security_summary .cs-dw-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px}' .
+        return '#csdt_security_summary .cs-dw-accent{height:3px;background:linear-gradient(90deg,#1e3a8a 0%,#f97316 100%);margin:-12px -12px 14px;border-radius:0}' .
+               '#csdt_security_summary .cs-dw-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px}' .
                '#csdt_security_summary .cs-dw-row:last-child{border-bottom:none}' .
                '#csdt_security_summary .cs-dw-lbl{color:#94a3b8;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}' .
-               '#csdt_security_summary .cs-dw-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;padding:12px 0 6px;border-bottom:2px solid #e5e7eb;margin-bottom:4px}' .
-               '#csdt_security_summary .cs-dw-actions{margin-top:14px;display:flex}' .
-               '#csdt_security_summary .cs-dw-actions a{flex:1;text-align:center;padding:13px 10px;border-radius:6px;font-size:12px;font-weight:700;text-decoration:none;transition:opacity .15s}' .
-               '#csdt_security_summary .cs-dw-btn-pri{background:linear-gradient(135deg,#1a3a8f,#1e6fd9);color:#fff!important}' .
-               '#csdt_security_summary .cs-dw-btn-pri:hover{opacity:.88}';
+               '#csdt_security_summary .cs-dw-section{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#1e3a8a;padding:7px 8px 6px;border-bottom:1px solid #dbeafe;border-left:3px solid #f97316;background:#f0f4ff;border-radius:0 4px 0 0;margin-bottom:4px}' .
+               '#csdt_security_summary .cs-dw-actions{margin-top:14px;display:flex}';
     }
 
     private static function get_convert_toast_css(): string {
@@ -1170,6 +1171,28 @@ class CloudScale_DevTools {
      * @since  1.8.56
      * @return void
      */
+    public static function maybe_lscache_purge(): void {
+        // Front-end endpoint: GET /?csdt_lscache_purge=TOKEN
+        // Fires before WordPress loads the page, so LSWS processes the LiteSpeed
+        // purge header in this normal front-end response (unlike admin-ajax.php which
+        // LSWS excludes from cache header processing).
+        if ( ! isset( $_GET['csdt_lscache_purge'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            return;
+        }
+        $token  = sanitize_text_field( (string) $_GET['csdt_lscache_purge'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+        $stored = get_option( 'csdt_opcache_token', '' );
+        if ( ! $stored || ! $token || ! hash_equals( $stored, $token ) ) {
+            wp_die( 'Unauthorized', '', 403 );
+        }
+        // Send the purge header directly so LSWS clears its full-page cache even
+        // when exit fires before wp_headers (which is where LiteSpeed plugin normally injects it).
+        header( 'X-LiteSpeed-Purge: *' );
+        do_action( 'litespeed_purge_all' );
+        header( 'Content-Type: application/json; charset=utf-8' );
+        echo wp_json_encode( [ 'purged' => true ] );
+        exit;
+    }
+
     public static function redirect_legacy_help_url() {
         // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
         $uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
@@ -3919,7 +3942,7 @@ class CloudScale_DevTools {
         if ( ! current_user_can( 'manage_options' ) ) { return; }
         wp_add_dashboard_widget(
             'csdt_security_summary',
-            '🤖 CloudScale Cyber and Devtools',
+            '🤖 CloudScale Cyber and Devtools <span style="font-size:10px;font-weight:400;color:#94a3b8;margin-left:6px;">v' . esc_html( self::VERSION ) . '</span>',
             [ __CLASS__, 'render_dashboard_widget' ]
         );
     }
@@ -3962,6 +3985,7 @@ class CloudScale_DevTools {
         $base_url = admin_url( 'tools.php?page=cloudscale-devtools' );
         ?>
 
+        <div class="cs-dw-accent"></div>
         <div class="cs-dw-section">🤖 <?php esc_html_e( 'AI Security', 'cloudscale-devtools' ); ?></div>
         <div class="cs-dw-row">
             <span class="cs-dw-lbl"><?php esc_html_e( 'STATUS', 'cloudscale-devtools' ); ?></span>
@@ -4032,7 +4056,17 @@ class CloudScale_DevTools {
         </div>
 
         <div class="cs-dw-actions">
-            <a href="<?php echo esc_url( $base_url ); ?>" class="cs-dw-btn-pri" style="flex:1;text-align:center;"><?php esc_html_e( 'View Cyber and Devtools', 'cloudscale-devtools' ); ?></a>
+            <a href="<?php echo esc_url( $base_url ); ?>"
+               style="display:flex;align-items:center;justify-content:center;gap:8px;flex:1;
+                      background:linear-gradient(135deg,#0ea5e9 0%,#0369a1 100%);
+                      color:#fff;font-weight:700;font-size:13px;padding:10px 16px;
+                      border-radius:8px;text-decoration:none;
+                      box-shadow:0 3px 10px rgba(14,165,233,0.35);letter-spacing:0.02em;
+                      transition:background .15s,box-shadow .15s,letter-spacing .15s;"
+               onmouseover="this.style.background='linear-gradient(135deg,#38bdf8 0%,#0284c7 100%)';this.style.boxShadow='0 8px 24px rgba(3,105,161,0.55)';this.style.letterSpacing='0.06em';"
+               onmouseout="this.style.background='linear-gradient(135deg,#0ea5e9 0%,#0369a1 100%)';this.style.boxShadow='0 3px 10px rgba(14,165,233,0.35)';this.style.letterSpacing='0.02em';">
+                <span style="font-size:15px">🛡️</span> <?php esc_html_e( 'View Cyber and Devtools', 'cloudscale-devtools' ); ?>
+            </a>
         </div>
         <?php
     }

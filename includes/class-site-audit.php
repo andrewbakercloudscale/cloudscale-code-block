@@ -468,6 +468,69 @@ class CSDT_Site_Audit {
                     'fix_label' => 'Disable Public WP-Cron',
                 ];
             } )(),
+            ( function () {
+                $file_mods_disabled = defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS;
+                // Cross-check the file directly — OPcache may still have the old version
+                // even after the constant was removed from wp-config.php.
+                if ( $file_mods_disabled ) {
+                    $cfg_raw = @file_get_contents( ABSPATH . 'wp-config.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+                    if ( $cfg_raw !== false && ! preg_match( "/define\s*\(\s*['\"]DISALLOW_FILE_MODS['\"]\s*,\s*true\s*\)/i", $cfg_raw ) ) {
+                        $file_mods_disabled = false; // removed from file; constant only persists in this process
+                    }
+                }
+                $updater_disabled   = ( defined( 'AUTOMATIC_UPDATER_DISABLED' ) && AUTOMATIC_UPDATER_DISABLED )
+                                   || ( defined( 'WP_AUTO_UPDATE_CORE' ) && WP_AUTO_UPDATE_CORE === false );
+                $disabled = $file_mods_disabled || $updater_disabled;
+
+                if ( $file_mods_disabled ) {
+                    $detail = 'DISALLOW_FILE_MODS is set to true in wp-config.php. This blocks WordPress auto-updates, prevents security patches from installing, and removes the Delete button from plugins. Fix removes only this constant; DISALLOW_FILE_EDIT (blocks the in-admin code editor) is left intact.';
+                } elseif ( $updater_disabled ) {
+                    $detail = 'AUTOMATIC_UPDATER_DISABLED or WP_AUTO_UPDATE_CORE=false is set in wp-config.php. WordPress will not auto-install security patches.';
+                } else {
+                    $detail = 'WordPress automatic updates are enabled and will install minor security releases automatically.';
+                }
+
+                $cfg_writable = is_writable( ABSPATH . 'wp-config.php' );
+                return [
+                    'id'          => 'enable_auto_updates',
+                    'title'       => $disabled
+                        ? 'Automatic updates are disabled — security patches will not auto-install'
+                        : 'Automatic updates are enabled',
+                    'detail'      => $detail,
+                    'fixed'       => ! $disabled,
+                    'fix_label'   => 'Enable Auto Updates',
+                    'risk'        => 'moderate',
+                    'confirm_msg' => $file_mods_disabled && $cfg_writable
+                        ? "This will remove define('DISALLOW_FILE_MODS', true) from wp-config.php. WordPress, plugins, and themes will be able to auto-update and the plugin Delete button will be restored."
+                        : null,
+                ];
+            } )(),
+            ( function () {
+                if ( ! function_exists( 'get_plugins' ) ) {
+                    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+                }
+                $all_plugins    = get_plugins();
+                $active_plugins = (array) get_option( 'active_plugins', [] );
+                $inactive = array_filter( $all_plugins, fn( $data, $k ) => ! in_array( $k, $active_plugins, true ), ARRAY_FILTER_USE_BOTH );
+                $count    = count( $inactive );
+                $names    = implode( ', ', array_map( fn( $d ) => $d['Name'], array_slice( $inactive, 0, 3 ) ) );
+                if ( $count > 3 ) { $names .= ' and ' . ( $count - 3 ) . ' more'; }
+                return [
+                    'id'          => 'delete_inactive_plugins',
+                    'title'       => $count > 0
+                        ? sprintf( '%d inactive plugin%s sitting on disk unpatched', $count, $count === 1 ? '' : 's' )
+                        : 'No inactive plugins — disk is clean',
+                    'detail'      => $count > 0
+                        ? sprintf( '%d deactivated plugin%s (%s) remain on disk. Inactive plugins receive no security attention and can be exploited via path traversal or known CVEs even when not running. Delete them if you no longer need them.', $count, $count === 1 ? '' : 's', $names )
+                        : 'All installed plugins are active. No unpatched plugin files sitting on disk.',
+                    'fixed'       => $count === 0,
+                    'fix_label'   => $count > 0 ? "Delete All {$count} Inactive" : 'Nothing to delete',
+                    'risk'        => 'moderate',
+                    'confirm_msg' => $count > 0
+                        ? "This will permanently delete all {$count} inactive plugin(s) from disk: {$names}. This cannot be undone. Make sure you do not need any of them before continuing."
+                        : null,
+                ];
+            } )(),
         ];
     }
     // ── Editor Debug Panel ────────────────────────────────────────────────────
@@ -993,6 +1056,67 @@ bantime  = 86400</pre>
                 wp_send_json_success( [
                     'fixes'   => self::get_quick_fixes(),
                     'warning' => "DISABLE_WP_CRON set in wp-config.php. Scheduled events will no longer run automatically — add a system cron to keep them firing:\n*/10 * * * * wp cron event run --due-now --path=/var/www/html",
+                ] );
+                return;
+            case 'enable_auto_updates':
+                $cfg_file = ABSPATH . 'wp-config.php';
+                if ( ! is_readable( $cfg_file ) || ! is_writable( $cfg_file ) ) {
+                    wp_send_json_success( [
+                        'fixes'   => self::get_quick_fixes(),
+                        'warning' => "wp-config.php is not writable (permissions may be set to 0400). Remove the following constants manually via SSH:\n\ndefine( 'DISALLOW_FILE_MODS', true );\ndefine( 'AUTOMATIC_UPDATER_DISABLED', true );\ndefine( 'WP_AUTO_UPDATE_CORE', false );",
+                    ] );
+                    return;
+                }
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+                $cfg = file_get_contents( $cfg_file );
+                // Remove DISALLOW_FILE_MODS=true — this is the primary blocker for both updates and plugin deletion
+                $cfg = preg_replace(
+                    "/define\s*\(\s*['\"]DISALLOW_FILE_MODS['\"]\s*,\s*true\s*\)\s*;[^\n]*\n?/i",
+                    '',
+                    $cfg
+                );
+                // Remove AUTOMATIC_UPDATER_DISABLED=true
+                $cfg = preg_replace(
+                    "/define\s*\(\s*['\"]AUTOMATIC_UPDATER_DISABLED['\"]\s*,\s*true\s*\)\s*;[^\n]*\n?/i",
+                    '',
+                    $cfg
+                );
+                // Remove WP_AUTO_UPDATE_CORE=false so WP falls back to default (minor updates enabled)
+                $cfg = preg_replace(
+                    "/define\s*\(\s*['\"]WP_AUTO_UPDATE_CORE['\"]\s*,\s*false\s*\)\s*;[^\n]*\n?/i",
+                    '',
+                    $cfg
+                );
+                // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+                if ( ! $cfg || file_put_contents( $cfg_file, $cfg ) === false ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
+                    wp_send_json_error( 'Failed to write wp-config.php' );
+                    return;
+                }
+                wp_send_json_success( [ 'fixes' => self::get_quick_fixes() ] );
+                return;
+            case 'delete_inactive_plugins':
+                if ( ! function_exists( 'get_plugins' ) ) {
+                    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+                }
+                if ( ! function_exists( 'delete_plugins' ) ) {
+                    require_once ABSPATH . 'wp-admin/includes/file.php';
+                }
+                $all_plugins    = get_plugins();
+                $active_plugins = (array) get_option( 'active_plugins', [] );
+                $inactive = array_keys( array_filter( $all_plugins, fn( $data, $k ) => ! in_array( $k, $active_plugins, true ), ARRAY_FILTER_USE_BOTH ) );
+                if ( empty( $inactive ) ) {
+                    wp_send_json_success( [ 'fixes' => self::get_quick_fixes(), 'message' => 'No inactive plugins found.' ] );
+                    return;
+                }
+                $result = delete_plugins( $inactive );
+                if ( is_wp_error( $result ) ) {
+                    wp_send_json_error( $result->get_error_message() );
+                    return;
+                }
+                $count = count( $inactive );
+                wp_send_json_success( [
+                    'fixes'   => self::get_quick_fixes(),
+                    'message' => sprintf( 'Deleted %d inactive plugin%s from disk.', $count, $count === 1 ? '' : 's' ),
                 ] );
                 return;
             default:
@@ -1527,7 +1651,7 @@ PROMPT;
         $has_key = CSDT_AI_Dispatcher::has_key();
 
         if ( $has_key ) {
-            $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first). IMPORTANT: (1) Do NOT generate findings about missing backup plugins or missing SEO plugins — those are handled separately. (2) The field "template_rendered_pages" lists pages whose post_content is empty because they use a custom theme template or page builder — their actual rendered content may be substantial. Do NOT flag these as thin or empty content. (3) Do NOT generate findings about post revisions in the database — those are handled separately. (4) Do NOT generate findings about missing meta descriptions or missing SEO title tags — those are handled separately. Never recommend Yoast SEO or Rank Math — use CloudScale SEO AI only. (5) Do NOT generate findings about brute-force protection, SSH monitor, login URL hiding, or two-factor authentication — those are already reported. (6) Do NOT generate findings about disk space, WordPress core updates, or the "admin" username — those are already reported. (7) Do NOT generate findings about passkey or WebAuthn authentication status — those are handled separately. (8) Do NOT generate findings about WP-Cron health, expired transients, or DISABLE_WP_CRON — those are handled separately. (9) Do NOT generate findings about autoloaded options or wp_options autoload size — those are handled separately. (10) Do NOT generate findings about the default featured image, default post thumbnail, or broken/missing default images — those are handled separately. (11) Do NOT generate findings about thin content, stub posts, near-zero word count, or average post word count being below any threshold — those are handled separately. (12) Do NOT generate findings about missing featured images on individual posts/pages (non-default) or overall featured image coverage — those are handled separately. (13) Do NOT generate findings about duplicate page titles or duplicate post titles — those are handled separately. (14) Do NOT generate findings about wp-config.php file permissions, readability, or writability — those are handled separately.';
+            $system = 'You are a WordPress site auditor. You receive structured JSON data about a WordPress site and must return a JSON array of findings. Each finding must be a JSON object with these exact keys: category (string: "SEO", "Content", "Performance", "Database", "Security", or "Plugins"), severity ("critical", "high", "medium", "low", or "info"), title (string, max 80 chars), detail (string, 1-3 sentences explaining the issue), fix (string, 1-2 sentences of specific actionable advice), affected (string, e.g. "14 pages", "wp_options table", "All posts"). Return ONLY the raw JSON array, no markdown, no code fences, no explanation. Order findings by severity (critical first). IMPORTANT: (1) Do NOT generate findings about missing backup plugins or missing SEO plugins — those are handled separately. (2) The field "template_rendered_pages" lists pages whose post_content is empty because they use a custom theme template or page builder — their actual rendered content may be substantial. Do NOT flag these as thin or empty content. (3) Do NOT generate findings about post revisions in the database — those are handled separately. (4) Do NOT generate findings about missing meta descriptions or missing SEO title tags — those are handled separately. Never recommend Yoast SEO or Rank Math — use CloudScale SEO AI only. (5) Do NOT generate findings about brute-force protection, SSH monitor, login URL hiding, or two-factor authentication — those are already reported. (6) Do NOT generate findings about disk space, WordPress core updates, or the "admin" username — those are already reported. (7) Do NOT generate findings about passkey or WebAuthn authentication status — those are handled separately. (8) Do NOT generate findings about WP-Cron health, expired transients, or DISABLE_WP_CRON — those are handled separately. (9) Do NOT generate findings about autoloaded options or wp_options autoload size — those are handled separately. (10) Do NOT generate findings about the default featured image, default post thumbnail, or broken/missing default images — those are handled separately. (11) Do NOT generate findings about thin content, stub posts, near-zero word count, or average post word count being below any threshold — those are handled separately. (12) Do NOT generate findings about missing featured images on individual posts/pages (non-default) or overall featured image coverage — those are handled separately. (13) Do NOT generate findings about duplicate page titles or duplicate post titles — those are handled separately. (14) Do NOT generate findings about wp-config.php file permissions, readability, or writability — those are handled separately. (15) Do NOT generate findings about inactive or unused themes — those are handled separately. (16) Do NOT generate findings about automatic background updates being disabled, AUTOMATIC_UPDATER_DISABLED, or WP_AUTO_UPDATE_CORE — those are handled separately.';
 
             $user_msg = "Audit this WordPress site and return findings as a JSON array:\n\n" . wp_json_encode( $data, JSON_PRETTY_PRINT );
 
@@ -1554,6 +1678,8 @@ PROMPT;
                         if ( strpos( $t, 'lockout' ) !== false )                                            return false;
                         if ( strpos( $t, 'two-factor' ) !== false || strpos( $t, '2fa' ) !== false )        return false;
                         if ( strpos( $t, 'login url' ) !== false )                                          return false;
+                        if ( strpos( $t, 'inactive theme' ) !== false || strpos( $t, 'unused theme' ) !== false ) return false;
+                        if ( strpos( $t, 'auto update' ) !== false || strpos( $t, 'auto-update' ) !== false || strpos( $t, 'automatic update' ) !== false || strpos( $t, 'background update' ) !== false ) return false;
                         return true;
                     } ) );
                     // Always append cross-sell and all rule-based findings even with AI
@@ -1723,6 +1849,23 @@ PROMPT;
         $active_count   = count( $active_slugs );
         $inactive_count = count( $all_plugins ) - $active_count;
 
+        // ── Inactive themes ──
+        $all_themes           = wp_get_themes();
+        $active_theme_slug    = get_option( 'stylesheet' );
+        $parent_theme_slug    = get_option( 'template' );
+        $inactive_theme_count = 0;
+        $inactive_theme_names = [];
+        foreach ( $all_themes as $slug => $theme ) {
+            if ( $slug !== $active_theme_slug && $slug !== $parent_theme_slug ) {
+                ++$inactive_theme_count;
+                $inactive_theme_names[] = $theme->get( 'Name' );
+            }
+        }
+
+        // ── Auto-update constants ──
+        $auto_updates_disabled = ( defined( 'AUTOMATIC_UPDATER_DISABLED' ) && AUTOMATIC_UPDATER_DISABLED )
+                              || ( defined( 'WP_AUTO_UPDATE_CORE' ) && WP_AUTO_UPDATE_CORE === false );
+
         // ── Cross-sell: backup & SEO plugin detection ──
         $backup_slugs = [ 'cloudscale-backup', 'updraftplus', 'backwpup', 'backup-backup',
                           'duplicator', 'duplicator-pro', 'backupbuddy', 'blogvault-real-time-backup',
@@ -1862,8 +2005,11 @@ PROMPT;
             'cron_overdue'        => $cron_overdue,
             'revision_count'      => $revision_count,
             'orphan_postmeta'     => $orphan_postmeta,
-            'active_plugins'      => $active_count,
-            'inactive_plugins'    => $inactive_count,
+            'active_plugins'       => $active_count,
+            'inactive_plugins'     => $inactive_count,
+            'inactive_themes'      => $inactive_theme_count,
+            'inactive_theme_names' => $inactive_theme_names,
+            'auto_updates_disabled' => $auto_updates_disabled,
             'has_backup_plugin'   => $has_backup,
             'has_seo_plugin'      => $has_seo,
             'wp_debug'            => $debug_on,
@@ -2159,14 +2305,42 @@ PROMPT;
             ];
         }
 
-        if ( $d['inactive_plugins'] > 3 ) {
+        if ( ( $d['inactive_plugins'] ?? 0 ) >= 1 ) {
+            $n   = $d['inactive_plugins'];
+            $sev = $n >= 6 ? 'high' : ( $n >= 3 ? 'medium' : 'low' );
             $findings[] = [
                 'category' => 'Plugins',
-                'severity' => 'medium',
-                'title'    => "{$d['inactive_plugins']} inactive plugins still installed",
-                'detail'   => "Inactive plugins don't run, but their files still exist on disk, expanding your attack surface. If a vulnerability is discovered in an inactive plugin it can still be exploited.",
-                'fix'      => 'Delete all plugins you are not using. Go to Plugins → deactivate and delete rather than just deactivate.',
-                'affected' => "{$d['inactive_plugins']} plugins",
+                'severity' => $sev,
+                'title'    => "{$n} inactive " . ( $n === 1 ? 'plugin' : 'plugins' ) . ' still installed',
+                'detail'   => "Inactive plugins don't run, but their files still exist on disk. If a vulnerability is discovered in an inactive plugin it can still be exploited via directory traversal or file-inclusion attacks.",
+                'fix'      => 'Delete every plugin you are not actively using. Go to Plugins, filter by Inactive, and delete each one — deactivating is not enough.',
+                'affected' => "{$n} inactive " . ( $n === 1 ? 'plugin' : 'plugins' ),
+            ];
+        }
+
+        if ( ( $d['inactive_themes'] ?? 0 ) >= 1 ) {
+            $n    = $d['inactive_themes'];
+            $sev  = $n >= 3 ? 'medium' : 'low';
+            $names = ! empty( $d['inactive_theme_names'] ) ? ' (' . implode( ', ', $d['inactive_theme_names'] ) . ')' : '';
+            $findings[] = [
+                'category' => 'Security',
+                'severity' => $sev,
+                'title'    => "{$n} inactive " . ( $n === 1 ? 'theme' : 'themes' ) . ' still installed',
+                'detail'   => "Unused themes sit on disk with their full PHP code intact. An attacker who gains write access can activate an inactive theme to run arbitrary code. WordPress itself recommends keeping only themes you actually use.",
+                'fix'      => 'Go to Appearance → Themes, click each unused theme, and delete it. You only need your active theme and its parent theme (if applicable).',
+                'affected' => "{$n} inactive " . ( $n === 1 ? 'theme' : 'themes' ) . $names,
+            ];
+        }
+
+        if ( ! empty( $d['auto_updates_disabled'] ) ) {
+            $findings[] = [
+                'category'   => 'Security',
+                'severity'   => 'high',
+                'title'      => 'WordPress automatic background updates are disabled',
+                'detail'     => 'WordPress releases security patches as minor updates (e.g. 6.9.x). With auto-updates disabled your site will not apply these patches automatically, leaving it exposed until you update manually.',
+                'fix'        => 'Remove or change the AUTOMATIC_UPDATER_DISABLED / WP_AUTO_UPDATE_CORE constant in wp-config.php. Click Fix It to have this done automatically.',
+                'fix_action' => 'enable_auto_updates',
+                'affected'   => 'wp-config.php',
             ];
         }
 
