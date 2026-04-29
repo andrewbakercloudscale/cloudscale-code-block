@@ -40,8 +40,10 @@ done < <(grep -rl "$CURRENT_VER" "$REPO_DIR" --include="*.php" --include="*.js" 
 # version string, so a drifted constant (e.g. left at an older patch) is never updated.
 sed -i '' "s/const VERSION\s*=\s*'[^']*'/const VERSION      = '$NEW_VER'/" "$MAIN_PHP"
 # Sync readme.txt and main PHP into repo/ so SVN trunk always has correct version.
-cp "$REPO_DIR/readme.txt" "$REPO_DIR/repo/readme.txt"
-sed -i '' "s/^ \* Version:.*/ * Version:     $NEW_VER/" "$REPO_DIR/repo/cs-code-block.php"
+if [ -d "$REPO_DIR/repo" ]; then
+  cp "$REPO_DIR/readme.txt" "$REPO_DIR/repo/readme.txt"
+  sed -i '' "s/^ \* Version:.*/ * Version:     $NEW_VER/" "$REPO_DIR/repo/cs-code-block.php"
+fi
 # ─────────────────────────────────────────────────────────────────────────────
 
 # PHP syntax check — abort before packaging if any file has a parse error

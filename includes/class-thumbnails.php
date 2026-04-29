@@ -1248,7 +1248,7 @@ class CSDT_Thumbnails {
         if ( ! is_singular( 'post' ) ) { return; }
         wp_register_style( 'csdt-hero-styles', false ); // phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion
         wp_enqueue_style( 'csdt-hero-styles' );
-        wp_add_inline_style( 'csdt-hero-styles', '.single .wp-post-image{aspect-ratio:1200/630;object-fit:cover;width:100%;display:block;height:auto}' );
+        wp_add_inline_style( 'csdt-hero-styles', '.single .wp-post-image{width:100%;display:block;height:auto}' );
     }
 
     // ─── Private: full URL diagnostic ────────────────────────────────────
